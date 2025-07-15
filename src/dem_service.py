@@ -17,6 +17,8 @@ from scipy.interpolate import griddata
 from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import unary_union
 from src.source_selector import DEMSourceSelector
+from src.enhanced_source_selector import EnhancedSourceSelector
+from src.gpxz_client import GPXZConfig
 
 # Configure GDAL logging to suppress non-critical errors
 import rasterio.env
@@ -75,8 +77,31 @@ class DEMService:
         # Thread lock for thread-safe dataset access
         self._dataset_lock = threading.RLock()
         
-        # Initialize source selector
-        self.source_selector = DEMSourceSelector(settings)
+        # Initialize enhanced source selector with multi-source support
+        use_s3 = getattr(settings, 'USE_S3_SOURCES', False)
+        use_apis = getattr(settings, 'USE_API_SOURCES', False)
+        
+        gpxz_config = None
+        if use_apis and hasattr(settings, 'GPXZ_API_KEY') and settings.GPXZ_API_KEY:
+            gpxz_config = GPXZConfig(
+                api_key=settings.GPXZ_API_KEY,
+                daily_limit=getattr(settings, 'GPXZ_DAILY_LIMIT', 100),
+                rate_limit_per_second=getattr(settings, 'GPXZ_RATE_LIMIT', 1)
+            )
+        
+        # Use enhanced source selector if multi-source features are enabled
+        if use_s3 or use_apis:
+            self.source_selector = EnhancedSourceSelector(
+                config=settings.DEM_SOURCES,
+                use_s3=use_s3,
+                use_apis=use_apis,
+                gpxz_config=gpxz_config
+            )
+            logger.info(f"Initialized enhanced source selector (S3: {use_s3}, APIs: {use_apis})")
+        else:
+            # Fall back to original source selector for local-only mode
+            self.source_selector = DEMSourceSelector(settings)
+            logger.info("Initialized basic source selector (local mode)")
         
         # Configure GDAL environment to suppress certain errors
         self._configure_gdal_environment()
@@ -287,6 +312,25 @@ class DEMService:
             logger.info(f"Created transformer for {dem_source_id}: WGS84 -> {dem_crs}")
         
         return self._transformer_cache[dem_source_id]
+
+    async def get_elevation_for_point(self, latitude: float, longitude: float,
+                                     dem_source_id: Optional[str] = None) -> Optional[float]:
+        """Get elevation with automatic source selection using enhanced multi-source selector"""
+        
+        # If enhanced source selector is available, use resilient API
+        if hasattr(self.source_selector, 'get_elevation_with_resilience'):
+            try:
+                result = await self.source_selector.get_elevation_with_resilience(latitude, longitude)
+                return result.get('elevation_m')
+            except Exception as e:
+                logger.error(f"Enhanced source selector failed: {e}")
+                # Fall back to traditional method
+                elevation, _, _ = self.get_elevation_at_point(latitude, longitude, dem_source_id, auto_select=True)
+                return elevation
+        else:
+            # Use traditional method
+            elevation, _, _ = self.get_elevation_at_point(latitude, longitude, dem_source_id, auto_select=True)
+            return elevation
 
     def get_elevation_at_point(self, latitude: float, longitude: float, dem_source_id: Optional[str] = None, 
                               auto_select: bool = True) -> Tuple[Optional[float], str, Optional[str]]:
@@ -1111,8 +1155,17 @@ class DEMService:
         """Get coverage summary from the source selector."""
         return self.source_selector.get_coverage_summary()
 
-    def close(self):
-        """Close all cached datasets."""
+    async def close(self):
+        """Close all cached datasets and enhanced source selector resources."""
+        # Close enhanced source selector if it exists
+        if hasattr(self.source_selector, 'close'):
+            try:
+                await self.source_selector.close()
+                logger.info("Enhanced source selector closed")
+            except Exception as e:
+                logger.warning(f"Error closing enhanced source selector: {e}")
+        
+        # Close cached datasets
         for dataset in self._dataset_cache.values():
             dataset.close()
         self._dataset_cache.clear()

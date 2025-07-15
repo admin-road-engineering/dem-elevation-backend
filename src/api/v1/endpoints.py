@@ -1,10 +1,11 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from src.config import Settings, get_settings
 from src.dem_service import DEMService
+from src.auth import get_current_user
 from src.models import (
     PointRequest, LineRequest, PathRequest, ContourDataRequest,
     PointResponse, LineResponse, PathResponse, ContourDataResponse,
@@ -89,7 +90,8 @@ async def get_source_info(
 @router.post("/point", response_model=PointResponse)
 async def get_elevation_point(
     request: PointRequest,
-    service: DEMService = Depends(get_dem_service)
+    service: DEMService = Depends(get_dem_service),
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
 ) -> PointResponse:
     """Get elevation for a single point."""
     try:

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "startCommand": "uvicorn src.main:app --host 0.0.0.0 --port $PORT --workers 2 --access-log",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 120,
+    "healthcheckInterval": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5
+  },
+  "hooks": {
+    "postDeploy": "python scripts/post_deploy_smoke_test.py --url $RAILWAY_SERVICE_URL --timeout 60"
+  },
+  "environments": {
+    "production": {
+      "variables": {
+        "LOG_LEVEL": "INFO",
+        "SUPPRESS_GDAL_ERRORS": "true",
+        "PYTHONPATH": "/app",
+        "GDAL_DISABLE_READDIR_ON_OPEN": "YES",
+        "GDAL_HTTP_TIMEOUT": "30"
+      }
+    }
+  }
+}

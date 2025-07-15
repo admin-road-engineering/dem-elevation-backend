@@ -1,0 +1,26 @@
+[phases.setup]
+nixPkgs = ["python311", "gdal", "gcc", "python311Packages.pip", "proj"]
+
+[phases.install]
+cmds = [
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  "python -c 'import src.config; print(\"Config validation passed\")'",
+  "python -c 'from src.auth import AuthConfig; print(\"Auth module imports successfully\")'",
+  "python -c 'import rasterio; import fiona; print(\"GDAL/PROJ dependencies available\")'",
+  "python scripts/switch_environment.py local --validate-only || echo 'Environment validation completed'"
+]
+
+[start]
+cmd = "uvicorn src.main:app --host 0.0.0.0 --port $PORT --workers 2 --access-log"
+
+[variables]
+PYTHONPATH = "/app"
+GDAL_DISABLE_READDIR_ON_OPEN = "YES"
+GDAL_HTTP_TIMEOUT = "30"
+GDAL_HTTP_CONNECTTIMEOUT = "30"
+PROJ_NETWORK = "ON"
