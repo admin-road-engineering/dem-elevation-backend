@@ -1,0 +1,35 @@
+name: dem-backend-fixed
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core Python
+  - python=3.11
+  
+  # NumPy first (to avoid ABI mismatches)
+  - numpy=1.26.4
+  
+  # Geospatial stack (exact versions for ABI compatibility)
+  - rasterio=1.3.9
+  - fiona=1.10.1
+  - gdal=3.10.2
+  - pyproj=3.6.1
+  - shapely=2.0.4
+  
+  # Scientific computing
+  - scipy=1.13.1
+  - matplotlib=3.8.4
+  
+  # Development tools
+  - pip
+  
+  # Python packages via pip (to avoid conda conflicts)
+  - pip:
+    - fastapi==0.111.0
+    - uvicorn[standard]==0.30.1
+    - pydantic==2.7.3
+    - pydantic-settings==2.3.3
+    - boto3==1.34.0
+    - scikit-image==0.24.0
+    - httpx==0.25.0
+    - PyJWT==2.10.1

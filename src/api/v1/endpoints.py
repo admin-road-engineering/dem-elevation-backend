@@ -10,7 +10,10 @@ from src.models import (
     PointRequest, LineRequest, PathRequest, ContourDataRequest,
     PointResponse, LineResponse, PathResponse, ContourDataResponse,
     LegacyContourDataResponse, GeoJSONFeatureCollection, ContourStatistics,
-    DEMPoint, ErrorResponse, SourceSelectionRequest, SourceSelectionResponse
+    DEMPoint, ErrorResponse, SourceSelectionRequest, SourceSelectionResponse,
+    # New standardized models
+    StandardCoordinate, PointsRequest, LineRequest_Standard, PathRequest_Standard,
+    StandardElevationResult, StandardMetadata, StandardResponse, StandardErrorResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -379,4 +382,68 @@ async def get_coverage_summary(
         
     except Exception as e:
         logger.error(f"Error getting coverage summary: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting coverage summary: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error getting coverage summary: {str(e)}")
+
+# =============================================================================
+# NEW STANDARDIZED API ENDPOINTS
+# =============================================================================
+
+@router.post("/points", response_model=StandardResponse, summary="Get elevations for multiple discrete coordinates")
+async def get_elevation_points(
+    request: PointsRequest,
+    service: DEMService = Depends(get_dem_service)
+) -> StandardResponse:
+    """Get elevations for multiple discrete coordinates (batch endpoint)."""
+    try:
+        if not request.points:
+            raise HTTPException(status_code=400, detail="Points list cannot be empty")
+        
+        # Convert to format expected by existing service
+        points_data = []
+        for i, point in enumerate(request.points):
+            points_data.append({
+                "latitude": point.lat,
+                "longitude": point.lon,
+                "id": i
+            })
+        
+        # Use existing path service for batch processing
+        elevations, dem_source_used, message = await run_in_threadpool(
+            service.get_elevations_for_path,
+            points_data,
+            request.source
+        )
+        
+        # Convert to standardized response format
+        results = []
+        successful_points = 0
+        
+        for elev in elevations:
+            elevation_value = elev["elevation_m"]
+            if elevation_value is not None:
+                successful_points += 1
+            
+            results.append(StandardElevationResult(
+                lat=elev["input_latitude"],
+                lon=elev["input_longitude"],
+                elevation=elevation_value,
+                data_source=dem_source_used,
+                resolution=1.0  # TODO: Get actual resolution from source
+            ))
+        
+        metadata = StandardMetadata(
+            total_points=len(results),
+            successful_points=successful_points
+        )
+        
+        return StandardResponse(
+            results=results,
+            metadata=metadata
+        )
+        
+    except ValueError as e:
+        logger.error(f"ValueError in points elevation: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error in points elevation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

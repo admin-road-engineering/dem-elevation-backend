@@ -1,0 +1,111 @@
+{
+  "timestamp": "2025-07-16T11:05:22.336496",
+  "duration_seconds": 7.102053,
+  "summary": {
+    "total_tests": 7,
+    "passed": 5,
+    "failed": 2,
+    "success_rate": 71.42857142857143
+  },
+  "services": {
+    "GPXZ.io": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "success_rate": 100.0
+    },
+    "AWS S3": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "success_rate": 100.0
+    },
+    "Main Platform": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "success_rate": 0.0
+    },
+    "DEM Backend": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "success_rate": 0.0
+    }
+  },
+  "detailed_results": [
+    {
+      "service": "GPXZ.io",
+      "test": "API Key Check",
+      "success": true,
+      "error": "",
+      "response_time_ms": 0,
+      "additional_info": {
+        "key_length": 28
+      }
+    },
+    {
+      "service": "GPXZ.io",
+      "test": "Direct API Test",
+      "success": true,
+      "error": "",
+      "response_time_ms": 759.5779895782471,
+      "additional_info": {
+        "elevation": null
+      }
+    },
+    {
+      "service": "AWS S3",
+      "test": "Credentials Check",
+      "success": true,
+      "error": "",
+      "response_time_ms": 0,
+      "additional_info": {
+        "access_key_length": 20
+      }
+    },
+    {
+      "service": "AWS S3",
+      "test": "Primary Bucket Access",
+      "success": true,
+      "error": "",
+      "response_time_ms": 328.7656307220459,
+      "additional_info": {
+        "bucket_name": "road-engineering-elevation-data"
+      }
+    },
+    {
+      "service": "AWS S3",
+      "test": "List Objects Test",
+      "success": true,
+      "error": "",
+      "response_time_ms": 37.50896453857422,
+      "additional_info": {
+        "object_count": 10,
+        "sample_objects": [
+          "act-elvis/elevation/1m-dem/z55/ACT2015/ACT2015_4ppm_6586070_55_0002_0002_1m.tif",
+          "act-elvis/elevation/1m-dem/z55/ACT2015/ACT2015_4ppm_6606046_55_0002_0002_1m.tif",
+          "act-elvis/elevation/1m-dem/z55/ACT2015/ACT2015_4ppm_6606048_55_0002_0002_1m.tif",
+          "act-elvis/elevation/1m-dem/z55/ACT2015/ACT2015_4ppm_6606050_55_0002_0002_1m.tif",
+          "act-elvis/elevation/1m-dem/z55/ACT2015/ACT2015_4ppm_6606052_55_0002_0002_1m.tif"
+        ]
+      }
+    },
+    {
+      "service": "Main Platform",
+      "test": "Production API",
+      "success": false,
+      "error": "[Errno 11001] getaddrinfo failed",
+      "response_time_ms": 0,
+      "additional_info": {}
+    },
+    {
+      "service": "DEM Backend",
+      "test": "Local Service Health",
+      "success": false,
+      "error": "Service not running or connection failed",
+      "response_time_ms": 0,
+      "additional_info": {}
+    }
+  ]
+}

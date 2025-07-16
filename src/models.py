@@ -26,6 +26,31 @@ class PathRequest(BaseModel):
     points: List[PathPoint]
     dem_source_id: Optional[str] = None
 
+# New standardized models for GPXZ-style API
+class StandardCoordinate(BaseModel):
+    """Standardized coordinate model for new API endpoints."""
+    lat: float = Field(..., ge=-90, le=90)
+    lon: float = Field(..., ge=-180, le=180)
+
+class PointsRequest(BaseModel):
+    """Request model for batch points endpoint."""
+    points: List[StandardCoordinate]
+    source: Optional[str] = None
+
+class LineRequest_Standard(BaseModel):
+    """Request model for line sampling endpoint."""
+    start: StandardCoordinate
+    end: StandardCoordinate
+    num_points: int = Field(..., ge=2, le=1000)
+    source: Optional[str] = None
+
+class PathRequest_Standard(BaseModel):
+    """Request model for complex path sampling endpoint."""
+    path: List[StandardCoordinate] = Field(..., min_items=2)
+    num_points: int = Field(..., ge=2, le=1000)
+    interpolation: str = Field(default="geodesic", regex="^(geodesic|linear)$")
+    source: Optional[str] = None
+
 class PolygonBounds(BaseModel):
     """Represents a polygon area for contour data generation."""
     polygon_coordinates: List[Coordinate] = Field(..., min_items=3, description="List of coordinates defining the polygon boundary")
@@ -74,6 +99,40 @@ class PathResponse(BaseModel):
     crs: str = "EPSG:4326"
     dem_source_used: str
     message: Optional[str] = None
+
+# New standardized response models
+class StandardElevationResult(BaseModel):
+    """Standardized elevation result for new API endpoints."""
+    lat: float
+    lon: float
+    elevation: Optional[float]
+    data_source: str
+    resolution: Optional[float] = None
+    interpolation: Optional[str] = None
+    distance_m: Optional[float] = None  # For line/path results
+    sequence: Optional[int] = None      # For line/path results
+
+class StandardMetadata(BaseModel):
+    """Standardized metadata for new API responses."""
+    total_points: int
+    successful_points: int
+    crs: str = "EPSG:4326"
+    units: str = "meters"
+    attribution_url: str = "https://dem-api.road.engineering/attribution"
+    total_distance_m: Optional[float] = None      # For line/path results
+    path_segments: Optional[int] = None           # For path results
+    interpolation: Optional[str] = None           # For line/path results
+
+class StandardResponse(BaseModel):
+    """Standardized response format for new API endpoints."""
+    status: str = "OK"
+    results: List[StandardElevationResult]
+    metadata: StandardMetadata
+
+class StandardErrorResponse(BaseModel):
+    """Standardized error response format."""
+    status: str = "ERROR"
+    error: Dict[str, Any]
 
 class DEMPoint(BaseModel):
     """Represents a native DEM point with grid coordinates."""
