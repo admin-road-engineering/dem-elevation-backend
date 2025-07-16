@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
 from typing import Dict, Any, List, Optional
@@ -11,14 +12,34 @@ from src.models import (
     PointResponse, LineResponse, PathResponse, ContourDataResponse,
     LegacyContourDataResponse, GeoJSONFeatureCollection, ContourStatistics,
     DEMPoint, ErrorResponse, SourceSelectionRequest, SourceSelectionResponse,
+    # Frontend-specific models
+    FrontendContourDataRequest, FrontendContourDataResponse,
     # New standardized models
     StandardCoordinate, PointsRequest, LineRequest_Standard, PathRequest_Standard,
-    StandardElevationResult, StandardMetadata, StandardResponse, StandardErrorResponse
+    StandardElevationResult, StandardMetadata, StandardResponse, StandardErrorResponse,
+    StandardErrorDetail
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/elevation", tags=["elevation"])
+
+def create_error_response(status_code: int, message: str, details: Optional[str] = None) -> StandardErrorResponse:
+    """Create a standardized error response."""
+    return StandardErrorResponse(
+        status="ERROR",
+        error=StandardErrorDetail(
+            code=status_code,
+            message=message,
+            details=details,
+            timestamp=datetime.utcnow().isoformat() + "Z"
+        )
+    )
+
+def raise_standard_http_exception(status_code: int, message: str, details: Optional[str] = None):
+    """Raise an HTTPException with standardized error format."""
+    error_response = create_error_response(status_code, message, details)
+    raise HTTPException(status_code=status_code, detail=error_response.dict())
 
 # Global DEM service instance (initialized on startup)
 dem_service: DEMService = None
@@ -214,8 +235,68 @@ async def get_elevation_path(
         logger.error(f"Unexpected error in path elevation: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.post("/contour-data", response_model=ContourDataResponse)
+@router.post("/contour-data", response_model=FrontendContourDataResponse)
 async def generate_contour_data(
+    request: FrontendContourDataRequest,
+    service: DEMService = Depends(get_dem_service)
+) -> FrontendContourDataResponse:
+    """
+    Generate grid elevation data for contour generation within a polygon area.
+    
+    This endpoint returns native DEM points as a grid for frontend contour processing,
+    matching the exact format expected by the main backend's contour service.
+    """
+    try:
+        if not request.area_bounds.polygon_coordinates:
+            raise HTTPException(status_code=400, detail="Polygon coordinates cannot be empty")
+        
+        if len(request.area_bounds.polygon_coordinates) < 3:
+            raise HTTPException(status_code=400, detail="Polygon must have at least 3 coordinates")
+        
+        # Convert coordinates to the format expected by the service
+        polygon_coords = [(coord.latitude, coord.longitude) for coord in request.area_bounds.polygon_coordinates]
+        
+        # Run blocking DEM operations in thread pool to get grid points
+        dem_points, grid_info, dem_source_used, error_message = await run_in_threadpool(
+            service.get_dem_points_in_polygon,
+            polygon_coords,
+            50000,  # max_points
+            request.grid_resolution_m,  # sampling_interval_m
+            request.source  # dem_source_id
+        )
+        
+        if error_message:
+            raise HTTPException(status_code=400, detail=error_message)
+        
+        if not dem_points:
+            raise HTTPException(status_code=400, detail="No elevation points could be generated for the specified area")
+        
+        # Convert to response model format
+        response_points = []
+        for point in dem_points:
+            response_points.append(DEMPoint(**point))
+        
+        return FrontendContourDataResponse(
+            status="OK",
+            dem_points=response_points,
+            total_points=len(response_points),
+            dem_source_used=dem_source_used,
+            grid_info=grid_info,
+            crs="EPSG:4326",
+            message="Contour data generated successfully."
+        )
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"ValueError in contour data generation: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error in contour data generation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.post("/contour-data/geojson", response_model=ContourDataResponse)
+async def generate_geojson_contour_data(
     request: ContourDataRequest,
     service: DEMService = Depends(get_dem_service)
 ) -> ContourDataResponse:

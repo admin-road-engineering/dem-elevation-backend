@@ -18,13 +18,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 #### Starting Service
 - **Local development**: `uvicorn src.main:app --host 0.0.0.0 --port 8001 --reload`
+- **Frontend integration**: Service runs on port 8001 with CORS enabled for direct frontend access
 - **Legacy batch script**: `scripts\start_dem_backend.bat` (Windows)
 - **Docker**: `docker-compose up --build`
 
+#### Frontend Integration Support
+- **Direct API access**: Service now supports direct frontend calls (hybrid architecture)
+- **CORS enabled for**: `localhost:5173`, `localhost:5174`, `localhost:3001`
+- **New contour endpoint**: `POST /api/v1/elevation/contour-data` for grid elevation data
+- **Standardized errors**: All endpoints return consistent error format
+
 ### Testing
+
+#### Unit and Integration Tests
 - **Run all tests**: `pytest tests/` (requires pytest to be installed)
 - **Run specific test**: `pytest tests/test_elevation_precision.py`
 - **Test files are located in**: `tests/` directory with comprehensive coverage including boundary tests, precision tests, and source selection tests
+
+#### API Endpoint Testing
+- **Health check**: `curl http://localhost:8001/api/v1/health`
+- **Test contour endpoint**:
+```bash
+curl -X POST "http://localhost:8001/api/v1/elevation/contour-data" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "area_bounds": {
+      "polygon_coordinates": [
+        {"latitude": -27.4698, "longitude": 153.0251},
+        {"latitude": -27.4705, "longitude": 153.0258},
+        {"latitude": -27.4712, "longitude": 153.0265},
+        {"latitude": -27.4698, "longitude": 153.0251}
+      ]
+    },
+    "grid_resolution_m": 10.0
+  }'
+```
+- **Test CORS**: Use browser dev tools from `localhost:5173` to verify cross-origin requests work
 
 ### Virtual Environment
 - **Activate**: `.\.venv\Scripts\activate.bat` (Windows)
@@ -118,16 +147,20 @@ This DEM Backend is a **specialized microservice** that serves as the **primary 
 - **Contour line generation for terrain visualization**
 - **Professional engineering standards compliance**
 
-### Integration with Main Platform
+### Integration with Main Platform (Hybrid Architecture)
 ```
-Frontend (React/Vercel) → Main API (FastAPI/Railway) → DEM Backend (This Service) → S3 DEM Files
+Frontend (React/Vercel) → DEM Backend (Direct) → S3 DEM Files
+Frontend (React/Vercel) → Main API (FastAPI/Railway) → DEM Backend → S3 DEM Files
 ```
 
-**Primary Integration Points:**
+**Integration Points:**
 - **Main Backend URL**: `http://localhost:3001` (development) / `https://api.road.engineering` (production)
 - **DEM Backend URL**: `http://localhost:8001` (development) / `https://dem-api.road.engineering` (production)
-- **Key Endpoint**: `/api/v1/elevation/path` - Batch elevation requests for road alignments
+- **Direct Frontend Access**: `/api/v1/elevation/contour-data` - Grid elevation data for contour generation
+- **Main Backend Proxy**: `/api/v1/elevation/path` - Batch elevation requests for road alignments
 - **Data Volume**: 3.6TB of high-resolution DEM files in AWS S3 (ap-southeast-2)
+
+**CORS Configuration**: Enables direct frontend access from `localhost:5173`, `localhost:5174`, and `localhost:3001`
 
 ### Core Service Architecture
 This is a **FastAPI-based elevation service** that provides elevation data from multiple DEM (Digital Elevation Model) sources including:
@@ -150,10 +183,12 @@ This is a **FastAPI-based elevation service** that provides elevation data from 
 
 3. **API Endpoints** (`src/api/v1/endpoints.py`)
    - Point elevation: `/v1/elevation/point`
+   - Batch points: `/v1/elevation/points`
    - Line elevation: `/v1/elevation/line` 
    - Path elevation: `/v1/elevation/path`
+   - **NEW**: Contour data: `/v1/elevation/contour-data` - Grid elevation sampling for contour generation
    - Source management: `/v1/elevation/sources`
-   - Contour data extraction for native DEM points
+   - Standardized error responses across all endpoints
 
 4. **Configuration System** (`src/config.py`)
    - Pydantic-based settings with environment variable support

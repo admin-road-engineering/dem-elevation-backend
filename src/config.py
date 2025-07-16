@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     REQUIRE_AUTH: bool = Field(default=False, description="Whether to require authentication for protected endpoints")
     
     # CORS and main platform integration
-    CORS_ORIGINS: str = Field(default="http://localhost:3001,http://localhost:5173", description="Comma-separated list of allowed CORS origins")
+    CORS_ORIGINS: str = Field(default="http://localhost:3001,http://localhost:5173,http://localhost:5174", description="Comma-separated list of allowed CORS origins")
     MAIN_BACKEND_URL: str = Field(default="http://localhost:3001", description="Main platform backend URL")
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

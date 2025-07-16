@@ -48,7 +48,7 @@ class PathRequest_Standard(BaseModel):
     """Request model for complex path sampling endpoint."""
     path: List[StandardCoordinate] = Field(..., min_items=2)
     num_points: int = Field(..., ge=2, le=1000)
-    interpolation: str = Field(default="geodesic", regex="^(geodesic|linear)$")
+    interpolation: str = Field(default="geodesic", pattern="^(geodesic|linear)$")
     source: Optional[str] = None
 
 class PolygonBounds(BaseModel):
@@ -63,6 +63,13 @@ class ContourDataRequest(BaseModel):
     minor_contour_interval_m: float = Field(1.0, ge=0.1, description="Interval for minor contour lines in meters")
     major_contour_interval_m: float = Field(5.0, ge=0.1, description="Interval for major contour lines in meters")
     dem_source_id: Optional[str] = None
+
+# Frontend-specific contour data request (matching their requirements)
+class FrontendContourDataRequest(BaseModel):
+    """Request model matching frontend requirements for contour data."""
+    area_bounds: PolygonBounds
+    grid_resolution_m: float = Field(10.0, ge=1.0, le=50.0, description="Grid resolution in meters")
+    source: Optional[str] = None
 
 # Response Models
 class PointResponse(BaseModel):
@@ -129,10 +136,17 @@ class StandardResponse(BaseModel):
     results: List[StandardElevationResult]
     metadata: StandardMetadata
 
+class StandardErrorDetail(BaseModel):
+    """Standardized error detail structure."""
+    code: int = Field(description="HTTP status code")
+    message: str = Field(description="Human-readable error message")
+    details: Optional[str] = Field(None, description="Additional error details")
+    timestamp: str = Field(description="ISO 8601 timestamp of the error")
+
 class StandardErrorResponse(BaseModel):
     """Standardized error response format."""
     status: str = "ERROR"
-    error: Dict[str, Any]
+    error: StandardErrorDetail
 
 class DEMPoint(BaseModel):
     """Represents a native DEM point with grid coordinates."""
@@ -193,6 +207,17 @@ class LegacyContourDataResponse(BaseModel):
     grid_info: Dict[str, Any] = Field(description="Information about the DEM grid (resolution, extent, etc.)")
     crs: str = "EPSG:4326"
     message: Optional[str] = None
+
+# Frontend-specific response model (matching their requirements)
+class FrontendContourDataResponse(BaseModel):
+    """Response model matching frontend requirements for contour data."""
+    status: str = "OK"
+    dem_points: List[DEMPoint] = Field(description="Grid elevation points for contour generation")
+    total_points: int = Field(description="Total number of points returned")
+    dem_source_used: str = Field(description="DEM source that was used")
+    grid_info: Dict[str, Any] = Field(description="Grid metadata including dimensions and bounds")
+    crs: str = "EPSG:4326"
+    message: str = Field(description="Success message")
 
 # Error Models
 class ErrorResponse(BaseModel):
