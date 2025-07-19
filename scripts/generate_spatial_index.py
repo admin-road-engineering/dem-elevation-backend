@@ -55,17 +55,15 @@ class SpatialIndexGenerator:
                 "coverage_summary": {}
             }
             
-            # Define S3 directories to scan
-            directories_to_scan = [
-                "csiro-elvis/elevation/1m-dem/z56/",
-                "dawe-elvis/elevation/50cm-dem/z56/", 
-                "ga-elvis/elevation/1m-dem/ausgeoid/z55/",
-                "griffith-elvis/elevation/50cm-dem/z55/",
-                "act-elvis/",
-                "ga-elvis/elevation/1m-dem/ausgeoid/"
-            ]
+            # Auto-discover ALL directories containing .tif files
+            logger.info("🔍 Auto-discovering all directories with .tif files...")
+            directories_to_scan = self._discover_all_tif_directories(s3_client, settings.AWS_S3_BUCKET_NAME)
             
-            for directory in directories_to_scan:
+            logger.info(f"📁 Found {len(directories_to_scan)} directories with .tif files:")
+            for directory in sorted(directories_to_scan):
+                logger.info(f"   📂 {directory}")
+            
+            for directory in sorted(directories_to_scan):
                 logger.info(f"Scanning directory: {directory}")
                 
                 # Extract UTM zone from directory path
@@ -127,6 +125,36 @@ class SpatialIndexGenerator:
             logger.error(f"❌ Error generating spatial index: {e}")
             raise
     
+    def _discover_all_tif_directories(self, s3_client, bucket_name: str) -> List[str]:
+        """Discover all directories in the bucket that contain .tif files"""
+        directories_with_tifs = set()
+        
+        try:
+            # Use paginator to handle large buckets
+            paginator = s3_client.get_paginator('list_objects_v2')
+            page_iterator = paginator.paginate(Bucket=bucket_name)
+            
+            for page in page_iterator:
+                if 'Contents' in page:
+                    for obj in page['Contents']:
+                        key = obj['Key']
+                        
+                        # Check if this is a .tif file
+                        if key.lower().endswith('.tif') or key.lower().endswith('.tiff'):
+                            # Extract directory path
+                            directory = '/'.join(key.split('/')[:-1]) + '/'
+                            directories_with_tifs.add(directory)
+                            
+                            # Log progress every 50 discoveries
+                            if len(directories_with_tifs) % 50 == 0:
+                                logger.info(f"   🔍 Found {len(directories_with_tifs)} directories so far...")
+            
+        except Exception as e:
+            logger.error(f"❌ Error discovering directories: {e}")
+            raise
+            
+        return sorted(list(directories_with_tifs))
+    
     def _extract_utm_zone(self, directory_path: str) -> str:
         """Extract UTM zone from directory path"""
         # Look for patterns like z56, z55, etc.
@@ -134,13 +162,27 @@ class SpatialIndexGenerator:
         if utm_match:
             return f"z{utm_match.group(1)}"
         
-        # Default zone based on directory content
+        # State-based zone assignment
         if "act-elvis" in directory_path:
             return "z55"  # ACT is in zone 55
+        elif "nsw-elvis" in directory_path:
+            return "z56"  # Most NSW is in zone 56
+        elif "qld-elvis" in directory_path:
+            return "z56"  # Most QLD is in zone 56  
+        elif "tas-elvis" in directory_path:
+            return "z55"  # Tasmania is in zone 55
         elif "ga-elvis/elevation/1m-dem/ausgeoid/" in directory_path:
             return "national"  # National coverage
         else:
-            return "unknown"
+            # Try to determine from path structure
+            if "/z54/" in directory_path:
+                return "z54"
+            elif "/z55/" in directory_path:
+                return "z55"
+            elif "/z56/" in directory_path:
+                return "z56"
+            else:
+                return "unknown"
     
     def _scan_s3_directory(self, s3_client, bucket_name: str, directory: str) -> List[Dict]:
         """Scan S3 directory for .tif files"""
