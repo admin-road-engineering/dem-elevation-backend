@@ -1,0 +1,381 @@
+{
+  "schema_version": "1.0",
+  "last_updated": "2024-01-17",
+  "description": "DEM elevation sources configuration for spatial coverage-based selection",
+  "elevation_sources": [
+    {
+      "id": "act_elvis",
+      "name": "Australian Capital Territory LiDAR",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/act-elvis/",
+      "crs": "EPSG:3577",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "NSW Elvis",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -35.9,
+        "max_lat": -35.1,
+        "min_lon": 148.7,
+        "max_lon": 149.4
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2019-2021",
+        "point_density": "8 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00AA00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "csiro_qld_z56",
+      "name": "Queensland/NSW 1m LiDAR (CSIRO)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/csiro-elvis/elevation/1m-dem/z56/",
+      "crs": "EPSG:32756",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "CSIRO",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -29.0,
+        "max_lat": -25.0,
+        "min_lon": 152.0,
+        "max_lon": 154.0
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2023",
+        "point_density": "4 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00AA00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "dawe_qld_z56_burnett",
+      "name": "Queensland 50cm LiDAR (DAWE)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/50cm-dem/z56/",
+      "crs": "EPSG:32756",
+      "resolution_m": 0.5,
+      "data_type": "LiDAR",
+      "provider": "DAWE",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -28.0,
+        "max_lat": -24.0,
+        "min_lon": 150.0,
+        "max_lon": 153.0
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.05m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2018-2021",
+        "point_density": "8 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00DD00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "ga_vic_z55",
+      "name": "Victoria 1m LiDAR (GA)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/z55/",
+      "crs": "EPSG:32755",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "GA",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -39.2,
+        "max_lat": -34.0,
+        "min_lon": 140.9,
+        "max_lon": 150.2
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2012-2013",
+        "point_density": "4 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00AA00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "ga_national_ausgeoid",
+      "name": "Australia National 1m DEM (GA)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/",
+      "crs": "EPSG:3577",
+      "resolution_m": 1,
+      "data_type": "DEM",
+      "provider": "GA",
+      "priority": 2,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -44.0,
+        "max_lat": -10.0,
+        "min_lon": 113.0,
+        "max_lon": 154.0
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "Various",
+        "point_density": "Variable",
+        "vertical_datum": "AHD",
+        "color": "#AA8800",
+        "opacity": 0.3
+      }
+    },
+    {
+      "id": "nz_auckland",
+      "name": "Auckland Region LiDAR",
+      "source_type": "s3",
+      "path": "s3://nz-elevation/auckland/",
+      "crs": "EPSG:2193",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "LINZ Open Data",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -37.5,
+        "max_lat": -36.0,
+        "min_lon": 174.0,
+        "max_lon": 176.0
+      },
+      "cost_per_query": 0.0,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2013-2019",
+        "point_density": "4 points/m²",
+        "vertical_datum": "NZVD2016",
+        "color": "#0080AA",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "nz_wellington",
+      "name": "Wellington Region LiDAR",
+      "source_type": "s3",
+      "path": "s3://nz-elevation/wellington/",
+      "crs": "EPSG:2193",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "LINZ Open Data",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -41.6,
+        "max_lat": -40.6,
+        "min_lon": 174.6,
+        "max_lon": 176.2
+      },
+      "cost_per_query": 0.0,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2013-2018",
+        "point_density": "4 points/m²",
+        "vertical_datum": "NZVD2016",
+        "color": "#0080AA",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "nz_canterbury",
+      "name": "Canterbury Region LiDAR",
+      "source_type": "s3",
+      "path": "s3://nz-elevation/canterbury/",
+      "crs": "EPSG:2193",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "LINZ Open Data",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -44.5,
+        "max_lat": -42.5,
+        "min_lon": 170.0,
+        "max_lon": 173.5
+      },
+      "cost_per_query": 0.0,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2015-2020",
+        "point_density": "4 points/m²",
+        "vertical_datum": "NZVD2016",
+        "color": "#0080AA",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "nz_otago",
+      "name": "Otago Region LiDAR",
+      "source_type": "s3",
+      "path": "s3://nz-elevation/otago/",
+      "crs": "EPSG:2193",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "LINZ Open Data",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -46.7,
+        "max_lat": -44.0,
+        "min_lon": 167.5,
+        "max_lon": 171.5
+      },
+      "cost_per_query": 0.0,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2016-2020",
+        "point_density": "4 points/m²",
+        "vertical_datum": "NZVD2016",
+        "color": "#0080AA",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "nz_national",
+      "name": "New Zealand National LiDAR",
+      "source_type": "s3",
+      "path": "s3://nz-elevation/",
+      "crs": "EPSG:2193",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "LINZ Open Data",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -47.3,
+        "max_lat": -34.4,
+        "min_lon": 166.4,
+        "max_lon": 178.6
+      },
+      "cost_per_query": 0.0,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2013-2021",
+        "point_density": "1-8 points/m²",
+        "vertical_datum": "NZVD2016",
+        "color": "#0080AA",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "gpxz_usa_ned",
+      "name": "USA NED 10m",
+      "source_type": "api",
+      "path": "api://gpxz",
+      "crs": "EPSG:4326",
+      "resolution_m": 10,
+      "data_type": "NED",
+      "provider": "GPXZ",
+      "priority": 2,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": 24.0,
+        "max_lat": 49.0,
+        "min_lon": -125.0,
+        "max_lon": -66.0
+      },
+      "cost_per_query": 0.01,
+      "accuracy": "±5m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "dataset": "USGS National Elevation Dataset",
+        "vertical_datum": "NAVD88",
+        "color": "#FF6600",
+        "opacity": 0.25
+      }
+    },
+    {
+      "id": "gpxz_europe_eudem",
+      "name": "Europe EU-DEM 25m",
+      "source_type": "api",
+      "path": "api://gpxz",
+      "crs": "EPSG:4326",
+      "resolution_m": 25,
+      "data_type": "EU-DEM",
+      "provider": "GPXZ",
+      "priority": 2,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": 34.0,
+        "max_lat": 71.0,
+        "min_lon": -32.0,
+        "max_lon": 45.0
+      },
+      "cost_per_query": 0.01,
+      "accuracy": "±7m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "dataset": "EU Digital Elevation Model",
+        "vertical_datum": "EVS2000",
+        "color": "#FF8800",
+        "opacity": 0.25
+      }
+    },
+    {
+      "id": "gpxz_global_srtm",
+      "name": "Global SRTM 30m",
+      "source_type": "api",
+      "path": "api://gpxz",
+      "crs": "EPSG:4326",
+      "resolution_m": 30,
+      "data_type": "SRTM",
+      "provider": "GPXZ",
+      "priority": 3,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -60.0,
+        "max_lat": 60.0,
+        "min_lon": -180.0,
+        "max_lon": 180.0
+      },
+      "cost_per_query": 0.01,
+      "accuracy": "±16m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "dataset": "Shuttle Radar Topography Mission",
+        "vertical_datum": "WGS84",
+        "color": "#FFB000",
+        "opacity": 0.15
+      }
+    }
+  ]
+}

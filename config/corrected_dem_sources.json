@@ -1,0 +1,86 @@
+{
+  "act_elvis": {
+    "path": "s3://road-engineering-elevation-data/act-elvis/",
+    "layer": null,
+    "crs": "EPSG:3577",
+    "description": "Australia ACT 1m LiDAR DEM"
+  },
+  "nz_auckland": {
+    "path": "s3://nz-elevation/auckland/",
+    "layer": null,
+    "crs": "EPSG:2193",
+    "description": "NZ Auckland 1m LiDAR DEM (LINZ Open Data)"
+  },
+  "nz_wellington": {
+    "path": "s3://nz-elevation/wellington/",
+    "layer": null,
+    "crs": "EPSG:2193",
+    "description": "NZ Wellington 1m LiDAR DEM (LINZ Open Data)"
+  },
+  "nz_canterbury": {
+    "path": "s3://nz-elevation/canterbury/",
+    "layer": null,
+    "crs": "EPSG:2193",
+    "description": "NZ Canterbury 1m LiDAR DEM (LINZ Open Data)"
+  },
+  "nz_otago": {
+    "path": "s3://nz-elevation/otago/",
+    "layer": null,
+    "crs": "EPSG:2193",
+    "description": "NZ Otago 1m LiDAR DEM (LINZ Open Data)"
+  },
+  "nz_national": {
+    "path": "s3://nz-elevation/",
+    "layer": null,
+    "crs": "EPSG:2193",
+    "description": "NZ National 1m LiDAR DEM (LINZ Open Data)"
+  },
+  "gpxz_usa_ned": {
+    "path": "api://gpxz",
+    "layer": null,
+    "crs": "EPSG:4326",
+    "description": "USA NED 10m via GPXZ API"
+  },
+  "gpxz_europe_eudem": {
+    "path": "api://gpxz",
+    "layer": null,
+    "crs": "EPSG:4326",
+    "description": "Europe EU-DEM 25m via GPXZ API"
+  },
+  "gpxz_global_srtm": {
+    "path": "api://gpxz",
+    "layer": null,
+    "crs": "EPSG:4326",
+    "description": "Global SRTM 30m via GPXZ API"
+  },
+  "csiro_qld_z56": {
+    "path": "s3://road-engineering-elevation-data/csiro-elvis/elevation/1m-dem/z56/",
+    "layer": null,
+    "crs": "EPSG:32756",
+    "description": "Queensland/NSW 1m LiDAR (CSIRO) - Clarence & Richmond Rivers"
+  },
+  "dawe_qld_z56_burnett": {
+    "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/50cm-dem/z56/",
+    "layer": null,
+    "crs": "EPSG:32756",
+    "description": "Queensland 50cm LiDAR (DAWE) - Burnett, Fitzroy, Mary Rivers"
+  },
+  "ga_vic_z55": {
+    "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/z55/",
+    "layer": null,
+    "crs": "EPSG:32755",
+    "description": "Victoria 1m LiDAR (GA) - Including Bendigo, Melbourne regions"
+  },
+  "griffith_qld_z55": {
+    "path": "s3://road-engineering-elevation-data/griffith-elvis/elevation/50cm-dem/z55/",
+    "layer": null,
+    "crs": "EPSG:32755",
+    "description": "Queensland/Victoria 50cm LiDAR (Griffith) - Multiple regional areas"
+  },
+  "ga_national_ausgeoid": {
+    "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/",
+    "layer": null,
+    "crs": "EPSG:3577",
+    "description": "Australia National 1m DEM (GA) - Multi-state coverage"
+  }
+}

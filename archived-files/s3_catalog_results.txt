@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "C:\Users\Admin\DEM Backend\run_s3_catalog_test.py", line 18, in <module>
+    exec(f.read(), globals_dict)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 315, in <module>
+  File "<string>", line 305, in main
+  File "<string>", line 263, in run_all_tests
+  File "C:\Users\Admin\miniconda3\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f680' in position 0: character maps to <undefined>

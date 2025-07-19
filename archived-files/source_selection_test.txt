@@ -1,0 +1,8 @@
+SOURCE SELECTION TEST RESULTS:
+==================================================
+Brisbane, Australia: local_dtm_gdb
+Auckland, New Zealand: local_dtm_gdb
+New York, USA: local_dtm_gdb
+Sydney, Australia: local_dtm_gdb
+==================================================
+Test completed successfully

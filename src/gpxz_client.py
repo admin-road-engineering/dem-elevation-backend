@@ -56,7 +56,14 @@ class GPXZClient:
     def __init__(self, config: GPXZConfig):
         self.config = config
         self.rate_limiter = GPXZRateLimiter(config.rate_limit_per_second)
-        self.client = httpx.AsyncClient(timeout=config.timeout)
+        self._client = None
+    
+    @property
+    def client(self) -> httpx.AsyncClient:
+        """Lazy initialization of HTTP client"""
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.config.timeout)
+        return self._client
     
     async def get_elevation_point(self, lat: float, lon: float) -> Optional[float]:
         """Get elevation for a single point"""
@@ -75,11 +82,18 @@ class GPXZClient:
             response.raise_for_status()
             data = response.json()
             
-            if "elevation" in data:
+            # Check for elevation in result object (GPXZ API format)
+            if "result" in data and "elevation" in data["result"]:
+                elevation_m = data["result"]["elevation"]
+                logger.info(f"GPXZ elevation for ({lat}, {lon}): {elevation_m}m from {data['result'].get('data_source', 'unknown')}")
+                return elevation_m
+            # Fallback to direct elevation field
+            elif "elevation" in data:
                 elevation_m = data["elevation"]
-                logger.debug(f"GPXZ elevation for ({lat}, {lon}): {elevation_m}m")
+                logger.info(f"GPXZ elevation for ({lat}, {lon}): {elevation_m}m")
                 return elevation_m
             
+            logger.warning(f"GPXZ API returned unexpected format: {data}")
             return None
             
         except NonRetryableError:
@@ -149,4 +163,6 @@ class GPXZClient:
     
     async def close(self):
         """Close the HTTP client"""
-        await self.client.aclose()
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None

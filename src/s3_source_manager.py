@@ -25,16 +25,37 @@ class DEMMetadata(BaseModel):
 class S3SourceManager:
     """Manages S3-based DEM sources with catalog support"""
     
-    def __init__(self, bucket_name: str, catalog_path: str = "dem_catalog.json"):
+    def __init__(self, bucket_name: str, catalog_path: str = "dem_catalog.json", aws_credentials: Optional[Dict] = None):
         self.bucket_name = bucket_name
         self.catalog_path = catalog_path
+        self.aws_credentials = aws_credentials
         self.s3_client = None
         self._catalog_cache = None
         
     def _get_client(self):
-        """Lazy load S3 client"""
+        """Lazy load S3 client with appropriate configuration"""
         if not self.s3_client:
-            self.s3_client = boto3.client('s3')
+            if self.bucket_name == "nz-elevation":
+                # NZ Open Data bucket - public access, no signature required
+                from botocore import UNSIGNED
+                from botocore.config import Config
+                self.s3_client = boto3.client(
+                    's3',
+                    region_name='ap-southeast-2',
+                    config=Config(signature_version=UNSIGNED)
+                )
+            else:
+                # Private bucket - requires AWS credentials
+                if self.aws_credentials:
+                    self.s3_client = boto3.client(
+                        's3',
+                        aws_access_key_id=self.aws_credentials.get('access_key_id'),
+                        aws_secret_access_key=self.aws_credentials.get('secret_access_key'),
+                        region_name=self.aws_credentials.get('region', 'ap-southeast-2')
+                    )
+                else:
+                    # Fall back to default credentials
+                    self.s3_client = boto3.client('s3')
         return self.s3_client
     
     def get_catalog(self, force_refresh: bool = False) -> Dict[str, DEMMetadata]:

@@ -1,0 +1,53 @@
+{
+  "timestamp": "2025-07-16T22:29:47.728881",
+  "success": false,
+  "results": [
+    {
+      "test": "Configuration Loading",
+      "success": true,
+      "message": "Loaded 7 DEM sources",
+      "timestamp": "2025-07-16T22:29:46.804095",
+      "details": {
+        "sources_count": 7,
+        "use_s3": true,
+        "use_api": true
+      }
+    },
+    {
+      "test": "Source Selection",
+      "success": true,
+      "message": "Selected sources for 4 locations",
+      "timestamp": "2025-07-16T22:29:46.804331",
+      "details": {
+        "Brisbane, Australia": "local_dtm_gdb",
+        "Auckland, New Zealand": "local_dtm_gdb",
+        "New York, USA": "local_dtm_gdb",
+        "Sydney, Australia": "local_dtm_gdb"
+      }
+    },
+    {
+      "test": "S3 Connectivity",
+      "success": true,
+      "message": "Found 5 S3 sources",
+      "timestamp": "2025-07-16T22:29:46.804356",
+      "details": {
+        "s3_sources_configured": 5,
+        "s3_sources_available": 5
+      }
+    },
+    {
+      "test": "Service Initialization",
+      "success": false,
+      "message": "Failed: 'DEMService' object has no attribute 'startup'",
+      "timestamp": "2025-07-16T22:29:47.457405",
+      "details": {}
+    },
+    {
+      "test": "Elevation Query",
+      "success": false,
+      "message": "Failed: 'DEMService' object has no attribute 'startup'",
+      "timestamp": "2025-07-16T22:29:47.728025",
+      "details": {}
+    }
+  ]
+}

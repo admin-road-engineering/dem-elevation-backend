@@ -128,12 +128,14 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
   -H "Content-Type: application/json" \
   -d '{"latitude": -27.4698, "longitude": 153.0251}'
 
-# Expected response format (aligned with main platform):
+# Expected response format (S3 → GPXZ → Google fallback chain):
 {
-  "elevation_m": 45.2,
-  "source": "local_dtm_gdb",
-  "coordinates": {"latitude": -27.4698, "longitude": 153.0251},
-  "metadata": {"accuracy_note": "High accuracy local DTM (±0.1m)"}
+  "latitude": -27.4698,
+  "longitude": 153.0251,
+  "elevation_m": 11.523284,
+  "crs": "EPSG:4326",
+  "dem_source_used": "gpxz_api",  // Can be: s3_sources, gpxz_api, or google_api
+  "message": null
 }
 ```
 
@@ -149,8 +151,8 @@ This DEM Backend is a **specialized microservice** that serves as the **primary 
 
 ### Integration with Main Platform (Hybrid Architecture)
 ```
-Frontend (React/Vercel) → DEM Backend (Direct) → S3 DEM Files
-Frontend (React/Vercel) → Main API (FastAPI/Railway) → DEM Backend → S3 DEM Files
+Frontend (React/Vercel) → DEM Backend (Direct) → S3 → GPXZ → Google (Fallback Chain)
+Frontend (React/Vercel) → Main API (FastAPI/Railway) → DEM Backend → S3 → GPXZ → Google (Fallback Chain)
 ```
 
 **Integration Points:**
@@ -163,10 +165,24 @@ Frontend (React/Vercel) → Main API (FastAPI/Railway) → DEM Backend → S3 DE
 **CORS Configuration**: Enables direct frontend access from `localhost:5173`, `localhost:5174`, and `localhost:3001`
 
 ### Core Service Architecture
-This is a **FastAPI-based elevation service** that provides elevation data from multiple DEM (Digital Elevation Model) sources including:
+This is a **FastAPI-based elevation service** that provides elevation data from multiple DEM (Digital Elevation Model) sources using a **priority-based fallback chain**:
+
+**Primary Sources (Priority 1):**
+- **AWS S3-hosted DEM files** - High-resolution LiDAR and DEM data (Australian & New Zealand)
+- **Australian S3 bucket** (`road-engineering-elevation-data`) - Private bucket with 214,450+ files
+- **New Zealand S3 bucket** (`nz-elevation`) - Public bucket with 1,691 files
+
+**Secondary Sources (Priority 2):**
+- **GPXZ.io API** - Global elevation data (USA NED, Europe EU-DEM, Global SRTM)
+- **Rate limited** - 100 requests/day (free tier), upgradeable for production
+
+**Fallback Sources (Priority 3):**
+- **Google Elevation API** - Global elevation fallback (2,500 requests/day free tier)
+- **Automatic failover** when GPXZ hits rate limits
+
+**Legacy Sources (Local mode only):**
 - **GeoTIFF files** (.tif/.tiff)
 - **ESRI File Geodatabases** (.gdb) with automatic layer discovery
-- **AWS S3-hosted DEM files** with transparent access (primary production data source)
 
 ### Key Components
 
@@ -176,8 +192,9 @@ This is a **FastAPI-based elevation service** that provides elevation data from 
    - CORS middleware configuration
 
 2. **DEM Service** (`src/dem_service.py`)
-   - Core elevation extraction logic
-   - Dataset caching and CRS transformations
+   - Core elevation extraction logic using **EnhancedSourceSelector**
+   - **S3 → GPXZ → Google fallback chain** implementation
+   - Dataset caching and CRS transformations for file-based sources
    - Bilinear interpolation for accurate elevation sampling
    - Thread pool for async operations
 
@@ -192,19 +209,33 @@ This is a **FastAPI-based elevation service** that provides elevation data from 
 
 4. **Configuration System** (`src/config.py`)
    - Pydantic-based settings with environment variable support
-   - DEM source definitions with automatic validation
-   - AWS S3 and GDAL error handling configuration
+   - DEM source definitions with **priority-based configuration**
+   - AWS S3, GPXZ API, and Google API credentials management
+   - Multi-environment support (local/api-test/production)
 
 5. **Data Models** (`src/models.py`)
    - Request/response models for all endpoints
    - Geographic coordinate validation
    - Error response standardization
 
-### DEM Source Selection
-- **Multi-source support**: Configure multiple DEM sources with priority-based selection
-- **Automatic source selection**: Service can automatically choose the best source based on location and resolution
-- **Source metadata**: Each source includes path, CRS, layer info, and descriptions
-- **Fallback mechanisms**: Graceful degradation when primary sources are unavailable
+6. **Enhanced Source Selector** (`src/enhanced_source_selector.py`)
+   - **S3 → GPXZ → Google fallback chain** implementation
+   - Circuit breaker pattern for external services
+   - Rate limit monitoring and cost management
+   - Async elevation retrieval with retry logic
+
+7. **External API Clients**
+   - **GPXZ Client** (`src/gpxz_client.py`) - Global elevation data via GPXZ.io API
+   - **Google Elevation Client** (`src/google_elevation_client.py`) - Google Maps Elevation API
+   - **S3 Source Manager** (`src/s3_source_manager.py`) - Multi-file S3 DEM access
+
+### DEM Source Selection (S3 → GPXZ → Google Fallback Chain)
+- **Priority-based selection**: Sources are tried in order of priority (1 = highest, 3 = lowest)
+- **Automatic failover**: If S3 sources fail, automatically falls back to GPXZ API, then Google API
+- **Circuit breaker pattern**: Prevents cascading failures with automatic recovery
+- **Rate limit awareness**: Monitors API limits and switches to fallback sources when needed
+- **Cost management**: S3 usage tracking to prevent unexpected charges during development
+- **Global coverage**: Combination of high-resolution regional data (S3) and global coverage (APIs)
 
 ### Geodatabase Handling
 - **Auto-discovery**: Automatically finds raster layers in .gdb files using common naming patterns
@@ -266,10 +297,14 @@ The service is configured to suppress non-critical GDAL errors by default (espec
 
 ### Performance Considerations
 **Critical for Production**: This service handles batch requests of up to 500 elevation points per request from the main platform. Performance optimizations include:
-- **15-minute caching** for elevation requests
+- **S3 → GPXZ → Google fallback chain** for maximum reliability and coverage
+- **Circuit breaker pattern** prevents cascading failures and reduces latency
+- **Rate limit awareness** optimizes API usage and prevents quota exhaustion
+- **15-minute caching** for elevation requests (when using file-based sources)
 - **Dataset caching** for frequently accessed DEM files
 - **Batch processing optimization** for road alignment analysis
 - **S3 integration** for scalable data storage (3.6TB of DEM files)
+- **Cost management** tracks S3 usage during development to prevent unexpected charges
 
 ### Testing Approach
 Tests cover precision validation, boundary conditions, source selection, S3 connectivity, and geodatabase access. Use pytest for running tests with comprehensive coverage of elevation extraction accuracy needed for professional engineering calculations.
@@ -383,8 +418,30 @@ if hasattr(s, 'USE_S3_SOURCES'):
 pytest tests/ -v --tb=short
 ```
 
+### Adding New DEM Data to S3
+
+When new DEM files are added to S3 buckets, the spatial index must be updated:
+
+**For Australian S3 bucket** (`road-engineering-elevation-data`):
+```bash
+python scripts/generate_spatial_index.py generate
+```
+
+**For New Zealand S3 bucket** (`nz-elevation`):
+```bash
+python scripts/generate_nz_spatial_index.py generate
+```
+
+**Then restart the service** to load the updated spatial index:
+```bash
+# Stop service (Ctrl+C) then restart
+uvicorn src.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+📖 **See [docs/S3_DATA_MANAGEMENT_GUIDE.md](docs/S3_DATA_MANAGEMENT_GUIDE.md)** for complete step-by-step instructions.
+
 ### Getting Help
 - **Logs**: Check console output for detailed error messages and source selection decisions
 - **Environment**: Use `python scripts/switch_environment.py local` to return to known working state
 - **Test suite**: Run `pytest tests/test_phase2_integration.py -v` to verify core functionality
-- **Documentation**: Refer to `docs/DEM_BACKEND_IMPLEMENTATION_PLAN.md` for detailed architecture
+- **Documentation**: Refer to `docs/IMPLEMENTATION_PLAN.md` for detailed architecture

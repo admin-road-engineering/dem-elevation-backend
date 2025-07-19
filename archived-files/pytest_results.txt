@@ -1,0 +1,29 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.5, pytest-8.4.1, pluggy-1.5.0 -- C:\Users\Admin\miniconda3\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Admin\DEM Backend
+plugins: anyio-4.9.0, asyncio-1.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... 2025-07-16 22:30:53 |     INFO |   src.logging_config | Logging configured
+2025-07-16 22:30:53 |     INFO |           src.config | 💡 GPXZ_API_KEY provided but no API sources configured. Add API sources to DEM_SOURCES to enable external elevation data.
+2025-07-16 22:30:53 |     INFO |           src.config | GPXZ API configured successfully
+2025-07-16 22:30:53 |     INFO |           src.config | ✅ Environment validation completed successfully - no issues found
+2025-07-16 22:30:53 |     INFO |           src.config | Configuration summary
+2025-07-16 22:30:53 |     INFO |             src.main | CORS configured for origins: ['http://localhost:3001', 'http://localhost:5173', 'http://localhost:5174']
+ERROR: file or directory not found: tests/test_source_selection.py
+
+collected 0 items
+
+============================== warnings summary ===============================
+..\miniconda3\Lib\site-packages\pydantic\_internal\_config.py:295
+..\miniconda3\Lib\site-packages\pydantic\_internal\_config.py:295
+  C:\Users\Admin\miniconda3\Lib\site-packages\pydantic\_internal\_config.py:295: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+..\miniconda3\Lib\site-packages\pydantic\fields.py:1011
+..\miniconda3\Lib\site-packages\pydantic\fields.py:1011
+  C:\Users\Admin\miniconda3\Lib\site-packages\pydantic\fields.py:1011: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.10/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= 4 warnings in 0.01s =============================

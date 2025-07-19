@@ -15,6 +15,7 @@ class DEMSource(BaseModel):
 class Settings(BaseSettings):
     DEM_SOURCES: Dict[str, Dict[str, Any]]  # Changed to use raw dict for backward compatibility
     DEFAULT_DEM_ID: Optional[str] = None  # Optional default DEM source ID
+    BASE_DIR: str = Field(default=".", description="Base directory for the application")
     
     # Multi-source environment settings
     USE_S3_SOURCES: bool = Field(default=False, description="Enable S3-based DEM sources")
@@ -46,6 +47,9 @@ class Settings(BaseSettings):
     GPXZ_API_KEY: Optional[str] = None
     GPXZ_DAILY_LIMIT: int = Field(default=100, description="Daily request limit for GPXZ API")
     GPXZ_RATE_LIMIT: int = Field(default=1, description="Requests per second limit for GPXZ API")
+    
+    # Google Elevation API Configuration
+    GOOGLE_ELEVATION_API_KEY: Optional[str] = None
     
     # Source selection settings
     AUTO_SELECT_BEST_SOURCE: bool = Field(default=True, description="Automatically select the best available source for each location")
@@ -226,16 +230,16 @@ def validate_environment_configuration(settings: Settings) -> None:
             )
         elif not api_sources and settings.GPXZ_API_KEY:
             logger.info(
-                "💡 GPXZ_API_KEY provided but no API sources configured. "
+                "GPXZ_API_KEY provided but no API sources configured. "
                 "Add API sources to DEM_SOURCES to enable external elevation data."
             )
         
         # Validate GPXZ rate limits
         if settings.GPXZ_API_KEY:
             if settings.GPXZ_DAILY_LIMIT <= 0:
-                logger.warning("⚠️ GPXZ_DAILY_LIMIT should be > 0 for API usage")
+                logger.warning("GPXZ_DAILY_LIMIT should be > 0 for API usage")
             if settings.GPXZ_RATE_LIMIT <= 0:
-                logger.warning("⚠️ GPXZ_RATE_LIMIT should be > 0 for API usage")
+                logger.warning("GPXZ_RATE_LIMIT should be > 0 for API usage")
             else:
                 logger.info(
                     "GPXZ API configured successfully",
@@ -263,13 +267,13 @@ def validate_environment_configuration(settings: Settings) -> None:
     if warnings:
         for warning in warnings:
             try:
-                logger.warning(f"⚠️ {warning}")
+                logger.warning(f"{warning}")
             except UnicodeEncodeError:
                 logger.warning(f"WARNING: {warning}")
         logger.info(f"Environment validation completed with {len(warnings)} warnings")
     else:
         try:
-            logger.info("✅ Environment validation completed successfully - no issues found")
+            logger.info("Environment validation completed successfully - no issues found")
         except UnicodeEncodeError:
             logger.info("Environment validation completed successfully - no issues found")
     

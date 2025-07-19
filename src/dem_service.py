@@ -19,6 +19,8 @@ from shapely.ops import unary_union
 from src.source_selector import DEMSourceSelector
 from src.enhanced_source_selector import EnhancedSourceSelector
 from src.gpxz_client import GPXZConfig
+from src.coverage_database import CoverageDatabase
+from src.spatial_selector import AutomatedSourceSelector
 
 # Configure GDAL logging to suppress non-critical errors
 import rasterio.env
@@ -77,31 +79,72 @@ class DEMService:
         # Thread lock for thread-safe dataset access
         self._dataset_lock = threading.RLock()
         
-        # Initialize enhanced source selector with multi-source support
+        # Set AWS environment variables globally for GDAL/rasterio
+        import os
+        os.environ['AWS_ACCESS_KEY_ID'] = settings.AWS_ACCESS_KEY_ID
+        os.environ['AWS_SECRET_ACCESS_KEY'] = settings.AWS_SECRET_ACCESS_KEY
+        os.environ['AWS_DEFAULT_REGION'] = settings.AWS_DEFAULT_REGION
+        
+        # Check if S3 or API sources are enabled - use EnhancedSourceSelector for these
         use_s3 = getattr(settings, 'USE_S3_SOURCES', False)
         use_apis = getattr(settings, 'USE_API_SOURCES', False)
         
-        gpxz_config = None
-        if use_apis and hasattr(settings, 'GPXZ_API_KEY') and settings.GPXZ_API_KEY:
-            gpxz_config = GPXZConfig(
-                api_key=settings.GPXZ_API_KEY,
-                daily_limit=getattr(settings, 'GPXZ_DAILY_LIMIT', 100),
-                rate_limit_per_second=getattr(settings, 'GPXZ_RATE_LIMIT', 1)
-            )
-        
-        # Use enhanced source selector if multi-source features are enabled
         if use_s3 or use_apis:
+            # Use EnhancedSourceSelector for S3 → GPXZ → Google fallback chain
+            gpxz_config = None
+            if use_apis and hasattr(settings, 'GPXZ_API_KEY') and settings.GPXZ_API_KEY:
+                gpxz_config = GPXZConfig(
+                    api_key=settings.GPXZ_API_KEY,
+                    daily_limit=getattr(settings, 'GPXZ_DAILY_LIMIT', 100),
+                    rate_limit_per_second=getattr(settings, 'GPXZ_RATE_LIMIT', 1)
+                )
+            
+            google_api_key = getattr(settings, 'GOOGLE_ELEVATION_API_KEY', None)
+            
+            # Prepare AWS credentials for S3 access
+            aws_credentials = None
+            if use_s3 and hasattr(settings, 'AWS_ACCESS_KEY_ID') and settings.AWS_ACCESS_KEY_ID:
+                aws_credentials = {
+                    'access_key_id': settings.AWS_ACCESS_KEY_ID,
+                    'secret_access_key': settings.AWS_SECRET_ACCESS_KEY,
+                    'region': settings.AWS_DEFAULT_REGION
+                }
+            
             self.source_selector = EnhancedSourceSelector(
                 config=settings.DEM_SOURCES,
                 use_s3=use_s3,
                 use_apis=use_apis,
-                gpxz_config=gpxz_config
+                gpxz_config=gpxz_config,
+                google_api_key=google_api_key,
+                aws_credentials=aws_credentials
             )
+            self.using_spatial_selector = False
             logger.info(f"Initialized enhanced source selector (S3: {use_s3}, APIs: {use_apis})")
         else:
-            # Fall back to original source selector for local-only mode
-            self.source_selector = DEMSourceSelector(settings)
-            logger.info("Initialized basic source selector (local mode)")
+            # For local-only mode, try spatial coverage system first
+            try:
+                # Load spatial coverage database
+                config_path = getattr(settings, 'DEM_SOURCES_CONFIG_PATH', 'config/dem_sources.json')
+                coverage_db = CoverageDatabase(config_path)
+                
+                # Initialize automated source selector
+                self.source_selector = AutomatedSourceSelector(coverage_db)
+                self.using_spatial_selector = True
+                
+                logger.info(f"Initialized spatial coverage selector with {len(coverage_db.sources)} sources")
+                
+                # Log coverage summary
+                stats = coverage_db.get_stats()
+                logger.info(f"Source statistics: {stats['enabled_sources']} enabled, "
+                           f"resolution {stats['resolution_range']['min']}-{stats['resolution_range']['max']}m")
+                           
+            except Exception as e:
+                logger.warning(f"Failed to initialize spatial selector, falling back to basic: {e}")
+                
+                # Fallback to basic selector system
+                self.source_selector = DEMSourceSelector(settings)
+                self.using_spatial_selector = False
+                logger.info("Initialized basic source selector (local mode)")
         
         # Configure GDAL environment to suppress certain errors
         self._configure_gdal_environment()
@@ -162,6 +205,69 @@ class DEMService:
             logger.info("GDAL environment configured to suppress non-critical errors")
         else:
             logger.info("GDAL error suppression disabled - showing all GDAL messages")
+
+    def _resolve_source_id(self, dem_source_id: str) -> str:
+        """
+        Resolve spatial source ID to actual DEM source ID in settings.
+        
+        For spatial sources that aren't directly available in settings,
+        we'll return the default source for now (future: API/S3 integration).
+        """
+        if dem_source_id in self.settings.DEM_SOURCES:
+            return dem_source_id
+        
+        if self.using_spatial_selector:
+            # For sources not in settings (like API sources), fall back to default
+            logger.warning(f"Spatial source '{dem_source_id}' not available in settings, using default: {self.default_dem_id}")
+            return self.default_dem_id
+        
+        return dem_source_id
+
+    def _get_elevation_from_gpxz_api(self, latitude: float, longitude: float, source_id: str) -> Tuple[Optional[float], str, Optional[str]]:
+        """Get elevation from GPXZ API for API sources."""
+        logger.warning(f"Using legacy GPXZ client for {source_id} - this should use enhanced source selector")
+        try:
+            # Create GPXZ client directly if we have the API key
+            if hasattr(self.settings, 'GPXZ_API_KEY') and self.settings.GPXZ_API_KEY:
+                from src.gpxz_client import GPXZClient, GPXZConfig
+                import asyncio
+                
+                # Create GPXZ config and client
+                gpxz_config = GPXZConfig(
+                    api_key=self.settings.GPXZ_API_KEY,
+                    daily_limit=getattr(self.settings, 'GPXZ_DAILY_LIMIT', 100),
+                    rate_limit_per_second=getattr(self.settings, 'GPXZ_RATE_LIMIT', 1)
+                )
+                gpxz_client = GPXZClient(gpxz_config)
+                
+                # Create an async wrapper for the synchronous call
+                async def get_gpxz_elevation():
+                    try:
+                        elevation = await gpxz_client.get_elevation_point(latitude, longitude)
+                        return elevation
+                    finally:
+                        # Always close the client
+                        await gpxz_client.close()
+                
+                # Run the async function
+                try:
+                    loop = asyncio.get_event_loop()
+                    elevation = loop.run_until_complete(get_gpxz_elevation())
+                except RuntimeError:
+                    # If no event loop is running, create a new one
+                    elevation = asyncio.run(get_gpxz_elevation())
+                
+                if elevation is not None:
+                    logger.info(f"GPXZ API returned elevation {elevation}m for ({latitude}, {longitude})")
+                    return elevation, source_id, None
+                else:
+                    return None, source_id, "GPXZ API returned no elevation data"
+            else:
+                return None, source_id, "GPXZ API key not available"
+                
+        except Exception as e:
+            logger.error(f"Error getting elevation from GPXZ API: {e}")
+            return None, source_id, f"GPXZ API error: {str(e)}"
 
     def _detect_geodatabase_path(self, path: str) -> Tuple[str, Optional[str]]:
         """
@@ -238,9 +344,18 @@ class DEMService:
         logger.warning(f"No valid raster layers found in geodatabase: {gdb_path}")
         return None
 
-    def _get_dataset(self, dem_source_id: str) -> rasterio.DatasetReader:
+    def _get_dataset(self, dem_source_id: str, lat: float = None, lon: float = None) -> rasterio.DatasetReader:
         """Get or create cached dataset for the given DEM source."""
-        if dem_source_id not in self._dataset_cache:
+        # Create cache key that includes coordinates for S3 directory sources
+        cache_key = dem_source_id
+        if lat is not None and lon is not None:
+            # Use coordinates in cache key for S3 directory sources
+            dem_source = self.settings.DEM_SOURCES.get(dem_source_id, {})
+            source_path = dem_source.get("path", "")
+            if source_path.startswith('s3://') and source_path.endswith('/'):
+                cache_key = f"{dem_source_id}_{lat:.4f}_{lon:.4f}"
+        
+        if cache_key not in self._dataset_cache:
             if dem_source_id not in self.settings.DEM_SOURCES:
                 raise ValueError(f"DEM source '{dem_source_id}' not found in configuration")
             
@@ -251,18 +366,18 @@ class DEMService:
             
             try:
                 # Open the dataset using the detected path and layer
-                dataset = self._open_dataset_with_fallbacks(gdb_path, layer_name)
-                self._dataset_cache[dem_source_id] = dataset
-                logger.info(f"Successfully opened and cached dataset for source: '{dem_source_id}'")
+                dataset = self._open_dataset_with_fallbacks(gdb_path, layer_name, lat, lon)
+                self._dataset_cache[cache_key] = dataset
+                logger.info(f"Successfully opened and cached dataset for source: '{cache_key}'")
                 
             except Exception as e:
                 dem_path = dem_source["path"]
                 logger.error(f"Failed to open DEM from source '{dem_source_id}' at path '{dem_path}': {e}")
                 raise ValueError(f"Could not access or open DEM file: {dem_path}. Reason: {e}")
         
-        return self._dataset_cache[dem_source_id]
+        return self._dataset_cache[cache_key]
 
-    def _open_dataset_with_fallbacks(self, path: str, layer_name: Optional[str] = None) -> rasterio.DatasetReader:
+    def _open_dataset_with_fallbacks(self, path: str, layer_name: Optional[str] = None, lat: float = None, lon: float = None) -> rasterio.DatasetReader:
         """
         Opens a dataset, with specific handling for geodatabases.
         """
@@ -276,8 +391,35 @@ class DEMService:
         logger.info(f"Attempting to open dataset: {rasterio_path}")
         
         try:
-            # Use a GDAL environment that doesn't suppress critical errors
-            with Env(CPL_LOG_ERRORS='ON'):
+            # Handle S3 paths with special directory discovery
+            if rasterio_path.startswith('s3://'):
+                # Check if this is a directory path that needs file discovery
+                if rasterio_path.endswith('/'):
+                    logger.info(f"S3 directory detected: {rasterio_path}")
+                    # This is handled by _discover_s3_files method
+                    discovered_files = self._discover_s3_files(rasterio_path)
+                    if discovered_files:
+                        # Use coordinate-based file selection if coordinates available
+                        selected_file = self._select_best_s3_file(discovered_files, rasterio_path, lat, lon)
+                        logger.info(f"Selected S3 file: {selected_file}")
+                        rasterio_path = selected_file.replace('s3://', '/vsis3/')
+                    else:
+                        raise ValueError(f"No DEM files found in S3 directory: {rasterio_path}")
+                else:
+                    # Single file, convert to /vsis3/ format
+                    rasterio_path = rasterio_path.replace('s3://', '/vsis3/')
+                    logger.info(f"Converting S3 file: {rasterio_path}")
+            
+            # Use GDAL environment with error logging and appropriate S3 configuration
+            env_config = {'CPL_LOG_ERRORS': 'ON'}
+            
+            # Configure for unsigned requests if using nz-elevation bucket
+            if '/vsis3/nz-elevation/' in rasterio_path:
+                env_config['AWS_NO_SIGN_REQUEST'] = 'YES'
+                env_config['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+                logger.info(f"Configuring unsigned access for NZ elevation bucket: {rasterio_path}")
+            
+            with Env(**env_config):
                 dataset = rasterio.open(rasterio_path)
                 if dataset.count > 0:
                     logger.info(f"Successfully opened dataset: {rasterio_path}")
@@ -291,6 +433,184 @@ class DEMService:
             logger.error(f"Failed to open dataset '{rasterio_path}'. Error: {e}")
             # Re-raise the exception to be caught by the calling function
             raise
+
+    def _discover_s3_files(self, s3_directory_path: str) -> List[str]:
+        """
+        Discover DEM files in an S3 directory
+        
+        Args:
+            s3_directory_path: S3 directory path (e.g., 's3://bucket/path/')
+            
+        Returns:
+            List of S3 file paths for DEM files
+        """
+        try:
+            import boto3
+            
+            # Parse S3 path
+            if not s3_directory_path.startswith('s3://'):
+                return []
+            
+            path_parts = s3_directory_path[5:].split('/', 1)  # Remove 's3://'
+            bucket_name = path_parts[0]
+            prefix = path_parts[1] if len(path_parts) > 1 else ""
+            
+            logger.info(f"Discovering files in S3: bucket={bucket_name}, prefix={prefix}")
+            
+            # Create S3 client with appropriate configuration
+            if bucket_name == "nz-elevation":
+                # NZ Open Data bucket - public access, no signature required
+                from botocore import UNSIGNED
+                from botocore.config import Config
+                s3 = boto3.client(
+                    's3',
+                    region_name='ap-southeast-2',
+                    config=Config(signature_version=UNSIGNED)
+                )
+            else:
+                # Private bucket - requires AWS credentials
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=self.settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=self.settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=self.settings.AWS_DEFAULT_REGION
+                )
+            
+            # List objects in the directory
+            response = s3.list_objects_v2(
+                Bucket=bucket_name,
+                Prefix=prefix,
+                MaxKeys=1000  # Reasonable limit for DEM tiles
+            )
+            
+            # Filter for DEM files (.tif, .tiff)
+            dem_files = []
+            for obj in response.get('Contents', []):
+                key = obj['Key']
+                if key.lower().endswith(('.tif', '.tiff')) and obj['Size'] > 0:
+                    full_s3_path = f"s3://{bucket_name}/{key}"
+                    dem_files.append(full_s3_path)
+            
+            logger.info(f"Found {len(dem_files)} DEM files in {s3_directory_path}")
+            
+            # Log sample files for debugging
+            for i, file_path in enumerate(dem_files[:5]):
+                logger.info(f"  Sample file {i+1}: {file_path.split('/')[-1]}")
+            
+            if len(dem_files) > 5:
+                logger.info(f"  ... and {len(dem_files) - 5} more files")
+            
+            return dem_files
+            
+        except Exception as e:
+            logger.error(f"Error discovering S3 files in {s3_directory_path}: {e}")
+            return []
+
+    def _select_best_s3_file(self, dem_files: List[str], original_path: str, lat: float = None, lon: float = None) -> str:
+        """
+        Select the best DEM file from available S3 files
+        
+        Uses spatial index if available, otherwise falls back to heuristics
+        
+        Args:
+            dem_files: List of S3 DEM file paths
+            original_path: Original directory path for context
+            lat: Latitude for coordinate-based selection
+            lon: Longitude for coordinate-based selection
+            
+        Returns:
+            Selected S3 file path
+        """
+        if not dem_files:
+            raise ValueError("No DEM files provided for selection")
+        
+        # Try spatial index first if coordinates provided
+        if lat is not None and lon is not None:
+            spatial_file = self._select_file_from_spatial_index(lat, lon, original_path)
+            if spatial_file:
+                logger.info(f"Selected file from spatial index: {spatial_file}")
+                return spatial_file
+        
+        # Simple heuristic: prefer files with known geographic terms
+        # This could be enhanced with actual coordinate-based selection
+        priority_terms = ['bendigo', 'melbourne', 'brisbane', 'sydney']
+        
+        for term in priority_terms:
+            for file_path in dem_files:
+                if term.lower() in file_path.lower():
+                    logger.info(f"Selected file based on geographic term '{term}': {file_path}")
+                    return file_path
+        
+        # Fallback to first file
+        selected = dem_files[0]
+        logger.info(f"Selected first available file: {selected}")
+        return selected
+    
+    def _load_spatial_index(self) -> Optional[Dict]:
+        """Load spatial index from config file"""
+        try:
+            import json
+            from pathlib import Path
+            
+            # Check if spatial index exists
+            spatial_index_path = Path(self.settings.BASE_DIR) / "config" / "spatial_index.json"
+            if not spatial_index_path.exists():
+                return None
+            
+            with open(spatial_index_path, 'r') as f:
+                spatial_index = json.load(f)
+            
+            logger.info(f"Loaded spatial index with {spatial_index.get('file_count', 0)} files")
+            return spatial_index
+            
+        except Exception as e:
+            logger.warning(f"Failed to load spatial index: {e}")
+            return None
+    
+    def _select_file_from_spatial_index(self, lat: float, lon: float, s3_directory: str) -> Optional[str]:
+        """Select specific file using spatial index"""
+        try:
+            spatial_index = self._load_spatial_index()
+            if not spatial_index:
+                return None
+            
+            # Find files that contain this coordinate
+            matching_files = []
+            for zone, zone_data in spatial_index.get("utm_zones", {}).items():
+                for file_info in zone_data.get("files", []):
+                    bounds = file_info.get("bounds", {})
+                    if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
+                        bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
+                        
+                        # Check if this file belongs to the requested directory
+                        file_path = file_info.get("file", "")
+                        if s3_directory.rstrip('/') in file_path:
+                            matching_files.append(file_info)
+            
+            if not matching_files:
+                return None
+            
+            # Select best file (highest resolution, most recent)
+            best_file = min(matching_files, key=lambda f: (
+                self._resolution_to_meters(f.get("resolution", "1m")),
+                f.get("last_modified", "1970-01-01")
+            ))
+            
+            logger.info(f"Spatial index selected: {best_file['filename']} for ({lat}, {lon})")
+            return best_file["file"]
+            
+        except Exception as e:
+            logger.warning(f"Error using spatial index: {e}")
+            return None
+    
+    def _resolution_to_meters(self, resolution_str: str) -> float:
+        """Convert resolution string to meters for comparison"""
+        if "cm" in resolution_str:
+            return float(resolution_str.replace("cm", "")) / 100
+        elif "m" in resolution_str:
+            return float(resolution_str.replace("m", ""))
+        else:
+            return 1.0  # Default
 
     def _get_transformer(self, dem_source_id: str) -> Transformer:
         """Get or create cached transformer for WGS84 to DEM CRS conversion."""
@@ -347,11 +667,35 @@ class DEMService:
             Tuple of (elevation_m, dem_source_used, error_message)
         """
         # Auto-select best source if enabled and no specific source requested
-        if auto_select and dem_source_id is None and self.settings.AUTO_SELECT_BEST_SOURCE:
+        if auto_select and dem_source_id is None:
             try:
-                best_source_id, scores = self.source_selector.select_best_source(latitude, longitude)
-                dem_source_id = best_source_id
-                logger.debug(f"Auto-selected source '{best_source_id}' for point ({latitude}, {longitude})")
+                if self.using_spatial_selector:
+                    # Use spatial selector for automated source selection
+                    selected_source = self.source_selector.select_best_source(latitude, longitude)
+                    dem_source_id = selected_source['id']
+                    logger.debug(f"Spatial selector chose '{dem_source_id}' for ({latitude}, {longitude})")
+                elif hasattr(self.source_selector, 'get_elevation_with_resilience'):
+                    # Use EnhancedSourceSelector for S3 → GPXZ → Google fallback
+                    import asyncio
+                    try:
+                        # Try to get the current event loop
+                        loop = asyncio.get_event_loop()
+                        result = loop.run_until_complete(self.source_selector.get_elevation_with_resilience(latitude, longitude))
+                    except RuntimeError:
+                        # If no event loop is running, create a new one
+                        result = asyncio.run(self.source_selector.get_elevation_with_resilience(latitude, longitude))
+                    
+                    if result.get('success') and result.get('elevation_m') is not None:
+                        logger.info(f"Enhanced selector returned {result['elevation_m']}m from {result['source']} for ({latitude}, {longitude})")
+                        return result['elevation_m'], result['source'], None
+                    else:
+                        logger.warning(f"Enhanced selector failed for ({latitude}, {longitude}): {result}")
+                        return None, "enhanced_selector_failed", "Enhanced selector could not retrieve elevation"
+                elif self.settings.AUTO_SELECT_BEST_SOURCE:
+                    # Use legacy selector
+                    best_source_id, scores = self.source_selector.select_best_source(latitude, longitude)
+                    dem_source_id = best_source_id
+                    logger.debug(f"Legacy selector chose '{best_source_id}' for point ({latitude}, {longitude})")
             except Exception as e:
                 logger.warning(f"Failed to auto-select source, using default: {e}")
                 dem_source_id = self.default_dem_id
@@ -361,10 +705,21 @@ class DEMService:
             dem_source_id = self.default_dem_id
         
         try:
-            # Use thread lock for thread-safe dataset access
+            # Check if this is an API source that needs special handling
+            if dem_source_id in self.settings.DEM_SOURCES:
+                dem_source = self.settings.DEM_SOURCES[dem_source_id]
+                source_path = dem_source.get("path", "")
+                
+                # Handle GPXZ API sources
+                if source_path == "api://gpxz":
+                    return self._get_elevation_from_gpxz_api(latitude, longitude, dem_source_id)
+            
+            # Use thread lock for thread-safe dataset access (file-based sources)
             with self._dataset_lock:
-                dataset = self._get_dataset(dem_source_id)
-                transformer = self._get_transformer(dem_source_id)
+                # Convert spatial source ID to actual dataset if needed
+                actual_source_id = self._resolve_source_id(dem_source_id)
+                dataset = self._get_dataset(actual_source_id, latitude, longitude)
+                transformer = self._get_transformer(actual_source_id)
                 
                 # Transform coordinates from WGS84 to DEM CRS
                 x, y = transformer.transform(longitude, latitude)
@@ -1131,29 +1486,97 @@ class DEMService:
         Returns:
             Tuple of (best_source_id, all_scores_as_dicts)
         """
-        best_source_id, scores = self.source_selector.select_best_source(
-            latitude, longitude, prefer_high_resolution, max_resolution_m
-        )
-        
-        # Convert scores to dictionaries for JSON serialization
-        scores_dict = []
-        for score in scores:
-            scores_dict.append({
-                "source_id": score.source_id,
-                "score": score.score,
-                "within_bounds": score.within_bounds,
-                "resolution_m": score.resolution_m,
-                "priority": score.priority,
-                "data_source": score.data_source,
-                "year": score.year,
-                "reason": score.reason
-            })
-        
-        return best_source_id, scores_dict
+        if self.using_spatial_selector:
+            # Use spatial selector
+            try:
+                selected_source = self.source_selector.select_best_source(latitude, longitude)
+                best_source_id = selected_source['id']
+                
+                # Get detailed coverage summary for all options
+                coverage_summary = self.source_selector.get_coverage_summary(latitude, longitude)
+                
+                # Convert to legacy format for backward compatibility
+                scores_dict = []
+                if coverage_summary['all_options']:
+                    for i, option in enumerate(coverage_summary['all_options']):
+                        scores_dict.append({
+                            "source_id": option['id'],
+                            "score": 1.0 - (i * 0.1),  # Higher score for better priority
+                            "within_bounds": True,
+                            "resolution_m": option['resolution_m'],
+                            "priority": option['priority'],
+                            "data_source": option['provider'],
+                            "year": option.get('metadata', {}).get('capture_date', 'Unknown'),
+                            "reason": coverage_summary['reason'] if i == 0 else f"Alternative option #{i+1}"
+                        })
+                else:
+                    # No coverage available
+                    scores_dict.append({
+                        "source_id": "none",
+                        "score": 0.0,
+                        "within_bounds": False,
+                        "resolution_m": 0,
+                        "priority": 999,
+                        "data_source": "No coverage",
+                        "year": "N/A",
+                        "reason": coverage_summary['reason']
+                    })
+                
+                return best_source_id, scores_dict
+                
+            except Exception as e:
+                logger.error(f"Spatial selector failed: {e}")
+                # Fall back to default
+                return self.default_dem_id, [{
+                    "source_id": self.default_dem_id,
+                    "score": 0.5,
+                    "within_bounds": True,
+                    "resolution_m": 0,
+                    "priority": 1,
+                    "data_source": "Fallback",
+                    "year": "Unknown",
+                    "reason": f"Spatial selector error: {e}"
+                }]
+        else:
+            # Use legacy selector
+            best_source_id, scores = self.source_selector.select_best_source(
+                latitude, longitude, prefer_high_resolution, max_resolution_m
+            )
+            
+            # Convert scores to dictionaries for JSON serialization
+            scores_dict = []
+            for score in scores:
+                scores_dict.append({
+                    "source_id": score.source_id,
+                    "score": score.score,
+                    "within_bounds": score.within_bounds,
+                    "resolution_m": score.resolution_m,
+                    "priority": score.priority,
+                    "data_source": score.data_source,
+                    "year": score.year,
+                    "reason": score.reason
+                })
+            
+            return best_source_id, scores_dict
 
     def get_coverage_summary(self) -> Dict[str, Any]:
         """Get coverage summary from the source selector."""
-        return self.source_selector.get_coverage_summary()
+        if self.using_spatial_selector:
+            # Return spatial selector statistics
+            stats = self.source_selector.get_selector_stats()
+            return {
+                "total_sources": stats["total_configured_sources"],
+                "enabled_sources": stats["enabled_sources"],
+                "cache_performance": {
+                    "total_selections": stats["total_selections"],
+                    "cache_hits": stats["cache_hits"],
+                    "hit_rate": stats["cache_hit_rate"]
+                },
+                "selector_type": "spatial_coverage"
+            }
+        else:
+            # Use legacy coverage summary
+            return self.source_selector.get_coverage_summary()
 
     async def close(self):
         """Close all cached datasets and enhanced source selector resources."""

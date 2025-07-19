@@ -1,0 +1,143 @@
+{
+  "discovered_sources": {
+    "act_1m_dem": {
+      "path": "s3://road-engineering-elevation-data/act-elvis/elevation/1m-dem/z55/ACT2020/",
+      "crs": "EPSG:32755",
+      "description": "Act 50cm LiDAR/DEM (ACT)",
+      "file_count": 3376,
+      "total_size_gb": 33.42,
+      "geographic_areas": [
+        "Act"
+      ],
+      "utm_zones": [
+        "z55"
+      ],
+      "resolutions": [
+        "50cm"
+      ]
+    },
+    "csiro_1m_dem": {
+      "path": "s3://road-engineering-elevation-data/csiro-elvis/elevation/1m-dem/z56/RichmondRiver2023/",
+      "crs": "EPSG:32756",
+      "description": "Richmond 1m LiDAR/DEM (CSIRO)",
+      "file_count": 8921,
+      "total_size_gb": 20.16,
+      "geographic_areas": [
+        "Richmond"
+      ],
+      "utm_zones": [
+        "z56"
+      ],
+      "resolutions": [
+        "1m",
+        "50cm"
+      ]
+    },
+    "dawe_1m_dem": {
+      "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/1m-dem/z54/CooperBasin2019/",
+      "crs": "EPSG:32754",
+      "description": "Cooper 50cm LiDAR/DEM (DAWE)",
+      "file_count": 32883,
+      "total_size_gb": 81.24,
+      "geographic_areas": [
+        "Cooper"
+      ],
+      "utm_zones": [
+        "z54"
+      ],
+      "resolutions": [
+        "50cm"
+      ]
+    },
+    "dawe_50cm_dem": {
+      "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/50cm-dem/z55/Murray2021/",
+      "crs": "EPSG:32755",
+      "description": "Murray 50cm LiDAR/DEM (DAWE)",
+      "file_count": 41,
+      "total_size_gb": 0.16,
+      "geographic_areas": [
+        "Murray"
+      ],
+      "utm_zones": [
+        "z55"
+      ],
+      "resolutions": [
+        "50cm"
+      ]
+    },
+    "ga_1m_dem_z55": {
+      "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/z55/",
+      "crs": "EPSG:32755",
+      "description": "Bendigo, Nt, Sa (+1 more) 50cm LiDAR/DEM (GA)",
+      "file_count": 21422,
+      "total_size_gb": 86.56,
+      "geographic_areas": [
+        "Sa",
+        "Nt",
+        "Wa",
+        "Bendigo"
+      ],
+      "utm_zones": [
+        "z55"
+      ],
+      "resolutions": [
+        "50cm"
+      ]
+    },
+    "ga_1m_dem_z54": {
+      "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/z54/",
+      "crs": "EPSG:32754",
+      "description": "Adelaide, Vic 50cm LiDAR/DEM (GA)",
+      "file_count": 12340,
+      "total_size_gb": 54.49,
+      "geographic_areas": [
+        "Vic",
+        "Adelaide"
+      ],
+      "utm_zones": [
+        "z54"
+      ],
+      "resolutions": [
+        "50cm"
+      ]
+    },
+    "griffith_50cm_dem": {
+      "path": "s3://road-engineering-elevation-data/griffith-elvis/elevation/50cm-dem/z55/Georgetown201806_Cycle6/",
+      "crs": "EPSG:32755",
+      "description": "Australia 50cm LiDAR/DEM (GRIFFITH)",
+      "file_count": 227,
+      "total_size_gb": 0.91,
+      "geographic_areas": [],
+      "utm_zones": [
+        "z55"
+      ],
+      "resolutions": [
+        "50cm"
+      ]
+    }
+  },
+  "validation_results": {
+    "valid": {
+      "act_elvis": {
+        "path": "s3://road-engineering-elevation-data/act-elvis/",
+        "layer": null,
+        "crs": "EPSG:3577",
+        "description": "Australia ACT 1m LiDAR DEM"
+      }
+    },
+    "invalid": {
+      "nsw_elvis": {
+        "path": "s3://road-engineering-elevation-data/nsw-elvis/",
+        "layer": null,
+        "crs": "EPSG:3577",
+        "description": "Australia NSW 1m LiDAR DEM"
+      },
+      "vic_elvis": {
+        "path": "s3://road-engineering-elevation-data/vic-elvis/",
+        "layer": null,
+        "crs": "EPSG:3577",
+        "description": "Australia VIC 1m LiDAR DEM"
+      }
+    },
+    "missing_in_config": {
+      "act_1m_dem": 

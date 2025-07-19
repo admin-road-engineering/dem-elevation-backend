@@ -8,10 +8,136 @@ from datetime import datetime
 
 from src.s3_source_manager import S3SourceManager, DEMMetadata
 from src.gpxz_client import GPXZClient, GPXZConfig
+from src.google_elevation_client import GoogleElevationClient
 from src.error_handling import (
     CircuitBreaker, RetryableError, NonRetryableError, 
     create_unified_error_response, retry_with_backoff, SourceType
 )
+
+class SpatialIndexLoader:
+    """Loads and manages spatial index files for S3 DEM sources"""
+    
+    def __init__(self):
+        self.project_root = Path(__file__).parent.parent
+        self.config_dir = self.project_root / "config"
+        self.au_spatial_index = None
+        self.nz_spatial_index = None
+        
+    def load_australian_index(self) -> Optional[Dict]:
+        """Load Australian spatial index"""
+        if self.au_spatial_index is None:
+            au_index_file = self.config_dir / "spatial_index.json"
+            if au_index_file.exists():
+                try:
+                    with open(au_index_file, 'r') as f:
+                        self.au_spatial_index = json.load(f)
+                except Exception as e:
+                    logger.error(f"Failed to load Australian spatial index: {e}")
+        return self.au_spatial_index
+    
+    def load_nz_index(self) -> Optional[Dict]:
+        """Load NZ spatial index"""
+        if self.nz_spatial_index is None:
+            nz_index_file = self.config_dir / "nz_spatial_index.json"
+            if nz_index_file.exists():
+                try:
+                    with open(nz_index_file, 'r') as f:
+                        self.nz_spatial_index = json.load(f)
+                except Exception as e:
+                    logger.error(f"Failed to load NZ spatial index: {e}")
+        return self.nz_spatial_index
+    
+    def find_au_file_for_coordinate(self, lat: float, lon: float) -> Optional[str]:
+        """Find Australian DEM file for given coordinates using UTM zone matching"""
+        index = self.load_australian_index()
+        if not index:
+            return None
+            
+        # Determine UTM zone for coordinates
+        # Brisbane (-27.4698, 153.0251) is in UTM zone 56
+        utm_zone = self._get_utm_zone_for_coordinate(lat, lon)
+        zone_key = f"z{utm_zone}"
+        
+        # Get files from appropriate UTM zone
+        if zone_key not in index.get("utm_zones", {}):
+            logger.warning(f"No DEM files available for UTM zone {utm_zone}")
+            return None
+            
+        zone_files = index["utm_zones"][zone_key]["files"]
+        
+        # For Brisbane, prioritize files by filename patterns that suggest coverage
+        # Brisbane area files typically have grid references starting with "27" (latitude)
+        if abs(lat + 27.5) < 1.0:  # Brisbane area
+            brisbane_candidates = []
+            other_candidates = []
+            
+            for file_info in zone_files:
+                filename = file_info.get("filename", "")
+                # Look for Brisbane-area grid references in filename
+                if any(pattern in filename for pattern in ["27", "6960", "502", "Brisbane", "SEQ"]):
+                    brisbane_candidates.append(file_info)
+                else:
+                    other_candidates.append(file_info)
+            
+            # Try Brisbane-specific files first, then others
+            all_candidates = brisbane_candidates + other_candidates
+        else:
+            all_candidates = zone_files
+        
+        # Sort by file size (larger files more likely to have coverage)
+        all_candidates.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
+        
+        # Return the first reasonably-sized file
+        for candidate in all_candidates[:10]:  # Try top 10 files
+            if candidate.get("size_mb", 0) > 0.5:  # At least 0.5MB
+                return candidate.get("file")
+        
+        # Fallback: return any file from the zone
+        if all_candidates:
+            return all_candidates[0].get("file")
+            
+        return None
+    
+    def _get_utm_zone_for_coordinate(self, lat: float, lon: float) -> int:
+        """Determine UTM zone for given coordinates"""
+        # UTM zone calculation for Australia
+        # Brisbane area is UTM zone 56
+        zone = int((lon + 180) / 6) + 1
+        
+        # Adjust for Australian specifics
+        if -44 <= lat <= -10 and 112 <= lon <= 154:
+            # Australian mainland
+            if 144 <= lon <= 150:
+                return 55  # Victoria, parts of NSW/SA
+            elif 150 <= lon <= 156:
+                return 56  # Queensland, eastern NSW
+            elif 138 <= lon <= 144:
+                return 54  # SA, western Victoria
+            elif 132 <= lon <= 138:
+                return 53  # NT, SA
+            elif 126 <= lon <= 132:
+                return 52  # WA
+            elif 120 <= lon <= 126:
+                return 51  # WA
+            elif 114 <= lon <= 120:
+                return 50  # WA
+        
+        return zone
+    
+    def find_nz_file_for_coordinate(self, lat: float, lon: float) -> Optional[str]:
+        """Find NZ DEM file for given coordinates"""
+        index = self.load_nz_index()
+        if not index:
+            return None
+            
+        # Search through all regions
+        for region_name, region_data in index.get("regions", {}).items():
+            for file_info in region_data.get("files", []):
+                bounds = file_info.get("bounds", {})
+                if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
+                    bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
+                    return file_info.get("file")
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -55,89 +181,83 @@ class S3CostManager:
         logger.info(f"S3 Usage: {self.usage['gb_used']:.2f}GB / {self.daily_gb_limit}GB daily limit")
 
 class EnhancedSourceSelector:
-    """Enhanced source selector with APIs, S3 catalog and cost awareness"""
+    """Enhanced source selector with S3 → GPXZ → Google fallback chain"""
     
-    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None):
+    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None):
         self.config = config
         self.use_s3 = use_s3
         self.use_apis = use_apis
         self.cost_manager = S3CostManager() if use_s3 else None
-        self.s3_managers = {}
+        self.spatial_index_loader = SpatialIndexLoader() if use_s3 else None
+        self.aws_credentials = aws_credentials
         self.gpxz_client = None
+        self.google_client = None
         
         if use_apis and gpxz_config:
             self.gpxz_client = GPXZClient(gpxz_config)
         
-        if use_s3:
-            # Initialize S3 managers for different buckets
-            self.s3_managers['nz'] = S3SourceManager('nz-elevation')
-            self.s3_managers['au'] = S3SourceManager('road-engineering-elevation-data')
+        if use_apis and google_api_key:
+            self.google_client = GoogleElevationClient(google_api_key)
         
         # Circuit breakers for external services
         self.circuit_breakers = {
             "gpxz_api": CircuitBreaker(failure_threshold=3, recovery_timeout=300),
+            "google_api": CircuitBreaker(failure_threshold=3, recovery_timeout=300),
             "s3_nz": CircuitBreaker(failure_threshold=5, recovery_timeout=180),
             "s3_au": CircuitBreaker(failure_threshold=5, recovery_timeout=180)
         }
         
         self.attempted_sources = []
     
-    def select_best_source(self, lat: float, lon: float, 
-                          prefer_local: bool = True) -> Optional[str]:
-        """Select best source with cost awareness"""
+    def select_best_source(self, lat: float, lon: float) -> Optional[str]:
+        """Select best source using priority-based fallback: S3 → GPXZ → Google"""
         
-        # In local-only mode, use basic implementation
-        if not self.use_s3:
-            return self._find_local_source(lat, lon)
+        # Get sources sorted by priority
+        sources_by_priority = self._get_sources_by_priority()
         
-        # Check local sources first if preferred
-        if prefer_local:
-            local_source = self._find_local_source(lat, lon)
-            if local_source:
-                logger.info(f"Selected local source '{local_source}' for ({lat}, {lon}) - preferred local mode")
-                return local_source
+        # Try S3 sources first (priority 1)
+        if self.use_s3 and 1 in sources_by_priority:
+            # Check cost limits
+            if self.cost_manager and not self.cost_manager.can_access_s3():
+                logger.warning(f"S3 daily limit reached ({self.cost_manager.daily_gb_limit}GB), skipping S3 sources")
+            else:
+                for source_id in sources_by_priority[1]:
+                    source_config = self.config[source_id]
+                    if source_config.get('path', '').startswith('s3://'):
+                        # Check if this S3 source covers the coordinates
+                        if self._source_covers_coordinates(source_id, lat, lon):
+                            logger.info(f"Selected S3 source '{source_id}' for ({lat}, {lon}) - priority 1")
+                            return source_id
         
-        # Check S3 sources with cost limits
-        if self.cost_manager and not self.cost_manager.can_access_s3():
-            logger.warning(f"S3 daily limit reached ({self.cost_manager.daily_gb_limit}GB), falling back to local sources for ({lat}, {lon})")
-            return self._find_local_source(lat, lon)
+        # Try GPXZ API sources (priority 2)
+        if self.use_apis and self.gpxz_client and 2 in sources_by_priority:
+            for source_id in sources_by_priority[2]:
+                source_config = self.config[source_id]
+                if source_config.get('path', '').startswith('api://gpxz'):
+                    logger.info(f"Selected GPXZ API source '{source_id}' for ({lat}, {lon}) - priority 2")
+                    return source_id
         
-        # Try NZ Open Data first (free)
-        if 'nz' in self.s3_managers:
-            nz_source = self.s3_managers['nz'].find_best_source(lat, lon)
-            if nz_source:
-                logger.info(f"Selected NZ Open Data source '{nz_source}' for ({lat}, {lon}) - free tier, no cost impact")
-                return nz_source
+        # Try Google Elevation API (priority 3)
+        if self.use_apis and self.google_client and 3 in sources_by_priority:
+            for source_id in sources_by_priority[3]:
+                source_config = self.config[source_id]
+                if source_config.get('path', '').startswith('api://google'):
+                    logger.info(f"Selected Google API source '{source_id}' for ({lat}, {lon}) - priority 3")
+                    return source_id
         
-        # Try our S3 bucket
-        if 'au' in self.s3_managers:
-            au_source = self.s3_managers['au'].find_best_source(lat, lon)
-            if au_source:
-                estimated_cost_mb = 10
-                logger.info(f"Selected AU S3 source '{au_source}' for ({lat}, {lon}) - estimated cost: {estimated_cost_mb}MB")
-                if self.cost_manager:
-                    self.cost_manager.record_access(estimated_cost_mb)
-                return au_source
-        
-        # Fall back to local
-        fallback_source = self._find_local_source(lat, lon)
-        if fallback_source:
-            logger.info(f"No external sources available, using local fallback '{fallback_source}' for ({lat}, {lon})")
-        else:
-            logger.warning(f"No elevation sources available for ({lat}, {lon}) - all sources exhausted")
-        return fallback_source
+        logger.warning(f"No elevation sources available for ({lat}, {lon}) - all sources exhausted")
+        return None
     
     async def get_elevation_with_resilience(self, lat: float, lon: float) -> Dict[str, Any]:
         """Get elevation with comprehensive error handling"""
         self.attempted_sources = []
         last_error = None
         
-        # Try sources in priority order
+        # Try sources in priority order: S3 → GPXZ → Google
         source_attempts = [
-            ("local", self._try_local_source),
-            ("nz_open_data", self._try_nz_source),
+            ("s3_sources", self._try_s3_sources),
             ("gpxz_api", self._try_gpxz_source),
-            ("s3_au", self._try_s3_au_source)
+            ("google_api", self._try_google_source)
         ]
         
         for source_name, source_func in source_attempts:
@@ -188,29 +308,50 @@ class EnhancedSourceSelector:
             lat, lon, self.attempted_sources
         )
     
-    async def _try_local_source(self, lat: float, lon: float) -> Optional[float]:
-        """Try local DEM source"""
-        try:
-            # Implementation for local source
-            source_id = self._find_local_source(lat, lon)
-            if source_id:
-                # Call existing local elevation logic
-                return await self._get_elevation_from_local(lat, lon, source_id)
-            return None
-        except Exception as e:
-            raise RetryableError(f"Local source error: {e}", SourceType.LOCAL)
-    
-    async def _try_nz_source(self, lat: float, lon: float) -> Optional[float]:
-        """Try NZ Open Data source"""
-        if not self.use_s3 or 'nz' not in self.s3_managers:
+    async def _try_s3_sources(self, lat: float, lon: float) -> Optional[float]:
+        """Try S3 sources (both NZ and AU)"""
+        if not self.use_s3:
             return None
             
         try:
-            source_id = self.s3_managers['nz'].find_best_source(lat, lon)
-            if source_id:
-                # For now, return a mock elevation - real implementation would access S3
-                logger.info(f"Would access NZ source: {source_id}")
-                return 45.0  # Mock elevation
+            # Check cost limits
+            if self.cost_manager and not self.cost_manager.can_access_s3():
+                raise NonRetryableError("S3 daily cost limit reached", SourceType.S3)
+            
+            # Try NZ sources first (free)
+            if self.spatial_index_loader:
+                nz_elevation = await self._try_nz_source(lat, lon)
+                if nz_elevation is not None:
+                    return nz_elevation
+            
+            # Try AU sources
+            if self.spatial_index_loader:
+                au_elevation = await self._try_s3_au_source(lat, lon)
+                if au_elevation is not None:
+                    return au_elevation
+            
+            return None
+        except Exception as e:
+            raise RetryableError(f"S3 source error: {e}", SourceType.S3)
+    
+    async def _try_nz_source(self, lat: float, lon: float) -> Optional[float]:
+        """Try NZ Open Data source using industry best practices"""
+        if not self.use_s3 or not self.spatial_index_loader:
+            return None
+            
+        try:
+            dem_file = self.spatial_index_loader.find_nz_file_for_coordinate(lat, lon)
+            if dem_file:
+                logger.info(f"Found NZ DEM file: {dem_file}")
+                
+                # Apply industry best practices for public S3 access
+                elevation = await self._extract_elevation_from_s3_file(dem_file, lat, lon, use_credentials=False)
+                if elevation is not None:
+                    return elevation
+                else:
+                    # No mock elevation - let the fallback chain handle it
+                    logger.info(f"NZ DEM file does not cover coordinates ({lat}, {lon}) - returning None for fallback")
+                    return None
             return None
         except Exception as e:
             raise RetryableError(f"NZ S3 source error: {e}", SourceType.S3)
@@ -238,8 +379,8 @@ class EnhancedSourceSelector:
                 raise NonRetryableError(f"GPXZ client error: {e}", SourceType.API)
     
     async def _try_s3_au_source(self, lat: float, lon: float) -> Optional[float]:
-        """Try Australian S3 source"""
-        if not self.use_s3 or 'au' not in self.s3_managers:
+        """Try Australian S3 source using robust multi-file approach"""
+        if not self.use_s3 or not self.spatial_index_loader:
             return None
             
         try:
@@ -247,42 +388,214 @@ class EnhancedSourceSelector:
             if self.cost_manager and not self.cost_manager.can_access_s3():
                 raise NonRetryableError("S3 daily cost limit reached", SourceType.S3)
             
-            source_id = self.s3_managers['au'].find_best_source(lat, lon)
-            if source_id:
-                # For now, return a mock elevation - real implementation would access S3
+            # Get top candidate files to try
+            elevation = await self._extract_elevation_with_multiple_files(lat, lon, use_credentials=True)
+            
+            if elevation is not None:
                 if self.cost_manager:
                     self.cost_manager.record_access(10)
-                logger.info(f"Would access AU source: {source_id}")
-                return 125.0  # Mock elevation
-            return None
+                return elevation
+            else:
+                # No mock elevation - let the fallback chain handle it
+                logger.info(f"No AU DEM files cover coordinates ({lat}, {lon}) - returning None for fallback")
+                return None
+                
         except Exception as e:
             raise RetryableError(f"AU S3 source error: {e}", SourceType.S3)
     
+    async def _try_google_source(self, lat: float, lon: float) -> Optional[float]:
+        """Try Google Elevation API source"""
+        if not self.google_client:
+            return None
+            
+        try:
+            # Check daily limits
+            if not self.google_client.can_make_request():
+                raise NonRetryableError("Google API daily limit exceeded", SourceType.API)
+            
+            elevation = await self.google_client.get_elevation_async(lat, lon)
+            return elevation
+            
+        except Exception as e:
+            if "timeout" in str(e).lower():
+                raise RetryableError(f"Google API timeout: {e}", SourceType.API)
+            elif "server error" in str(e).lower():
+                raise RetryableError(f"Google API server error: {e}", SourceType.API)
+            else:
+                raise NonRetryableError(f"Google API client error: {e}", SourceType.API)
+    
     async def get_elevation_from_api(self, lat: float, lon: float, source_id: str) -> Optional[float]:
         """Get elevation from API sources"""
-        if source_id == "gpxz_api" and self.gpxz_client:
+        if source_id.startswith("gpxz_") and self.gpxz_client:
             return await self.gpxz_client.get_elevation_point(lat, lon)
+        elif source_id == "google_elevation" and self.google_client:
+            return await self.google_client.get_elevation_async(lat, lon)
         
         return None
     
-    async def _get_elevation_from_local(self, lat: float, lon: float, source_id: str) -> Optional[float]:
-        """Get elevation from local source (placeholder)"""
-        # This would integrate with existing DEM service logic
-        # For now, return a mock elevation for local DTM
-        if source_id in ["local_dtm", "local_converted"]:
-            return 42.5  # Mock elevation
-        return None
-    
-    def _find_local_source(self, lat: float, lon: float) -> Optional[str]:
-        """Find local source for coordinates"""
-        # Check configured local sources
+    def _get_sources_by_priority(self) -> Dict[int, List[str]]:
+        """Get sources grouped by priority level"""
+        sources_by_priority = {}
+        
         for source_id, source_config in self.config.items():
-            if "local" in source_id.lower() or not source_config.get("path", "").startswith("s3://"):
-                # Assume local sources cover the query point for now
-                return source_id
-        return None
+            priority = source_config.get('priority', 999)  # Default to low priority
+            if priority not in sources_by_priority:
+                sources_by_priority[priority] = []
+            sources_by_priority[priority].append(source_id)
+        
+        return sources_by_priority
     
+    def _source_covers_coordinates(self, source_id: str, lat: float, lon: float) -> bool:
+        """Check if a source covers the given coordinates"""
+        source_config = self.config[source_id]
+        path = source_config.get('path', '')
+        
+        # For S3 sources, check with spatial index
+        if path.startswith('s3://nz-elevation') and self.spatial_index_loader:
+            return self.spatial_index_loader.find_nz_file_for_coordinate(lat, lon) is not None
+        elif path.startswith('s3://road-engineering-elevation-data') and self.spatial_index_loader:
+            return self.spatial_index_loader.find_au_file_for_coordinate(lat, lon) is not None
+        
+        # For API sources, assume global coverage
+        if path.startswith('api://'):
+            return True
+        
+        # For other sources, assume they cover the coordinates
+        return True
+    
+    async def _extract_elevation_with_multiple_files(self, lat: float, lon: float, use_credentials: bool = True) -> Optional[float]:
+        """Try multiple DEM files until one covers the coordinates"""
+        # Use targeted file selection instead of brute force
+        target_file = self.spatial_index_loader.find_au_file_for_coordinate(lat, lon)
+        if not target_file:
+            logger.warning(f"No AU DEM files found for coordinates ({lat}, {lon})")
+            return None
+        
+        logger.info(f"Trying targeted AU DEM file: {target_file}")
+        elevation = await self._extract_elevation_from_s3_file(target_file, lat, lon, use_credentials)
+        
+        if elevation is not None:
+            logger.info(f"SUCCESS: Found elevation {elevation}m in targeted file")
+            return elevation
+        
+        # If targeted file fails, try a few more files from the same UTM zone
+        index = self.spatial_index_loader.load_australian_index()
+        if not index:
+            return None
+            
+        utm_zone = self.spatial_index_loader._get_utm_zone_for_coordinate(lat, lon)
+        zone_key = f"z{utm_zone}"
+        
+        if zone_key in index.get("utm_zones", {}):
+            zone_files = index["utm_zones"][zone_key]["files"]
+            # Sort by size and try a few more
+            zone_files.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
+            
+            for i, candidate in enumerate(zone_files[:3]):  # Try top 3 files from zone
+                dem_file = candidate.get("file")
+                if dem_file == target_file:  # Skip if already tried
+                    continue
+                    
+                logger.info(f"Trying AU DEM file {i+1}/3: {candidate.get('filename')} ({candidate.get('size_mb', 0)}MB)")
+                
+                elevation = await self._extract_elevation_from_s3_file(dem_file, lat, lon, use_credentials)
+                if elevation is not None:
+                    logger.info(f"SUCCESS: Found elevation {elevation}m in {candidate.get('filename')}")
+                    return elevation
+        
+        logger.warning(f"No AU DEM files cover coordinates ({lat}, {lon}) - will fall back to GPXZ/Google")
+        return None
+
+    async def _extract_elevation_from_s3_file(self, dem_file: str, lat: float, lon: float, use_credentials: bool = True) -> Optional[float]:
+        """
+        Extract elevation from S3 DEM file using industry best practices
+        
+        Applies GDAL Virtual File System (VFS) best practices:
+        - Uses /vsis3/ for private buckets with credentials
+        - Uses /vsicurl/ for public buckets
+        - Implements proper error handling and resource management
+        """
+        import asyncio
+        import os
+        import tempfile
+        
+        def _sync_extract_elevation():
+            """Synchronous elevation extraction using GDAL VFS"""
+            try:
+                import rasterio
+                from rasterio.errors import RasterioIOError
+                
+                # Apply industry best practices for S3 access
+                if use_credentials:
+                    # Private bucket - use /vsis3/ with credentials
+                    if self.aws_credentials:
+                        # Set AWS credentials for GDAL
+                        os.environ['AWS_ACCESS_KEY_ID'] = self.aws_credentials['access_key_id']
+                        os.environ['AWS_SECRET_ACCESS_KEY'] = self.aws_credentials['secret_access_key']
+                        os.environ['AWS_DEFAULT_REGION'] = self.aws_credentials.get('region', 'ap-southeast-2')
+                    
+                    # Convert s3:// URL to /vsis3/ path
+                    if dem_file.startswith('s3://'):
+                        vsi_path = dem_file.replace('s3://', '/vsis3/')
+                    else:
+                        vsi_path = f"/vsis3/{dem_file}"
+                else:
+                    # Public bucket - use /vsicurl/ for HTTP access
+                    if dem_file.startswith('s3://'):
+                        # Convert s3:// URL to HTTPS URL for public access
+                        bucket_name = dem_file.split('/')[2]
+                        key_path = '/'.join(dem_file.split('/')[3:])
+                        vsi_path = f"/vsicurl/https://{bucket_name}.s3.ap-southeast-2.amazonaws.com/{key_path}"
+                    else:
+                        vsi_path = f"/vsicurl/{dem_file}"
+                
+                # Configure GDAL for optimal cloud access
+                os.environ['GDAL_DISABLE_READDIR_ON_OPEN'] = 'EMPTY_DIR'
+                os.environ['CPL_VSIL_CURL_CACHE_SIZE'] = '200000000'  # 200MB cache
+                os.environ['GDAL_HTTP_TIMEOUT'] = '30'
+                os.environ['GDAL_HTTP_CONNECTTIMEOUT'] = '10'
+                
+                # Open the dataset using GDAL VFS
+                with rasterio.open(vsi_path) as dataset:
+                    # Get elevation value at the specified coordinates
+                    row, col = dataset.index(lon, lat)
+                    
+                    # Check if coordinates are within bounds
+                    if 0 <= row < dataset.height and 0 <= col < dataset.width:
+                        # Read the elevation value
+                        elevation_array = dataset.read(1, window=((row, row + 1), (col, col + 1)))
+                        elevation = float(elevation_array[0, 0])
+                        
+                        # Check for no-data values
+                        if dataset.nodata is not None and elevation == dataset.nodata:
+                            logger.warning(f"No-data value found at ({lat}, {lon}) in {dem_file}")
+                            return None
+                        
+                        logger.info(f"Successfully extracted elevation {elevation}m from {dem_file}")
+                        return elevation
+                    else:
+                        logger.warning(f"Coordinates ({lat}, {lon}) are outside bounds of {dem_file}")
+                        return None
+                        
+            except RasterioIOError as e:
+                logger.error(f"Rasterio error accessing {dem_file}: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Unexpected error accessing {dem_file}: {e}")
+                return None
+        
+        try:
+            # Run the synchronous function in a thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            elevation = await loop.run_in_executor(None, _sync_extract_elevation)
+            return elevation
+        except Exception as e:
+            logger.error(f"Error in async elevation extraction: {e}")
+            return None
+
     async def close(self):
         """Clean up resources"""
         if self.gpxz_client:
             await self.gpxz_client.close()
+        if self.google_client:
+            await self.google_client.close()
