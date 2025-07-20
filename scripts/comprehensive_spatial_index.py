@@ -16,6 +16,9 @@ from botocore.exceptions import ClientError
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# Import UTM conversion utilities
+from scripts.utm_converter import DEMFilenameParser
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,7 @@ class ComprehensiveSpatialIndexGenerator:
         self.config_dir = self.project_root / "config"
         self.config_dir.mkdir(exist_ok=True)
         self.spatial_index_file = self.config_dir / "spatial_index.json"
+        self.filename_parser = DEMFilenameParser()
         
     def generate_complete_index(self) -> Dict:
         """Generate complete spatial index by scanning entire S3 bucket"""
@@ -234,34 +238,49 @@ class ComprehensiveSpatialIndexGenerator:
                 return "unknown"
     
     def _extract_bounds_from_filename(self, filename: str) -> Optional[Dict]:
-        """Extract coordinate bounds from DEM filename"""
-        # Pattern for standard DEM files with grid coordinates
-        # Example: SomeName_3726677_56_0001_0001.tif
-        pattern = r'_(\d{7})_(\d{2})_\d{4}_\d{4}\.tiff?$'
-        match = re.search(pattern, filename)
+        """
+        Extract precise coordinate bounds from DEM filename using UTM conversion
         
-        if match:
-            easting = int(match.group(1))
-            zone = int(match.group(2))
+        Uses proper UTM to lat/lon conversion for accurate spatial indexing
+        """
+        try:
+            # Use the robust filename parser with UTM conversion
+            bounds = self.filename_parser.extract_bounds_from_filename(filename)
             
-            # Convert grid coordinates to approximate lat/lon bounds
-            # This is a simplified conversion - actual bounds would need proper UTM conversion
-            # For now, use broad regional bounds based on zone
-            if zone == 54:
-                return {"min_lat": -26.0, "max_lat": -10.0, "min_lon": 138.0, "max_lon": 144.0}
-            elif zone == 55:
-                return {"min_lat": -43.0, "max_lat": -10.0, "min_lon": 144.0, "max_lon": 150.0}
-            elif zone == 56:
-                return {"min_lat": -35.0, "max_lat": -10.0, "min_lon": 150.0, "max_lon": 156.0}
-            else:
-                return {"min_lat": -44.0, "max_lat": -9.0, "min_lon": 112.0, "max_lon": 154.0}
+            if bounds:
+                # Validate bounds are reasonable for Australia/NZ
+                if (bounds["min_lat"] >= -50 and bounds["max_lat"] <= -8 and 
+                    bounds["min_lon"] >= 110 and bounds["max_lon"] <= 180):
+                    return bounds
+            
+            # If UTM conversion fails, use regional fallback
+            logger.warning(f"UTM conversion failed for {filename}, using regional bounds")
+            return self._get_regional_bounds_fallback(filename)
+            
+        except Exception as e:
+            logger.warning(f"Error extracting bounds from {filename}: {e}")
+            return self._get_regional_bounds_fallback(filename)
+    
+    def _get_regional_bounds_fallback(self, filename: str) -> Dict[str, float]:
+        """Fallback to regional bounds based on filename content"""
+        filename_lower = filename.lower()
         
-        # Fallback patterns for other naming conventions
-        if any(pattern in filename.lower() for pattern in ['clarence', 'richmond']):
+        # State/region-based bounds (more precise than before)
+        if any(x in filename_lower for x in ['act', 'canberra']):
+            return {"min_lat": -35.9, "max_lat": -35.1, "min_lon": 148.9, "max_lon": 149.4}
+        elif any(x in filename_lower for x in ['nsw', 'sydney']):
+            return {"min_lat": -37.5, "max_lat": -28.0, "min_lon": 140.9, "max_lon": 153.6}
+        elif any(x in filename_lower for x in ['qld', 'queensland', 'brisbane']):
+            return {"min_lat": -29.2, "max_lat": -9.0, "min_lon": 137.9, "max_lon": 153.6}
+        elif any(x in filename_lower for x in ['tas', 'tasmania']):
+            return {"min_lat": -43.6, "max_lat": -39.6, "min_lon": 143.8, "max_lon": 148.5}
+        elif any(x in filename_lower for x in ['clarence', 'richmond']):
             return {"min_lat": -29.0, "max_lat": -25.0, "min_lon": 151.0, "max_lon": 154.0}
-        
-        # Default broad Australia bounds
-        return {"min_lat": -44.0, "max_lat": -9.0, "min_lon": 112.0, "max_lon": 154.0}
+        elif any(x in filename_lower for x in ['cooper', 'z54']):
+            return {"min_lat": -30.0, "max_lat": -20.0, "min_lon": 138.0, "max_lon": 144.0}
+        else:
+            # Default Australia-wide bounds (last resort)
+            return {"min_lat": -44.0, "max_lat": -9.0, "min_lon": 112.0, "max_lon": 154.0}
     
     def _extract_resolution(self, filename: str) -> str:
         """Extract resolution from filename"""

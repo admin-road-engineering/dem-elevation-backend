@@ -14,6 +14,9 @@ from datetime import datetime
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# Import UTM conversion utilities
+from scripts.utm_converter import DEMFilenameParser
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -28,6 +31,7 @@ class SpatialIndexGenerator:
         self.config_dir = self.project_root / "config"
         self.config_dir.mkdir(exist_ok=True)
         self.spatial_index_file = self.config_dir / "spatial_index.json"
+        self.filename_parser = DEMFilenameParser()
         
     def generate_complete_index(self) -> Dict:
         """Generate complete spatial index from S3 bucket"""
@@ -212,137 +216,49 @@ class SpatialIndexGenerator:
         return files_found
     
     def _extract_bounds_from_filename(self, filename: str) -> Optional[Dict]:
-        """Extract geographic bounds from filename patterns"""
+        """
+        Extract precise coordinate bounds from DEM filename using UTM conversion
         
-        # Pattern 1: ClarenceRiver2023-DEM-AHD-1m_3706680_56_0001_0001.tif
-        # Format: NAME_EASTING_ZONE_TILE_TILE.tif
-        match = re.match(r'.*_(\d{7})_(\d{2})_\d+_\d+\.tif', filename)
-        if match:
-            easting = int(match.group(1))
-            utm_zone = int(match.group(2))
-            
-            # Use regional patterns instead of UTM conversion for now
-            # This provides better accuracy for spatial indexing
-            if utm_zone == 56:  # Queensland zone
-                return {
-                    "min_lat": -29.0,
-                    "max_lat": -25.0,
-                    "min_lon": 151.0,
-                    "max_lon": 154.0
-                }
-            elif utm_zone == 55:  # Victoria zone
-                return {
-                    "min_lat": -39.0,
-                    "max_lat": -34.0,
-                    "min_lon": 143.0,
-                    "max_lon": 150.0
-                }
-        
-        # Pattern 2: E153_S28_1m_dem.tif (Easting 153, Southing 28)
-        match = re.match(r'E(\d+)_S(\d+)_.*\.tif', filename)
-        if match:
-            east = int(match.group(1))
-            south = int(match.group(2))
-            return {
-                "min_lat": -south - 1,
-                "max_lat": -south,
-                "min_lon": east,
-                "max_lon": east + 1
-            }
-        
-        # Pattern 3: Brisbane_153_-28_1m.tif (Lon 153, Lat -28)
-        match = re.match(r'.*_(\d+)_(-?\d+)_.*\.tif', filename)
-        if match:
-            lon = int(match.group(1))
-            lat = int(match.group(2))
-            return {
-                "min_lat": lat - 0.5,
-                "max_lat": lat + 0.5,
-                "min_lon": lon - 0.5,
-                "max_lon": lon + 0.5
-            }
-        
-        # Pattern 4: ACT_Tile_123_456.tif (Grid tile system)
-        match = re.match(r'.*_(\d+)_(\d+)\.tif', filename)
-        if match and "act" in filename.lower():
-            # ACT tiles - approximate bounds
-            return {
-                "min_lat": -35.9,
-                "max_lat": -35.1,
-                "min_lon": 148.7,
-                "max_lon": 149.4
-            }
-        
-        # Pattern 5: Generic regional files based on content
-        if any(region in filename.lower() for region in ['clarence', 'richmond']):
-            # Clarence River area (Northern NSW/Southern QLD)
-            return {
-                "min_lat": -29.5,
-                "max_lat": -28.5,
-                "min_lon": 152.5,
-                "max_lon": 153.5
-            }
-        
-        if any(region in filename.lower() for region in ['brisbane', 'qld', 'queensland']):
-            return {
-                "min_lat": -28.5,
-                "max_lat": -26.5,
-                "min_lon": 152.5,
-                "max_lon": 154.5
-            }
-        
-        if any(region in filename.lower() for region in ['melbourne', 'vic', 'victoria', 'bendigo']):
-            return {
-                "min_lat": -38.5,
-                "max_lat": -36.5,
-                "min_lon": 143.5,
-                "max_lon": 145.5
-            }
-        
-        return None
-    
-    def _utm_to_latlon_bounds(self, easting: int, utm_zone: int) -> Optional[Dict]:
-        """Convert UTM coordinates to approximate lat/lon bounds"""
+        Uses proper UTM to lat/lon conversion for accurate spatial indexing
+        """
         try:
-            # Simple approximation for Australian UTM zones
-            # This is a rough conversion - for precise work, use proper UTM transformation
+            # Use the robust filename parser with UTM conversion
+            bounds = self.filename_parser.extract_bounds_from_filename(filename)
             
-            # Central meridian for UTM zone
-            central_meridian = (utm_zone - 1) * 6 - 180 + 3
+            if bounds:
+                # Validate bounds are reasonable for Australia/NZ
+                if (bounds["min_lat"] >= -50 and bounds["max_lat"] <= -8 and 
+                    bounds["min_lon"] >= 110 and bounds["max_lon"] <= 180):
+                    return bounds
             
-            # Approximate conversion (rough but workable for indexing)
-            if utm_zone == 56:  # Queensland/NSW
-                # Zone 56 covers roughly 150-156°E
-                # More realistic conversion: easting ~500000 = central meridian (153°E)
-                approx_lon = 153 + (easting - 500000) / 111000  # Rough degrees per meter
-                # Assume typical Queensland latitudes
-                approx_lat = -27.0  # Central Queensland latitude
-                
-                return {
-                    "min_lat": approx_lat - 0.01,
-                    "max_lat": approx_lat + 0.01,
-                    "min_lon": approx_lon - 0.01,
-                    "max_lon": approx_lon + 0.01
-                }
-            elif utm_zone == 55:  # Victoria/NSW
-                # Zone 55 covers roughly 144-150°E
-                # More realistic conversion: easting ~500000 = central meridian (147°E)
-                approx_lon = 147 + (easting - 500000) / 111000  # Rough degrees per meter
-                # Assume typical Victoria latitudes
-                approx_lat = -37.0  # Central Victoria latitude
-                
-                return {
-                    "min_lat": approx_lat - 0.01,
-                    "max_lat": approx_lat + 0.01,
-                    "min_lon": approx_lon - 0.01,
-                    "max_lon": approx_lon + 0.01
-                }
-            
-            return None
+            # If UTM conversion fails, use regional fallback
+            logger.warning(f"UTM conversion failed for {filename}, using regional bounds")
+            return self._get_regional_bounds_fallback(filename)
             
         except Exception as e:
-            logger.warning(f"Error converting UTM to lat/lon: {e}")
-            return None
+            logger.warning(f"Error extracting bounds from {filename}: {e}")
+            return self._get_regional_bounds_fallback(filename)
+    
+    def _get_regional_bounds_fallback(self, filename: str) -> Dict[str, float]:
+        """Fallback to regional bounds based on filename content"""
+        filename_lower = filename.lower()
+        
+        # State/region-based bounds (more precise than before)
+        if any(x in filename_lower for x in ['act', 'canberra']):
+            return {"min_lat": -35.9, "max_lat": -35.1, "min_lon": 148.9, "max_lon": 149.4}
+        elif any(x in filename_lower for x in ['nsw', 'sydney']):
+            return {"min_lat": -37.5, "max_lat": -28.0, "min_lon": 140.9, "max_lon": 153.6}
+        elif any(x in filename_lower for x in ['qld', 'queensland', 'brisbane']):
+            return {"min_lat": -29.2, "max_lat": -9.0, "min_lon": 137.9, "max_lon": 153.6}
+        elif any(x in filename_lower for x in ['tas', 'tasmania']):
+            return {"min_lat": -43.6, "max_lat": -39.6, "min_lon": 143.8, "max_lon": 148.5}
+        elif any(x in filename_lower for x in ['clarence', 'richmond']):
+            return {"min_lat": -29.0, "max_lat": -25.0, "min_lon": 151.0, "max_lon": 154.0}
+        elif any(x in filename_lower for x in ['cooper', 'z54']):
+            return {"min_lat": -30.0, "max_lat": -20.0, "min_lon": 138.0, "max_lon": 144.0}
+        else:
+            # Default Australia-wide bounds (last resort)
+            return {"min_lat": -44.0, "max_lat": -9.0, "min_lon": 112.0, "max_lon": 154.0}
     
     def _extract_resolution(self, filename: str) -> str:
         """Extract resolution from filename"""
