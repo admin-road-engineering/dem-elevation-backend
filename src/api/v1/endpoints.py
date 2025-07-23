@@ -1,13 +1,15 @@
 import logging
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.concurrency import run_in_threadpool
 from typing import Dict, Any, List, Optional
 
 from src.config import Settings
 from src.dem_service import DEMService
 from src.dem_exceptions import DEMCoordinateError, DEMServiceError
-from src.dependencies import get_dem_service, get_contour_service, get_dataset_manager, get_settings_cached
+from src.dependencies import get_dem_service, get_contour_service, get_dataset_manager, get_settings_cached, get_elevation_service
+from src.dataset_manager import DatasetManager
+from src.contour_service import ContourService
+from src.unified_elevation_service import UnifiedElevationService
 from src.auth import get_current_user
 from src.models import (
     PointRequest, LineRequest, PathRequest, ContourDataRequest,
@@ -81,7 +83,8 @@ async def get_source_info(
 ) -> Dict[str, Any]:
     """Get detailed information about a specific DEM source."""
     try:
-        info = await run_in_threadpool(service.get_source_info, source_id)
+        # Use DEMService method directly (it's already lean and delegates to DatasetManager)
+        info = service.get_source_info(source_id)
         
         if "error" in info:
             raise HTTPException(status_code=400, detail=info["error"])
@@ -257,13 +260,11 @@ async def generate_contour_data(
         # Convert coordinates to the format expected by the service
         polygon_coords = [(coord.latitude, coord.longitude) for coord in request.area_bounds.polygon_coordinates]
         
-        # Run blocking DEM operations in thread pool to get grid points
-        dem_points, grid_info, dem_source_used, error_message = await run_in_threadpool(
-            service.get_dem_points_in_polygon,
+        # Use DEMService delegation method (which calls ContourService internally)
+        dem_points, dem_source_used, error_message = service.get_dem_points_in_polygon(
             polygon_coords,
-            50000,  # max_points
-            request.grid_resolution_m,  # sampling_interval_m
-            request.source  # dem_source_id
+            request.source or "auto",
+            50000  # max_points
         )
         
         if error_message:
@@ -282,7 +283,7 @@ async def generate_contour_data(
             dem_points=response_points,
             total_points=len(response_points),
             dem_source_used=dem_source_used,
-            grid_info=grid_info,
+            grid_info={},  # Empty grid info for backward compatibility
             crs="EPSG:4326",
             message="Contour data generated successfully."
         )
@@ -299,10 +300,10 @@ async def generate_contour_data(
 @router.post("/contour-data/geojson", response_model=ContourDataResponse)
 async def generate_geojson_contour_data(
     request: ContourDataRequest,
-    service: DEMService = Depends(get_dem_service)
+    contour_service: ContourService = Depends(get_contour_service)
 ) -> ContourDataResponse:
     """
-    Generate GeoJSON contour lines from DEM data within a polygon area.
+    Generate GeoJSON contour lines from DEM data within a polygon area using ContourService.
     
     This endpoint generates server-side contour lines as GeoJSON features that can be
     directly displayed on the frontend map, eliminating browser memory issues.
@@ -317,15 +318,14 @@ async def generate_geojson_contour_data(
         # Convert coordinates to the format expected by the service
         polygon_coords = [(coord.latitude, coord.longitude) for coord in request.area_bounds.polygon_coordinates]
         
-        # Run blocking DEM operations in thread pool to generate GeoJSON contours
-        geojson_contours, statistics, dem_source_used, error_message = await run_in_threadpool(
-            service.generate_geojson_contours,
-            polygon_coords,
-            request.max_points,
-            request.sampling_interval_m,
-            request.minor_contour_interval_m,
-            request.major_contour_interval_m,
-            request.dem_source_id
+        # Use ContourService directly for contour generation
+        geojson_contours, statistics, dem_source_used, error_message = contour_service.generate_geojson_contours(
+            polygon_coords=polygon_coords,
+            dem_source_id=request.dem_source_id or "auto",
+            max_points=request.max_points,
+            minor_contour_interval_m=request.minor_contour_interval_m,
+            major_contour_interval_m=request.major_contour_interval_m,
+            simplify_tolerance=request.sampling_interval_m / 1000.0  # Convert to degrees approximately
         )
         
         if error_message:
@@ -378,13 +378,11 @@ async def generate_legacy_contour_data(
         # Convert coordinates to the format expected by the service
         polygon_coords = [(coord.latitude, coord.longitude) for coord in request.area_bounds.polygon_coordinates]
         
-        # Run blocking DEM operations in thread pool
-        dem_points, grid_info, dem_source_used, error_message = await run_in_threadpool(
-            service.get_dem_points_in_polygon,
+        # Use DEMService delegation method (which calls ContourService internally)
+        dem_points, dem_source_used, error_message = service.get_dem_points_in_polygon(
             polygon_coords,
-            request.max_points,
-            request.sampling_interval_m,
-            request.dem_source_id
+            request.dem_source_id or "auto",
+            request.max_points
         )
         
         if error_message:
@@ -400,7 +398,7 @@ async def generate_legacy_contour_data(
             total_points=len(response_points),
             area_bounds=request.area_bounds,
             dem_source_used=dem_source_used,
-            grid_info=grid_info,
+            grid_info={},  # Empty grid info for backward compatibility
             crs="EPSG:4326",
             message=f"Successfully extracted {len(response_points)} native DEM points from polygon area"
         )
@@ -417,20 +415,25 @@ async def generate_legacy_contour_data(
 @router.post("/select-source", response_model=SourceSelectionResponse)
 async def select_best_source(
     request: SourceSelectionRequest,
+    elevation_service: UnifiedElevationService = Depends(get_elevation_service),
     service: DEMService = Depends(get_dem_service)
 ) -> SourceSelectionResponse:
-    """Select the best DEM source for a specific location."""
+    """Select the best DEM source for a specific location using unified elevation service."""
     try:
-        best_source_id, scores = await run_in_threadpool(
-            service.select_best_source_for_point,
-            request.latitude,
-            request.longitude,
-            request.prefer_high_resolution,
-            request.max_resolution_m
-        )
+        # Use the unified elevation service to get elevation and determine which source was used
+        result = await elevation_service.get_elevation(request.latitude, request.longitude)
+        best_source_id = result.dem_source_used
+        
+        # Create mock scores for backward compatibility (unified service handles selection internally)
+        scores = [{
+            "source_id": best_source_id,
+            "score": 1.0,
+            "within_bounds": True,
+            "reason": "Selected by unified elevation service"
+        }]
         
         # Get detailed info about the selected source
-        source_info = await run_in_threadpool(service.get_source_info, best_source_id)
+        source_info = service.get_source_info(best_source_id)
         
         # Get list of available sources for this location
         available_sources = [score["source_id"] for score in scores if score["within_bounds"]]
@@ -459,7 +462,8 @@ async def get_coverage_summary(
 ) -> Dict[str, Any]:
     """Get a summary of coverage for all configured DEM sources."""
     try:
-        summary = await run_in_threadpool(service.get_coverage_summary)
+        # Use DEMService method directly (it's already lean and delegates appropriately)
+        summary = service.get_coverage_summary()
         return summary
         
     except Exception as e:
