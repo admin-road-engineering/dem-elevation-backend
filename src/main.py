@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from src.config import get_settings, validate_environment_configuration
-from src.api.v1.endpoints import router as elevation_router, init_dem_service
+from src.api.v1.endpoints import router as elevation_router
+from src.dependencies import init_service_container, close_service_container, get_dem_service
 from src.logging_config import setup_logging
 
 # Setup structured logging based on environment
@@ -27,7 +28,8 @@ async def lifespan(app: FastAPI):
         # Validate configuration and log results
         validate_environment_configuration(settings)
         
-        init_dem_service(settings)
+        # Initialize dependency injection container
+        service_container = init_service_container(settings)
         logger.info(
             "DEM Elevation Service started successfully",
             extra={
@@ -49,13 +51,8 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down DEM Elevation Service...", extra={"event": "shutdown_begin"})
     try:
-        # Clean up DEM service resources
-        from src.api.v1.endpoints import dem_service
-        if dem_service:
-            if hasattr(dem_service, 'close') and callable(dem_service.close):
-                await dem_service.close()
-            else:
-                dem_service.close()
+        # Clean up service container and all managed services
+        await close_service_container()
         logger.info("DEM Elevation Service shut down successfully", extra={"event": "shutdown_complete"})
     except Exception as e:
         logger.error("Error during shutdown", extra={"event": "shutdown_failed"}, exc_info=True)
@@ -102,7 +99,6 @@ app.include_router(elevation_router, prefix="/api")
 
 # Import models for legacy endpoint
 from src.models import PointsRequest, StandardResponse
-from src.api.v1.endpoints import get_dem_service
 
 # Legacy compatibility endpoint
 @app.post("/api/get_elevations", tags=["legacy"])

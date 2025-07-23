@@ -4,9 +4,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.concurrency import run_in_threadpool
 from typing import Dict, Any, List, Optional
 
-from src.config import Settings, get_settings
+from src.config import Settings
 from src.dem_service import DEMService
 from src.dem_exceptions import DEMCoordinateError, DEMServiceError
+from src.dependencies import get_dem_service, get_contour_service, get_dataset_manager, get_settings_cached
 from src.auth import get_current_user
 from src.models import (
     PointRequest, LineRequest, PathRequest, ContourDataRequest,
@@ -42,28 +43,12 @@ def raise_standard_http_exception(status_code: int, message: str, details: Optio
     error_response = create_error_response(status_code, message, details)
     raise HTTPException(status_code=status_code, detail=error_response.dict())
 
-# Global DEM service instance (initialized on startup)
-dem_service: DEMService = None
-
-def get_dem_service() -> DEMService:
-    """Dependency to get the DEM service instance."""
-    if dem_service is None:
-        raise HTTPException(status_code=500, detail="DEM service not initialized")
-    return dem_service
-
-def init_dem_service(settings: Settings):
-    """Initialize the global DEM service instance."""
-    global dem_service
-    try:
-        dem_service = DEMService(settings)
-        logger.info("DEM service initialized successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize DEM service: {e}")
-        raise e
+# Service dependencies are now managed by the dependency injection container
+# See src/dependencies.py for service initialization and management
 
 @router.get("/sources", summary="List available DEM sources")
 async def list_dem_sources(
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings_cached)
 ) -> Dict[str, Any]:
     """List all configured DEM sources with their basic information."""
     try:

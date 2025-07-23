@@ -376,6 +376,64 @@
         "color": "#FFB000",
         "opacity": 0.15
       }
+    },
+    {
+      "id": "google_elevation",
+      "name": "Google Elevation API",
+      "source_type": "api",
+      "path": "api://google",
+      "crs": "EPSG:4326",
+      "resolution_m": 30,
+      "data_type": "Mixed",
+      "provider": "Google",
+      "priority": 4,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -90.0,
+        "max_lat": 90.0,
+        "min_lon": -180.0,
+        "max_lon": 180.0
+      },
+      "cost_per_query": 0.005,
+      "accuracy": "±10m",
+      "enabled": true,
+      "visible_in_coverage": false,
+      "metadata": {
+        "dataset": "Google Maps Elevation API",
+        "vertical_datum": "WGS84",
+        "color": "#FF0000",
+        "opacity": 0.1,
+        "note": "Fallback API service"
+      }
+    },
+    {
+      "id": "local_fallback",
+      "name": "Local DTM Geodatabase",
+      "source_type": "file",
+      "path": "./data/DTM.gdb",
+      "crs": null,
+      "resolution_m": 1,
+      "data_type": "DTM",
+      "provider": "Local",
+      "priority": 5,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -90.0,
+        "max_lat": 90.0,
+        "min_lon": -180.0,
+        "max_lon": 180.0
+      },
+      "cost_per_query": 0.0,
+      "accuracy": "Variable",
+      "enabled": true,
+      "visible_in_coverage": false,
+      "metadata": {
+        "dataset": "Local development/fallback geodatabase",
+        "vertical_datum": "Variable",
+        "color": "#666666",
+        "opacity": 0.05,
+        "note": "Local development fallback"
+      }
     }
   ]
 }

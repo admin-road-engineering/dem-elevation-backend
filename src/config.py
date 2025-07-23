@@ -15,18 +15,24 @@ class DEMSource(BaseModel):
         extra = "allow"  # Allow additional fields for future extensibility
 
 def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]:
-    """Load DEM sources from external configuration file"""
+    """
+    Load DEM sources from external configuration file as single source of truth.
+    
+    This function now uses dem_sources.json as the definitive source configuration,
+    eliminating programmatic hardcoding of API sources for better maintainability.
+    """
     config_file = Path(base_dir) / "config" / "dem_sources.json"
     
     if not config_file.exists():
-        # Fallback to minimal sources if file doesn't exist
+        # Fallback to minimal local source if config file doesn't exist
         return {
             "local_fallback": {
                 "path": "./data/DTM.gdb",
                 "layer": None,
                 "crs": None,
-                "description": "Local fallback",
-                "priority": 4
+                "description": "Local fallback geodatabase",
+                "priority": 4,
+                "source_type": "file"
             }
         }
     
@@ -34,55 +40,31 @@ def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]
         with open(config_file, 'r') as f:
             data = json.load(f)
         
-        # Convert the structured format to flat format expected by current system
+        # Convert the comprehensive JSON structure to the format expected by current system
         sources = {}
         
-        # Add API sources with priority 2-3
-        sources["gpxz_api"] = {
-            "path": "api://gpxz",
-            "layer": None,
-            "crs": None,
-            "description": "GPXZ.io API (global coverage)",
-            "priority": 2
-        }
-        sources["google_elevation"] = {
-            "path": "api://google", 
-            "layer": None,
-            "crs": None,
-            "description": "Google Elevation API (fallback)",
-            "priority": 3
-        }
+        for source_config in data.get("elevation_sources", []):
+            # Skip disabled sources
+            if not source_config.get("enabled", True):
+                continue
+                
+            source_id = source_config["id"]
+            sources[source_id] = {
+                "path": source_config["path"],
+                "layer": source_config.get("layer"),
+                "crs": source_config.get("crs"),
+                "description": source_config.get("name", source_config.get("description", "")),
+                "priority": source_config.get("priority", 3),
+                "source_type": source_config.get("source_type", "file"),
+                "bounds": source_config.get("bounds"),
+                "resolution_m": source_config.get("resolution_m"),
+                "data_type": source_config.get("data_type"),
+                "provider": source_config.get("provider"),
+                "cost_per_query": source_config.get("cost_per_query", 0.0),
+                "accuracy": source_config.get("accuracy")
+            }
         
-        # Add a unified Australian S3 source using spatial index
-        sources["au_spatial_index"] = {
-            "path": "s3://road-engineering-elevation-data/",
-            "layer": None,
-            "crs": "multiple",
-            "description": "Australian DEM files via spatial index (569,206 files)",
-            "priority": 1
-        }
-        
-        # Add NZ S3 sources from file with priority 1
-        for source in data.get("elevation_sources", []):
-            if (source.get("source_type") == "s3" and 
-                source.get("enabled", True) and 
-                "nz-elevation" in source.get("path", "")):
-                sources[source["id"]] = {
-                    "path": source["path"],
-                    "layer": None,
-                    "crs": source.get("crs"),
-                    "description": source.get("name", source["id"]),
-                    "priority": source.get("priority", 1)
-                }
-        
-        # Add local fallback with priority 4
-        sources["local_fallback"] = {
-            "path": "./data/DTM.gdb",
-            "layer": None,
-            "crs": None,
-            "description": "Local fallback DTM geodatabase",
-            "priority": 4
-        }
+        # dem_sources.json is now the single source of truth - no programmatic additions needed
         
         return sources
         
