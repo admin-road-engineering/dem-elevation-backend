@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import rasterio
+from cachetools import LRUCache
 from rasterio.enums import Resampling
 from rasterio.env import Env
 from pyproj import Transformer, Geod
@@ -18,6 +19,11 @@ from shapely.geometry import Polygon, Point, LineString
 from shapely.ops import unary_union
 from src.source_selector import DEMSourceSelector
 from src.enhanced_source_selector import EnhancedSourceSelector
+from src.unified_elevation_service import UnifiedElevationService
+from src.dem_exceptions import (
+    DEMServiceError, DEMFileError, DEMCacheError, 
+    DEMCoordinateError, DEMProcessingError
+)
 from src.gpxz_client import GPXZConfig
 from src.coverage_database import CoverageDatabase
 from src.spatial_selector import AutomatedSourceSelector
@@ -28,6 +34,34 @@ from rasterio.errors import RasterioIOError
 import warnings
 
 logger = logging.getLogger(__name__)
+
+class ClosingLRUCache(LRUCache):
+    """
+    An LRU cache that calls .close() on evicted items.
+    This is essential for caches that store objects with open file handles,
+    like rasterio datasets, to prevent resource leaks.
+    """
+    def popitem(self):
+        """Evict the least recently used item, closing it if possible."""
+        key, value = super().popitem()
+        if hasattr(value, 'close') and callable(value.close):
+            try:
+                value.close()
+                logger.info(f"Closed evicted cache item: {key}")
+            except Exception as e:
+                logger.warning(f"Error closing evicted cache item {key}: {e}")
+        return key, value
+
+    def clear(self):
+        """Clear the cache and close all remaining items."""
+        for key, value in self.items():
+            if hasattr(value, 'close') and callable(value.close):
+                try:
+                    value.close()
+                    logger.info(f"Closed cache item on clear: {key}")
+                except Exception as e:
+                    logger.warning(f"Error closing cache item {key} on clear: {e}")
+        super().clear()
 
 class GDALErrorFilter(logging.Filter):
     """Custom filter to suppress known non-critical GDAL errors."""
@@ -74,8 +108,9 @@ class GDALErrorFilter(logging.Filter):
 class DEMService:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._dataset_cache: Dict[str, rasterio.DatasetReader] = {}
-        self._transformer_cache: Dict[str, Transformer] = {}
+        # Use size-limited, resource-safe LRU caches
+        self._dataset_cache = ClosingLRUCache(maxsize=settings.DATASET_CACHE_SIZE)
+        self._transformer_cache = LRUCache(maxsize=settings.DATASET_CACHE_SIZE)
         # Thread lock for thread-safe dataset access
         self._dataset_lock = threading.RLock()
         
@@ -85,7 +120,11 @@ class DEMService:
         os.environ['AWS_SECRET_ACCESS_KEY'] = settings.AWS_SECRET_ACCESS_KEY
         os.environ['AWS_DEFAULT_REGION'] = settings.AWS_DEFAULT_REGION
         
-        # Check if S3 or API sources are enabled - use EnhancedSourceSelector for these
+        # Initialize unified elevation service that handles all source selection logic
+        self.elevation_service = UnifiedElevationService(settings)
+        
+        # Legacy support - maintain existing source selector for backward compatibility
+        # TODO: Migrate remaining methods to use elevation_service and remove this
         use_s3 = getattr(settings, 'USE_S3_SOURCES', False)
         use_apis = getattr(settings, 'USE_API_SOURCES', False)
         
@@ -651,6 +690,107 @@ class DEMService:
             # Use traditional method
             elevation, _, _ = self.get_elevation_at_point(latitude, longitude, dem_source_id, auto_select=True)
             return elevation
+
+    async def get_elevation_unified(self, latitude: float, longitude: float, 
+                                   dem_source_id: Optional[str] = None) -> Tuple[Optional[float], str, Optional[str]]:
+        """
+        Get elevation using the unified elevation service (new architecture).
+        
+        This method demonstrates the cleaner architecture with consolidated source selection.
+        Eventually, this will replace get_elevation_at_point once fully tested.
+        
+        Returns:
+            Tuple of (elevation_m, dem_source_used, error_message)
+        """
+        try:
+            result = await self.elevation_service.get_elevation(latitude, longitude, dem_source_id)
+            return result.elevation_m, result.dem_source_used, result.message
+        except DEMCoordinateError as e:
+            logger.warning(f"Invalid coordinates provided: {e}")
+            return None, "coordinate_error", str(e)
+        except DEMServiceError as e:
+            logger.error(f"DEM service error: {e}")
+            return None, "service_error", str(e)
+        except Exception as e:
+            logger.error(f"Unexpected error in unified elevation query: {e}")
+            return None, "unexpected_error", str(e)
+
+    async def get_elevations_for_line_unified(self, start_lat: float, start_lon: float,
+                                            end_lat: float, end_lon: float, num_points: int,
+                                            dem_source_id: Optional[str] = None) -> Tuple[List[Dict[str, Any]], str, Optional[str]]:
+        """
+        Get elevations for points along a line using the unified elevation service.
+        
+        Returns:
+            Tuple of (point_list, dem_source_used, error_message)
+        """
+        try:
+            # Generate line points
+            points = self.generate_line_points(start_lat, start_lon, end_lat, end_lon, num_points)
+            
+            result_points = []
+            primary_source = None
+            
+            for i, (lat, lon) in enumerate(points):
+                elevation, dem_used, message = await self.get_elevation_unified(lat, lon, dem_source_id)
+                if primary_source is None:
+                    primary_source = dem_used
+                    
+                result_points.append({
+                    "latitude": lat,
+                    "longitude": lon,
+                    "elevation_m": elevation,
+                    "sequence": i,
+                    "message": message
+                })
+            
+            return result_points, primary_source or "unknown", None
+            
+        except DEMCoordinateError as e:
+            logger.warning(f"Invalid coordinates in line elevation: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error getting elevations for line: {e}")
+            return [], dem_source_id or "unknown", str(e)
+
+    async def get_elevations_for_path_unified(self, points: List[Dict[str, Any]], 
+                                            dem_source_id: Optional[str] = None) -> Tuple[List[Dict[str, Any]], str, Optional[str]]:
+        """
+        Get elevations for a list of discrete points using the unified elevation service.
+        
+        Returns:
+            Tuple of (elevation_list, dem_source_used, error_message)
+        """
+        try:
+            result_elevations = []
+            primary_source = None
+            
+            for i, point in enumerate(points):
+                lat = point["latitude"]
+                lon = point["longitude"]
+                point_id = point.get("id", i)
+                
+                elevation, dem_used, message = await self.get_elevation_unified(lat, lon, dem_source_id)
+                if primary_source is None:
+                    primary_source = dem_used
+                
+                result_elevations.append({
+                    "input_latitude": lat,
+                    "input_longitude": lon,
+                    "input_id": point_id,
+                    "elevation_m": elevation,
+                    "sequence": i,
+                    "message": message
+                })
+            
+            return result_elevations, primary_source or "unknown", None
+            
+        except DEMCoordinateError as e:
+            logger.warning(f"Invalid coordinates in path elevation: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Error getting elevations for path: {e}")
+            return [], dem_source_id or "unknown", str(e)
 
     def get_elevation_at_point(self, latitude: float, longitude: float, dem_source_id: Optional[str] = None, 
                               auto_select: bool = True) -> Tuple[Optional[float], str, Optional[str]]:
@@ -1579,18 +1719,25 @@ class DEMService:
             return self.source_selector.get_coverage_summary()
 
     async def close(self):
-        """Close all cached datasets and enhanced source selector resources."""
-        # Close enhanced source selector if it exists
+        """Close all cached datasets and elevation service resources."""
+        # Close unified elevation service
+        try:
+            await self.elevation_service.close()
+            logger.info("Closed unified elevation service resources.")
+        except Exception as e:
+            logger.warning(f"Error closing elevation service: {e}")
+        
+        # Close legacy source selector if it exists (for backward compatibility)
         if hasattr(self.source_selector, 'close'):
             try:
                 await self.source_selector.close()
-                logger.info("Enhanced source selector closed")
+                logger.info("Closed legacy source selector resources.")
             except Exception as e:
-                logger.warning(f"Error closing enhanced source selector: {e}")
+                logger.warning(f"Error closing legacy source selector: {e}")
         
-        # Close cached datasets
-        for dataset in self._dataset_cache.values():
-            dataset.close()
-        self._dataset_cache.clear()
-        self._transformer_cache.clear()
-        logger.info("DEM Service closed and caches cleared") 
+        # The custom ClosingLRUCache's clear() method handles closing datasets.
+        if hasattr(self._dataset_cache, 'clear'):
+            self._dataset_cache.clear()
+        if hasattr(self._transformer_cache, 'clear'):
+            self._transformer_cache.clear()
+        logger.info("DEM Service closed and all caches cleared.") 

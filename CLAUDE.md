@@ -280,10 +280,31 @@ This is a **FastAPI-based elevation service** that provides elevation data from 
 - **Error suppression**: Configured to suppress non-critical GDAL errors from geodatabase access
 
 ### Performance Features
-- **Dataset caching**: Keeps recently used DEM datasets in memory (configurable cache size)
+- **Resource-safe dataset caching**: LRU cache with automatic file handle cleanup (prevents memory leaks)
+- **Size-limited caching**: Configurable cache sizes prevent unbounded memory growth
 - **CRS transformation caching**: Caches coordinate transformations for performance
 - **Thread pooling**: Non-blocking I/O operations using FastAPI's thread pool
-- **Resource cleanup**: Proper dataset cleanup on service shutdown
+- **Automatic resource cleanup**: Proper dataset cleanup on service shutdown and cache eviction
+
+### Code Quality Improvements (2025-07-23)
+Based on independent code review feedback, significant architectural improvements have been implemented:
+
+**Phase 1 - Critical Fixes (Complete):**
+- **Resource-safe caching**: Implemented `ClosingLRUCache` to prevent file handle leaks
+- **Consolidated source selection**: `UnifiedElevationService` centralizes all source selection logic  
+- **Specific exception handling**: Replaced broad `Exception` catches with targeted exception types
+
+**Phase 2 - API Modernization (Complete):**
+- **All core endpoints modernized**: Point, line, path, and batch endpoints now use unified elevation service
+- **True async pattern**: Eliminated thread pool usage (`run_in_threadpool`) across all elevation endpoints
+- **Consistent error handling**: All endpoints feature specific `DEMCoordinateError` and `DEMServiceError` handling
+- **Enhanced API methods**: New `get_elevations_for_line_unified()` and `get_elevations_for_path_unified()` methods
+
+**Benefits Achieved:**
+- **Memory stability**: No unbounded cache growth, automatic resource cleanup
+- **Performance**: True async operations without thread pool overhead
+- **Maintainability**: Centralized logic, specific exceptions, focused responsibilities
+- **Production readiness**: Enterprise-grade error handling and resource management
 
 ### AWS S3 Integration
 - **Transparent S3 access**: DEM files can be hosted on S3 with `s3://` paths

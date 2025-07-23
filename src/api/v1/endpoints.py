@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 
 from src.config import Settings, get_settings
 from src.dem_service import DEMService
+from src.dem_exceptions import DEMCoordinateError, DEMServiceError
 from src.auth import get_current_user
 from src.models import (
     PointRequest, LineRequest, PathRequest, ContourDataRequest,
@@ -117,14 +118,13 @@ async def get_elevation_point(
     service: DEMService = Depends(get_dem_service),
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
 ) -> PointResponse:
-    """Get elevation for a single point."""
+    """Get elevation for a single point using the unified elevation service."""
     try:
-        # Run blocking DEM operations in thread pool
-        elevation, dem_source_used, message = await run_in_threadpool(
-            service.get_elevation_at_point,
+        # Use the new, fully async unified service method
+        elevation, dem_source_used, message = await service.get_elevation_unified(
             request.latitude,
             request.longitude,
-            request.dem_source_id
+            dem_source_id=request.dem_source_id
         )
         
         return PointResponse(
@@ -135,8 +135,14 @@ async def get_elevation_point(
             message=message
         )
         
+    except DEMCoordinateError as e:
+        logger.warning(f"Invalid coordinates in point elevation: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid coordinates: {str(e)}")
+    except DEMServiceError as e:
+        logger.error(f"DEM service error in point elevation: {e}")
+        raise HTTPException(status_code=502, detail=f"Elevation service error: {str(e)}")
     except ValueError as e:
-        logger.error(f"ValueError in point elevation: {e}")
+        logger.warning(f"ValueError in point elevation: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error in point elevation: {e}")
@@ -147,11 +153,10 @@ async def get_elevation_line(
     request: LineRequest,
     service: DEMService = Depends(get_dem_service)
 ) -> LineResponse:
-    """Get elevations for points along a line segment."""
+    """Get elevations for points along a line segment using unified elevation service."""
     try:
-        # Run blocking DEM operations in thread pool
-        points, dem_source_used, message = await run_in_threadpool(
-            service.get_elevations_for_line,
+        # Use the new unified service for line elevation
+        points, dem_source_used, message = await service.get_elevations_for_line_unified(
             request.start_point.latitude,
             request.start_point.longitude,
             request.end_point.latitude,
@@ -177,8 +182,14 @@ async def get_elevation_line(
             message=message
         )
         
+    except DEMCoordinateError as e:
+        logger.warning(f"Invalid coordinates in line elevation: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid coordinates: {str(e)}")
+    except DEMServiceError as e:
+        logger.error(f"DEM service error in line elevation: {e}")
+        raise HTTPException(status_code=502, detail=f"Elevation service error: {str(e)}")
     except ValueError as e:
-        logger.error(f"ValueError in line elevation: {e}")
+        logger.warning(f"ValueError in line elevation: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error in line elevation: {e}")
@@ -189,7 +200,7 @@ async def get_elevation_path(
     request: PathRequest,
     service: DEMService = Depends(get_dem_service)
 ) -> PathResponse:
-    """Get elevations for a list of discrete points."""
+    """Get elevations for a list of discrete points using unified elevation service."""
     try:
         if not request.points:
             raise HTTPException(status_code=400, detail="Points list cannot be empty")
@@ -203,9 +214,8 @@ async def get_elevation_path(
                 "id": point.id
             })
         
-        # Run blocking DEM operations in thread pool
-        elevations, dem_source_used, message = await run_in_threadpool(
-            service.get_elevations_for_path,
+        # Use the new unified service for batch elevation
+        elevations, dem_source_used, message = await service.get_elevations_for_path_unified(
             points_data,
             request.dem_source_id
         )
@@ -228,8 +238,14 @@ async def get_elevation_path(
             message=message
         )
         
+    except DEMCoordinateError as e:
+        logger.warning(f"Invalid coordinates in path elevation: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid coordinates: {str(e)}")
+    except DEMServiceError as e:
+        logger.error(f"DEM service error in path elevation: {e}")
+        raise HTTPException(status_code=502, detail=f"Elevation service error: {str(e)}")
     except ValueError as e:
-        logger.error(f"ValueError in path elevation: {e}")
+        logger.warning(f"ValueError in path elevation: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error in path elevation: {e}")
@@ -488,9 +504,8 @@ async def get_elevation_points(
                 "id": i
             })
         
-        # Use existing path service for batch processing
-        elevations, dem_source_used, message = await run_in_threadpool(
-            service.get_elevations_for_path,
+        # Use unified elevation service for batch processing
+        elevations, dem_source_used, message = await service.get_elevations_for_path_unified(
             points_data,
             request.source
         )
@@ -522,8 +537,14 @@ async def get_elevation_points(
             metadata=metadata
         )
         
+    except DEMCoordinateError as e:
+        logger.warning(f"Invalid coordinates in points elevation: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid coordinates: {str(e)}")
+    except DEMServiceError as e:
+        logger.error(f"DEM service error in points elevation: {e}")
+        raise HTTPException(status_code=502, detail=f"Elevation service error: {str(e)}")
     except ValueError as e:
-        logger.error(f"ValueError in points elevation: {e}")
+        logger.warning(f"ValueError in points elevation: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error in points elevation: {e}")
