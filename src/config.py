@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Dict, Any, Optional, List
 import os
+import json
+from pathlib import Path
 
 class DEMSource(BaseModel):
     path: str
@@ -12,8 +14,88 @@ class DEMSource(BaseModel):
     class Config:
         extra = "allow"  # Allow additional fields for future extensibility
 
+def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]:
+    """Load DEM sources from external configuration file"""
+    config_file = Path(base_dir) / "config" / "dem_sources.json"
+    
+    if not config_file.exists():
+        # Fallback to minimal sources if file doesn't exist
+        return {
+            "local_fallback": {
+                "path": "./data/DTM.gdb",
+                "layer": None,
+                "crs": None,
+                "description": "Local fallback",
+                "priority": 4
+            }
+        }
+    
+    try:
+        with open(config_file, 'r') as f:
+            data = json.load(f)
+        
+        # Convert the structured format to flat format expected by current system
+        sources = {}
+        
+        # Add API sources with priority 2-3
+        sources["gpxz_api"] = {
+            "path": "api://gpxz",
+            "layer": None,
+            "crs": None,
+            "description": "GPXZ.io API (global coverage)",
+            "priority": 2
+        }
+        sources["google_elevation"] = {
+            "path": "api://google", 
+            "layer": None,
+            "crs": None,
+            "description": "Google Elevation API (fallback)",
+            "priority": 3
+        }
+        
+        # Add a unified Australian S3 source using spatial index
+        sources["au_spatial_index"] = {
+            "path": "s3://road-engineering-elevation-data/",
+            "layer": None,
+            "crs": "multiple",
+            "description": "Australian DEM files via spatial index (569,206 files)",
+            "priority": 1
+        }
+        
+        # Add NZ S3 sources from file with priority 1
+        for source in data.get("elevation_sources", []):
+            if (source.get("source_type") == "s3" and 
+                source.get("enabled", True) and 
+                "nz-elevation" in source.get("path", "")):
+                sources[source["id"]] = {
+                    "path": source["path"],
+                    "layer": None,
+                    "crs": source.get("crs"),
+                    "description": source.get("name", source["id"]),
+                    "priority": source.get("priority", 1)
+                }
+        
+        # Add local fallback with priority 4
+        sources["local_fallback"] = {
+            "path": "./data/DTM.gdb",
+            "layer": None,
+            "crs": None,
+            "description": "Local fallback DTM geodatabase",
+            "priority": 4
+        }
+        
+        return sources
+        
+    except Exception as e:
+        # Return minimal config on error
+        return {
+            "gpxz_api": {"path": "api://gpxz", "priority": 2},
+            "local_fallback": {"path": "./data/DTM.gdb", "priority": 4}
+        }
+
 class Settings(BaseSettings):
-    DEM_SOURCES: Dict[str, Dict[str, Any]]  # Changed to use raw dict for backward compatibility
+    # Load DEM sources from external file instead of environment
+    _dem_sources_cache: Optional[Dict[str, Dict[str, Any]]] = None
     DEFAULT_DEM_ID: Optional[str] = None  # Optional default DEM source ID
     BASE_DIR: str = Field(default=".", description="Base directory for the application")
     
@@ -69,6 +151,13 @@ class Settings(BaseSettings):
     MAIN_BACKEND_URL: str = Field(default="http://localhost:3001", description="Main platform backend URL")
     
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    
+    @property
+    def DEM_SOURCES(self) -> Dict[str, Dict[str, Any]]:
+        """Load DEM sources from external configuration file"""
+        if self._dem_sources_cache is None:
+            self._dem_sources_cache = load_dem_sources_from_file(self.BASE_DIR)
+        return self._dem_sources_cache
 
 def runtime_config_check(settings: Settings) -> Dict[str, Any]:
     """Runtime configuration check with fallback capabilities"""

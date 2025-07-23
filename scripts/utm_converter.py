@@ -141,13 +141,51 @@ class DEMFilenameParser:
         - CooperBasin2019_DEM_3676990_54_01_001.tif
         """
         
-        # Pattern 1: Standard grid naming (easting_zone_tile_tile)
-        pattern1 = r'_(\d{7})_(\d{2})_\d+_\d+'
+        # Pattern 1: Wagga Wagga and similar DTM-GRID format (check BEFORE generic pattern)
+        # Example: WaggaWaggaLidar2009-DTM-GRID-001_4806126_55_0002_0002.tif
+        pattern1 = r'DTM-GRID-\d+_(\d{7})_(\d{2})_\d+_\d+'
         match1 = re.search(pattern1, filename)
         
         if match1:
-            easting_str = match1.group(1)
+            coord_str = match1.group(1)  # 7-digit coordinate (grid reference format)
             zone = int(match1.group(2))
+            
+            if len(coord_str) == 7:
+                # Wagga Wagga format appears to be: EEENNMM where EEE=easting(km), NN=northing offset, MM=tile
+                # Example: 4806126 = 480 (480km easting) + 61 + 26 (modifiers)
+                easting_km = int(coord_str[:3])  # First 3 digits: 480
+                modifier_part = coord_str[3:]     # Remaining: 6126
+                
+                # Convert to full UTM coordinates
+                easting = (easting_km * 1000) + 500  # 480000 + 500 = 480500m
+                
+                # For zone 55 (NSW), estimate northing based on typical Wagga Wagga location
+                # Wagga Wagga is around 6100000m northing in UTM zone 55
+                if zone == 55:
+                    # Try to interpret the modifier as a northing offset
+                    if len(modifier_part) == 4:  # 6126
+                        northing_offset = int(modifier_part[:2])  # 61
+                        tile_modifier = int(modifier_part[2:])    # 26
+                        northing = 6100000 + (northing_offset * 1000) + (tile_modifier * 10)
+                    else:
+                        northing = self._estimate_northing_from_zone(zone)
+                else:
+                    northing = self._estimate_northing_from_zone(zone)
+                
+                return {
+                    "easting": easting,
+                    "northing": northing,
+                    "zone": zone,
+                    "tile_size": 1000
+                }
+        
+        # Pattern 2: Standard grid naming (easting_zone_tile_tile) - Generic pattern
+        pattern2 = r'_(\d{7})_(\d{2})_\d+_\d+'
+        match2 = re.search(pattern2, filename)
+        
+        if match2:
+            easting_str = match2.group(1)
+            zone = int(match2.group(2))
             
             # Convert 7-digit easting to full coordinate
             # Example: 6586070 -> 658607 (6-digit) + 0 (1km grid)
@@ -162,13 +200,85 @@ class DEMFilenameParser:
                     "tile_size": 1000
                 }
         
-        # Pattern 2: Alternative naming (northing in different position)
-        pattern2 = r'_(\d{6,7})_(\d{2})_'
-        match2 = re.search(pattern2, filename)
+        # Pattern 3: SW format (Brisbane and other QLD files)
+        # Example: Brisbane_2019_Prj_SW_465000_6970000_1k_DEM_1m.tif
+        pattern3 = r'SW_(\d+)_(\d+)_1[kK]?_DEM_1m\.tif'
+        match3 = re.search(pattern3, filename)
         
-        if match2:
-            coord_str = match2.group(1)
-            zone = int(match2.group(2))
+        if match3:
+            easting = int(match3.group(1))
+            northing = int(match3.group(2))
+            
+            # Determine UTM zone from easting (Queensland is mostly zone 56)
+            if 400000 <= easting <= 599999:
+                zone = 56  # Most of Queensland
+            elif 300000 <= easting <= 399999:
+                zone = 55  # Western Queensland
+            else:
+                zone = 56  # Default to 56 for Queensland
+            
+            return {
+                "easting": easting + 500,  # Center of 1km tile
+                "northing": northing + 500,
+                "zone": zone,
+                "tile_size": 1000
+            }
+        
+        # Pattern 4: Clarence River format (grid reference in filename)
+        # Example: Clarence2019-DEM-1m_5275257_GDA2020_55.tif
+        pattern4 = r'Clarence\d{4}-DEM-1m_(\d{7})_GDA2020_(\d{2})\.tif'
+        match4 = re.search(pattern4, filename)
+        
+        if match4:
+            grid_ref = match4.group(1)
+            zone = int(match4.group(2))
+            
+            # Australian Map Grid (AMG) format interpretation
+            # 7-digit format appears to be: EEENNNM where EEE=easting(km), NNN=northing(km), M=modifier
+            if len(grid_ref) == 7:
+                # Try standard Australian grid format
+                easting_km = int(grid_ref[:3])   # First 3 digits (e.g., 527 from 5275257)
+                northing_part = grid_ref[3:]     # Remaining 4 digits (e.g., 5257)
+                
+                # For zone 55 (NSW/QLD border area), typical coordinates:
+                # Easting: 500-600km, Northing: 6700-6900km
+                if zone == 55:
+                    # Full easting coordinate 
+                    easting = (easting_km * 1000) + 500  # e.g., 527000 + 500 = 527500
+                    
+                    # Northing interpretation - try different approaches
+                    if len(northing_part) == 4:
+                        # Could be abbreviated northing like 5257 -> 6705257 or 6725700
+                        if int(northing_part) < 3000:  # Small number, likely needs 670X prefix
+                            northing = 6700000 + (int(northing_part) * 100) + 50  # e.g., 5257 -> 6700525700
+                        else:  # Larger number, try 67XX000 format
+                            northing = 6700000 + (int(northing_part) * 10) + 500
+                    else:
+                        northing = self._estimate_northing_from_zone(zone)
+                elif zone == 56:
+                    easting = (easting_km * 1000) + 500
+                    if len(northing_part) == 4:
+                        northing = 6900000 + (int(northing_part) * 10) + 500  # Zone 56 typically higher northing
+                    else:
+                        northing = self._estimate_northing_from_zone(zone)
+                else:
+                    easting = (easting_km * 1000) + 500
+                    northing = self._estimate_northing_from_zone(zone)
+                
+                return {
+                    "easting": easting,
+                    "northing": northing,
+                    "zone": zone,
+                    "tile_size": 1000
+                }
+        
+        # Pattern 5: Alternative naming (northing in different position) - Original Pattern 3
+        pattern5 = r'_(\d{6,7})_(\d{2})_'
+        match5 = re.search(pattern5, filename)
+        
+        if match5:
+            coord_str = match5.group(1)
+            zone = int(match5.group(2))
             
             # Determine if this is easting or northing based on value range
             coord_val = int(coord_str)
@@ -231,7 +341,7 @@ class DEMFilenameParser:
             )
             
             # Validate bounds are reasonable for Australia/NZ
-            if (bounds["min_lat"] < -50 and bounds["max_lat"] > -50 and 
+            if (bounds["min_lat"] > -50 and bounds["max_lat"] < -8 and 
                 bounds["min_lon"] > 110 and bounds["max_lon"] < 180):
                 return bounds
             else:

@@ -15,7 +15,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import UTM conversion utilities
-from scripts.utm_converter import DEMFilenameParser
+from utm_converter import DEMFilenameParser
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

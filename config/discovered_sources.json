@@ -19,7 +19,7 @@
     "csiro_1m_dem": {
       "path": "s3://road-engineering-elevation-data/csiro-elvis/elevation/1m-dem/z56/RichmondRiver2023/",
       "crs": "EPSG:32756",
-      "description": "Richmond 1m LiDAR/DEM (CSIRO)",
+      "description": "Richmond 50cm LiDAR/DEM (CSIRO)",
       "file_count": 8921,
       "total_size_gb": 20.16,
       "geographic_areas": [
@@ -29,7 +29,21 @@
         "z56"
       ],
       "resolutions": [
-        "1m",
+        "50cm",
+        "1m"
+      ]
+    },
+    "dawe_50cm_dem": {
+      "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/50cm-dem/z55/WeanyWheel2021/",
+      "crs": "EPSG:32755",
+      "description": "Australia 50cm LiDAR/DEM (DAWE)",
+      "file_count": 96,
+      "total_size_gb": 0.98,
+      "geographic_areas": [],
+      "utm_zones": [
+        "z55"
+      ],
+      "resolutions": [
         "50cm"
       ]
     },
@@ -49,22 +63,6 @@
         "50cm"
       ]
     },
-    "dawe_50cm_dem": {
-      "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/50cm-dem/z55/Murray2021/",
-      "crs": "EPSG:32755",
-      "description": "Murray 50cm LiDAR/DEM (DAWE)",
-      "file_count": 41,
-      "total_size_gb": 0.16,
-      "geographic_areas": [
-        "Murray"
-      ],
-      "utm_zones": [
-        "z55"
-      ],
-      "resolutions": [
-        "50cm"
-      ]
-    },
     "ga_1m_dem_z55": {
       "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/z55/",
       "crs": "EPSG:32755",
@@ -72,10 +70,10 @@
       "file_count": 21422,
       "total_size_gb": 86.56,
       "geographic_areas": [
-        "Sa",
         "Nt",
         "Wa",
-        "Bendigo"
+        "Bendigo",
+        "Sa"
       ],
       "utm_zones": [
         "z55"
@@ -102,17 +100,110 @@
       ]
     },
     "griffith_50cm_dem": {
-      "path": "s3://road-engineering-elevation-data/griffith-elvis/elevation/50cm-dem/z55/Georgetown201806_Cycle6/",
-      "crs": "EPSG:32755",
+      "path": "s3://road-engineering-elevation-data/griffith-elvis/elevation/50cm-dem/z56/StLawrence201805_Cycle6/",
+      "crs": "EPSG:32756",
       "description": "Australia 50cm LiDAR/DEM (GRIFFITH)",
-      "file_count": 227,
-      "total_size_gb": 0.91,
+      "file_count": 2071,
+      "total_size_gb": 14.73,
+      "geographic_areas": [],
+      "utm_zones": [
+        "z56"
+      ],
+      "resolutions": [
+        "50cm"
+      ]
+    },
+    "nsw_2m_dem": {
+      "path": "s3://road-engineering-elevation-data/nsw-elvis/elevation/2m-dem/z55/Numbla201702/",
+      "crs": "EPSG:32755",
+      "description": "Australia 2m LiDAR/DEM (NSW)",
+      "file_count": 1,
+      "total_size_gb": 0.0,
       "geographic_areas": [],
       "utm_zones": [
         "z55"
       ],
       "resolutions": [
+        "2m"
+      ]
+    },
+    "nsw_1m_dem": {
+      "path": "s3://road-engineering-elevation-data/nsw-elvis/elevation/1m-dem/z56/Katoomba201407/",
+      "crs": "EPSG:32756",
+      "description": "Australia 50cm LiDAR/DEM (NSW)",
+      "file_count": 77,
+      "total_size_gb": 1.29,
+      "geographic_areas": [],
+      "utm_zones": [
+        "z56"
+      ],
+      "resolutions": [
+        "50cm",
+        "1m"
+      ]
+    },
+    "qld_1m_dem": {
+      "path": "s3://road-engineering-elevation-data/qld-elvis/elevation/1m-dem/z54/PortStewart_2014_Twn/",
+      "crs": "EPSG:4326",
+      "description": "Wa 1m LiDAR/DEM (QLD)",
+      "file_count": 122,
+      "total_size_gb": 0.6,
+      "geographic_areas": [
+        "Wa"
+      ],
+      "utm_zones": [],
+      "resolutions": [
+        "1m"
+      ]
+    },
+    "qld_50cm_dem": {
+      "path": "s3://road-engineering-elevation-data/qld-elvis/elevation/50cm-dem/z55/Burdekin_River_South_2024_Prj/",
+      "crs": "EPSG:4326",
+      "description": "Australia 50cm LiDAR/DEM (QLD)",
+      "file_count": 9443,
+      "total_size_gb": 20.54,
+      "geographic_areas": [],
+      "utm_zones": [],
+      "resolutions": [
         "50cm"
+      ]
+    },
+    "tas_1m_dem": {
+      "path": "s3://road-engineering-elevation-data/tas-elvis/elevation/1m-dem/z55/ClimateFuturesHuon2008/",
+      "crs": "EPSG:4326",
+      "description": "Australia 50cm LiDAR/DEM (TAS)",
+      "file_count": 283,
+      "total_size_gb": 0.4,
+      "geographic_areas": [],
+      "utm_zones": [],
+      "resolutions": [
+        "50cm",
+        "1m"
+      ]
+    },
+    "tas_50cm_dem": {
+      "path": "s3://road-engineering-elevation-data/tas-elvis/elevation/50cm-dem/z55/SouthCoast2021/",
+      "crs": "EPSG:4326",
+      "description": "Australia 50cm LiDAR/DEM (TAS)",
+      "file_count": 242,
+      "total_size_gb": 4.08,
+      "geographic_areas": [],
+      "utm_zones": [],
+      "resolutions": [
+        "50cm"
+      ]
+    },
+    "tas_2m_dem": {
+      "path": "s3://road-engineering-elevation-data/tas-elvis/elevation/2m-dem/z55/MeanderValleyRegional2014/",
+      "crs": "EPSG:4326",
+      "description": "Australia 50cm LiDAR/DEM (TAS)",
+      "file_count": 2357,
+      "total_size_gb": 1.52,
+      "geographic_areas": [],
+      "utm_zones": [],
+      "resolutions": [
+        "50cm",
+        "2m"
       ]
     }
   },
@@ -122,22 +213,45 @@
         "path": "s3://road-engineering-elevation-data/act-elvis/",
         "layer": null,
         "crs": "EPSG:3577",
-        "description": "Australia ACT 1m LiDAR DEM"
-      }
-    },
-    "invalid": {
-      "nsw_elvis": {
-        "path": "s3://road-engineering-elevation-data/nsw-elvis/",
-        "layer": null,
-        "crs": "EPSG:3577",
-        "description": "Australia NSW 1m LiDAR DEM"
+        "description": "Australia ACT 1m LiDAR DEM",
+        "priority": 1
       },
-      "vic_elvis": {
-        "path": "s3://road-engineering-elevation-data/vic-elvis/",
+      "csiro_qld_z56": {
+        "path": "s3://road-engineering-elevation-data/csiro-elvis/elevation/1m-dem/z56/",
+        "layer": null,
+        "crs": "EPSG:32756",
+        "description": "Queensland/NSW 1m LiDAR (CSIRO) - Clarence & Richmond Rivers",
+        "priority": 1
+      },
+      "dawe_qld_z56_burnett": {
+        "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/50cm-dem/z56/",
+        "layer": null,
+        "crs": "EPSG:32756",
+        "description": "Queensland 50cm LiDAR (DAWE) - Burnett, Fitzroy, Mary Rivers",
+        "priority": 1
+      },
+      "ga_vic_z55": {
+        "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/z55/",
+        "layer": null,
+        "crs": "EPSG:32755",
+        "description": "Victoria 1m LiDAR (GA) - Including Bendigo, Melbourne regions",
+        "priority": 1
+      },
+      "griffith_qld_z55": {
+        "path": "s3://road-engineering-elevation-data/griffith-elvis/elevation/50cm-dem/z55/",
+        "layer": null,
+        "crs": "EPSG:32755",
+        "description": "Queensland/Victoria 50cm LiDAR (Griffith) - Multiple regional areas",
+        "priority": 1
+      },
+      "ga_national_ausgeoid": {
+        "path": "s3://road-engineering-elevation-data/ga-elvis/elevation/1m-dem/ausgeoid/",
         "layer": null,
         "crs": "EPSG:3577",
-        "description": "Australia VIC 1m LiDAR DEM"
+        "description": "Australia National 1m DEM (GA) - Multi-state coverage",
+        "priority": 1
       }
     },
+    "invalid": {},
     "missing_in_config": {
       "act_1m_dem": 

@@ -48,55 +48,52 @@ class SpatialIndexLoader:
         return self.nz_spatial_index
     
     def find_au_file_for_coordinate(self, lat: float, lon: float) -> Optional[str]:
-        """Find Australian DEM file for given coordinates using UTM zone matching"""
+        """Find Australian DEM file for given coordinates using precise bounds matching"""
         index = self.load_australian_index()
         if not index:
             return None
             
-        # Determine UTM zone for coordinates
-        # Brisbane (-27.4698, 153.0251) is in UTM zone 56
-        utm_zone = self._get_utm_zone_for_coordinate(lat, lon)
-        zone_key = f"z{utm_zone}"
+        # Search through all UTM zones to find files that contain the coordinate
+        matching_files = []
         
-        # Get files from appropriate UTM zone
-        if zone_key not in index.get("utm_zones", {}):
-            logger.warning(f"No DEM files available for UTM zone {utm_zone}")
+        for zone_key, zone_data in index.get("utm_zones", {}).items():
+            for file_info in zone_data.get("files", []):
+                bounds = file_info.get("bounds", {})
+                
+                # Skip files with fallback bounds (not precise)
+                min_lat = bounds.get("min_lat", 999)
+                max_lat = bounds.get("max_lat", -999)
+                min_lon = bounds.get("min_lon", 999)
+                max_lon = bounds.get("max_lon", -999)
+                
+                # Skip Queensland fallback bounds and Australia-wide fallback bounds
+                is_qld_fallback = (abs(min_lat - (-29.2)) < 0.1 and abs(max_lat - (-9.0)) < 0.1)
+                is_au_fallback = (abs(min_lat - (-44.0)) < 0.1 and abs(max_lat - (-9.0)) < 0.1)
+                
+                if not is_qld_fallback and not is_au_fallback:
+                    # Check if coordinate falls within precise bounds
+                    if (min_lat <= lat <= max_lat and min_lon <= lon <= max_lon):
+                        matching_files.append(file_info)
+        
+        if not matching_files:
+            logger.warning(f"No AU DEM files with precise bounds cover coordinates ({lat}, {lon})")
             return None
-            
-        zone_files = index["utm_zones"][zone_key]["files"]
         
-        # For Brisbane, prioritize files by filename patterns that suggest coverage
-        # Brisbane area files typically have grid references starting with "27" (latitude)
+        # Sort by file size and prioritize Brisbane files for Brisbane coordinates
         if abs(lat + 27.5) < 1.0:  # Brisbane area
-            brisbane_candidates = []
-            other_candidates = []
-            
-            for file_info in zone_files:
-                filename = file_info.get("filename", "")
-                # Look for Brisbane-area grid references in filename
-                if any(pattern in filename for pattern in ["27", "6960", "502", "Brisbane", "SEQ"]):
-                    brisbane_candidates.append(file_info)
-                else:
-                    other_candidates.append(file_info)
-            
-            # Try Brisbane-specific files first, then others
-            all_candidates = brisbane_candidates + other_candidates
-        else:
-            all_candidates = zone_files
+            brisbane_files = [f for f in matching_files if "brisbane" in f.get("filename", "").lower()]
+            if brisbane_files:
+                # Sort Brisbane files by size (larger files more likely to have good coverage)
+                brisbane_files.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
+                best_file = brisbane_files[0].get("file")
+                logger.info(f"Found Brisbane DEM file for ({lat}, {lon}): {brisbane_files[0].get('filename')}")
+                return best_file
         
-        # Sort by file size (larger files more likely to have coverage)
-        all_candidates.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
-        
-        # Return the first reasonably-sized file
-        for candidate in all_candidates[:10]:  # Try top 10 files
-            if candidate.get("size_mb", 0) > 0.5:  # At least 0.5MB
-                return candidate.get("file")
-        
-        # Fallback: return any file from the zone
-        if all_candidates:
-            return all_candidates[0].get("file")
-            
-        return None
+        # Sort all matching files by size and return the largest
+        matching_files.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
+        best_file = matching_files[0].get("file")
+        logger.info(f"Found AU DEM file for ({lat}, {lon}): {matching_files[0].get('filename')}")
+        return best_file
     
     def _get_utm_zone_for_coordinate(self, lat: float, lon: float) -> int:
         """Determine UTM zone for given coordinates"""
@@ -446,15 +443,28 @@ class EnhancedSourceSelector:
         return sources_by_priority
     
     def _source_covers_coordinates(self, source_id: str, lat: float, lon: float) -> bool:
-        """Check if a source covers the given coordinates"""
+        """Check if a source covers the given coordinates using spatial index"""
         source_config = self.config[source_id]
         path = source_config.get('path', '')
         
-        # For S3 sources, check with spatial index
-        if path.startswith('s3://nz-elevation') and self.spatial_index_loader:
-            return self.spatial_index_loader.find_nz_file_for_coordinate(lat, lon) is not None
-        elif path.startswith('s3://road-engineering-elevation-data') and self.spatial_index_loader:
+        # For unified Australian spatial index source
+        if source_id == 'au_spatial_index' and self.spatial_index_loader:
             return self.spatial_index_loader.find_au_file_for_coordinate(lat, lon) is not None
+            
+        # For Australian S3 sources, use spatial index to find actual file match
+        elif path.startswith('s3://road-engineering-elevation-data') and self.spatial_index_loader:
+            au_file = self.spatial_index_loader.find_au_file_for_coordinate(lat, lon)
+            if au_file:
+                # Check if the found file matches this source's directory path
+                return au_file.startswith(path) or path.rstrip('/') in au_file
+            return False
+            
+        # For NZ sources, check with spatial index
+        elif path.startswith('s3://nz-elevation') and self.spatial_index_loader:
+            nz_file = self.spatial_index_loader.find_nz_file_for_coordinate(lat, lon)
+            if nz_file:
+                return nz_file.startswith(path) or path.rstrip('/') in nz_file
+            return False
         
         # For API sources, assume global coverage
         if path.startswith('api://'):
@@ -557,8 +567,18 @@ class EnhancedSourceSelector:
                 
                 # Open the dataset using GDAL VFS
                 with rasterio.open(vsi_path) as dataset:
-                    # Get elevation value at the specified coordinates
-                    row, col = dataset.index(lon, lat)
+                    # Check if we need coordinate transformation
+                    if dataset.crs and dataset.crs != 'EPSG:4326':
+                        # Transform lat/lon to dataset CRS
+                        from rasterio.warp import transform
+                        xs, ys = transform('EPSG:4326', dataset.crs, [lon], [lat])
+                        x, y = xs[0], ys[0]
+                        logger.debug(f"Transformed ({lat}, {lon}) to ({x}, {y}) in {dataset.crs}")
+                    else:
+                        x, y = lon, lat
+                    
+                    # Get row/col indices for the transformed coordinates
+                    row, col = dataset.index(x, y)
                     
                     # Check if coordinates are within bounds
                     if 0 <= row < dataset.height and 0 <= col < dataset.width:
@@ -575,6 +595,7 @@ class EnhancedSourceSelector:
                         return elevation
                     else:
                         logger.warning(f"Coordinates ({lat}, {lon}) are outside bounds of {dem_file}")
+                        logger.debug(f"Row {row} not in [0, {dataset.height}), Col {col} not in [0, {dataset.width})")
                         return None
                         
             except RasterioIOError as e:

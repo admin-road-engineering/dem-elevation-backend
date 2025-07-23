@@ -34,6 +34,13 @@ S3.env
 !.env.example
 !env.example
 
+# API Keys and Secrets
+*.key
+*api_key*
+*API_KEY*
+secrets.json
+credentials.json
+
 # IDE
 .vscode/
 .idea/
@@ -86,3 +93,33 @@ dem_usage.json
 
 # Claude AI
 .claude/
+
+# Generated Files - Checkpoint and Progress Files
+config/checkpoint_*.json
+config/*_results.json
+config/*_report.md
+config/*_summary.md
+config/precise_coordinates.csv
+config/precise_spatial_index.json
+config/*.json.backup
+config/utm_converter_validation_*.json
+
+# Test Results and Reports
+*test_results.json
+*_TEST_REPORT.md
+*_FINAL_REPORT.md
+PROJECT_STATUS.md
+COMPREHENSIVE_*.md
+GOOGLE_*.md
+GPXZ_*.md
+PHASE_*.md
+
+# Analysis and Utility Scripts (Root Level)
+analyze_*.py
+test_*.py
+
+# Batch Files
+*.bat
+
+# Generated Documentation (Keep only essential docs)
+# Note: docs/ folder documentation should be committed

@@ -60,7 +60,7 @@ This document outlines the comprehensive testing strategy for the S3 â†’ GPXZ â†
 **Purpose**: Final fallback when GPXZ rate limits exceeded
 
 **Authentication:**
-- API Key: `AIzaSyAyBIQ7miuT86ndVnCYV_TQUWToxCCsZFQ`
+- API Key: `YOUR_GOOGLE_API_KEY`
 - Query Parameter: `key={api_key}`
 
 **Rate Limits:**
