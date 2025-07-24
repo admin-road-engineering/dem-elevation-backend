@@ -123,3 +123,38 @@ test_*.py
 
 # Generated Documentation (Keep only essential docs)
 # Note: docs/ folder documentation should be committedconfig/grouped_spatial_index.json
+
+# Debug Scripts (Temporary)
+debug_*.py
+
+# Analysis Scripts (Temporary)
+analyze_*.py
+test_*.py
+comprehensive_*.py
+incremental_*.py
+metadata_*.py
+overlap_*.py
+validate_*.py
+ground_truth_*.py
+phase1_*.py
+quick_*.py
+smart_*.py
+fix_*.py
+add_*.py
+create_*.py
+generate_*.py
+populate_*.py
+direct_*.py
+
+# Large Index Files (Too big for git)
+config/phase3_*_index.json
+config/grouped_spatial_index.json
+config/*_backup_*.json
+
+# Analysis Results
+config/campaign_structure_analysis.json
+config/audit_response_validation_report.json
+config/*_report_*.md
+
+# AI Chat Files
+Gemini.md

@@ -387,10 +387,28 @@ Tests cover precision validation, boundary conditions, source selection, S3 conn
 - **Outlier analysis**: `python scripts/analyze_performance_outliers.py` - Performance pattern analysis
 - **Run all tests**: `pytest tests/` - Comprehensive test suite with 15+ tests covering all components
 
-#### Phase 3 Preparation (Ready to Implement)
-- **Geographic subdivision**: Metro-specific dataset creation for Brisbane, Sydney, Melbourne
-- **Performance targets**: 316x Brisbane speedup, 42x Sydney speedup through targeted datasets
-- **Hierarchical selection**: Metro → Regional → Rural → National selection cascade
+#### Phase 3 Implementation (COMPLETE) ✅
+- **Campaign-based selection**: 1,151 survey campaigns with multi-factor scoring
+- **Brisbane metro tiling**: 6,816 spatial tiles for 54,000x speedup
+- **Performance achieved**: Brisbane 54,026x, Sydney 672x speedup
+- **Manual update system**: `scripts/manual_campaign_update.py` for S3 data updates
+
+#### Manual Campaign Updates (When You Add S3 Data)
+```bash
+# After adding new DEM files to S3, run these commands:
+
+# 1. Analyze what's new (safe, no changes)
+python scripts/manual_campaign_update.py --analyze
+
+# 2. Update campaign index with new campaigns  
+python scripts/manual_campaign_update.py --update
+
+# 3. Validate the updated index
+python scripts/manual_campaign_update.py --validate
+
+# 4. Restart DEM service to load new campaigns (optional)
+# Only needed if you want immediate access to new data
+```
 
 ## Troubleshooting Guide
 

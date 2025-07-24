@@ -13,6 +13,7 @@ from src.dem_exceptions import (
     DEMServiceError, DEMSourceError, DEMAPIError, DEMS3Error,
     DEMCoordinateError, DEMConfigurationError
 )
+from src.gpxz_client import GPXZConfig
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +46,23 @@ class UnifiedElevationService:
             
             if use_s3 or use_apis:
                 logger.info("Initializing enhanced source selector with S3/API support")
+                
+                # Prepare configurations for external services
+                gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
+                google_api_key = settings.GOOGLE_ELEVATION_API_KEY
+                aws_creds = {
+                    "access_key_id": settings.AWS_ACCESS_KEY_ID,
+                    "secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                    "region": settings.AWS_DEFAULT_REGION
+                } if settings.AWS_ACCESS_KEY_ID else None
+
                 self.source_selector = EnhancedSourceSelector(
-                    dem_sources=settings.DEM_SOURCES,
-                    enable_s3_sources=use_s3,
-                    enable_api_sources=use_apis
+                    config=settings.DEM_SOURCES,
+                    use_s3=use_s3,
+                    use_apis=use_apis,
+                    gpxz_config=gpxz_config,
+                    google_api_key=google_api_key,
+                    aws_credentials=aws_creds
                 )
                 self.using_enhanced_selector = True
             else:
@@ -124,23 +138,23 @@ class UnifiedElevationService:
         """Handle elevation queries using enhanced source selector"""
         try:
             if source_id:
-                # Use specific source if requested
-                result = await self.source_selector.get_elevation_from_source(
-                    lat, lon, source_id
-                )
-            else:
-                # Use automatic source selection with full fallback chain
-                result = await self.source_selector.get_elevation_with_fallback(lat, lon)
+                # This path is not fully implemented in the enhanced selector yet
+                # and would bypass the main resilience logic.
+                # For now, we log a warning and use the main fallback.
+                logger.warning(f"Specific source_id '{source_id}' requested, but enhanced selector prioritizes the fallback chain. Ignoring for now.")
+
+            # Use automatic source selection with full fallback chain
+            result = await self.source_selector.get_elevation_with_resilience(lat, lon)
             
             return ElevationResult(
-                elevation_m=result.get('elevation'),
+                elevation_m=result.get('elevation_m'),
                 dem_source_used=result.get('source', 'unknown'),
-                message=result.get('message'),
+                message=f"Attempted sources: {result.get('attempted_sources')}",
                 metadata=result.get('metadata')
             )
             
         except Exception as e:
-            logger.error(f"Enhanced elevation query failed: {e}")
+            logger.error(f"Enhanced elevation query failed: {e}", exc_info=True)
             return ElevationResult(
                 elevation_m=None,
                 dem_source_used="enhanced_error",

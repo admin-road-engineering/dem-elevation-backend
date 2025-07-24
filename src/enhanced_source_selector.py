@@ -10,6 +10,7 @@ from src.s3_source_manager import S3SourceManager, DEMMetadata
 from src.gpxz_client import GPXZClient, GPXZConfig
 from src.google_elevation_client import GoogleElevationClient
 from src.smart_dataset_selector import SmartDatasetSelector
+from src.campaign_dataset_selector import CampaignDatasetSelector
 from src.error_handling import (
     CircuitBreaker, RetryableError, NonRetryableError, 
     create_unified_error_response, retry_with_backoff, SourceType
@@ -206,6 +207,9 @@ class EnhancedSourceSelector:
         self.gpxz_client = None
         self.google_client = None
         
+        # Phase 3 Selector
+        self.campaign_selector = CampaignDatasetSelector() if use_s3 else None
+        
         if use_apis and gpxz_config:
             self.gpxz_client = GPXZClient(gpxz_config)
         
@@ -337,9 +341,9 @@ class EnhancedSourceSelector:
                 if nz_elevation is not None:
                     return nz_elevation
             
-            # Try AU sources
+            # Try AU sources with the new robust fallback logic
             if self.spatial_index_loader:
-                au_elevation = await self._try_s3_au_source(lat, lon)
+                au_elevation = await self._try_s3_au_source_with_fallback(lat, lon)
                 if au_elevation is not None:
                     return au_elevation
             
@@ -391,30 +395,81 @@ class EnhancedSourceSelector:
             else:
                 raise NonRetryableError(f"GPXZ client error: {e}", SourceType.API)
     
-    async def _try_s3_au_source(self, lat: float, lon: float) -> Optional[float]:
-        """Try Australian S3 source using robust multi-file approach"""
-        if not self.use_s3 or not self.spatial_index_loader:
+    async def _try_s3_au_source_with_fallback(self, lat: float, lon: float) -> Optional[float]:
+        """
+        Try Australian S3 sources with a robust Phase 3 -> Phase 2 fallback.
+        This implements the critical file-level fallback chain.
+        """
+        if not self.use_s3 or not self.campaign_selector:
             return None
-            
+
+        # Phase 3: Campaign-based search (high-performance)
+        logger.info(f"Starting Phase 3 campaign search for ({lat}, {lon})")
         try:
-            # Check cost limits
-            if self.cost_manager and not self.cost_manager.can_access_s3():
-                raise NonRetryableError("S3 daily cost limit reached", SourceType.S3)
-            
-            # Get top candidate files to try
-            elevation = await self._extract_elevation_with_multiple_files(lat, lon, use_credentials=True)
-            
-            if elevation is not None:
-                if self.cost_manager:
-                    self.cost_manager.record_access(10)
-                return elevation
-            else:
-                # No mock elevation - let the fallback chain handle it
-                logger.info(f"No AU DEM files cover coordinates ({lat}, {lon}) - returning None for fallback")
-                return None
+            # 1. Get candidate files from the Phase 3 selector
+            phase3_files, campaigns_searched = self.campaign_selector.find_files_for_coordinate(lat, lon, max_campaigns=3)
+
+            if phase3_files:
+                logger.info(f"Phase 3: Found {len(phase3_files)} candidate files in campaigns: {campaigns_searched}")
+                # 2. Iterate through candidate files with file-level fallback
+                for i, file_info in enumerate(phase3_files):
+                    dem_key = file_info.get("key")
+                    if not dem_key:
+                        continue
+                    
+                    logger.debug(f"Phase 3: Attempting file {i+1}/{len(phase3_files)}: {dem_key}")
+                    elevation = await self._extract_elevation_from_s3_file(dem_key, lat, lon, use_credentials=True)
+                    
+                    if elevation is not None:
+                        logger.info(f"SUCCESS (Phase 3): Found elevation {elevation}m in {dem_key}")
+                        if self.cost_manager:
+                            self.cost_manager.record_access(file_info.get("size_mb", 10))
+                        return elevation
+                    # If elevation is None, it means file didn't cover point or had nodata. Continue to next file.
                 
+                logger.warning(f"Phase 3: Exhausted {len(phase3_files)} candidate files with no elevation found.")
+            else:
+                logger.info(f"Phase 3: No candidate files found by campaign selector.")
+
         except Exception as e:
-            raise RetryableError(f"AU S3 source error: {e}", SourceType.S3)
+            logger.error(f"Error during Phase 3 campaign search: {e}", exc_info=True)
+            # Fall through to Phase 2 on error
+
+        # Phase 2: Grouped dataset fallback (lower-performance)
+        logger.info(f"Falling back to Phase 2 grouped dataset search for ({lat}, {lon})")
+        try:
+            if not self.spatial_index_loader:
+                return None
+
+            # 3. Get candidate files from the Phase 2 selector
+            phase2_files, datasets_searched = self.spatial_index_loader.smart_selector.find_files_for_coordinate(lat, lon)
+
+            if phase2_files:
+                logger.info(f"Phase 2: Found {len(phase2_files)} candidate files in datasets: {datasets_searched}")
+                # 4. Iterate through candidate files with file-level fallback
+                for i, file_info in enumerate(phase2_files):
+                    dem_key = file_info.get("key")
+                    if not dem_key:
+                        continue
+
+                    logger.debug(f"Phase 2: Attempting file {i+1}/{len(phase2_files)}: {dem_key}")
+                    elevation = await self._extract_elevation_from_s3_file(dem_key, lat, lon, use_credentials=True)
+
+                    if elevation is not None:
+                        logger.info(f"SUCCESS (Phase 2): Found elevation {elevation}m in {dem_key}")
+                        if self.cost_manager:
+                            self.cost_manager.record_access(file_info.get("size_mb", 10))
+                        return elevation
+                
+                logger.warning(f"Phase 2: Exhausted {len(phase2_files)} candidate files with no elevation found.")
+            else:
+                logger.info(f"Phase 2: No candidate files found by grouped selector.")
+
+        except Exception as e:
+            logger.error(f"Error during Phase 2 grouped search: {e}", exc_info=True)
+
+        logger.warning(f"S3 Search Exhausted: No AU DEM files cover coordinates ({lat}, {lon}). Will fall back to external APIs.")
+        return None
     
     async def _try_google_source(self, lat: float, lon: float) -> Optional[float]:
         """Try Google Elevation API source"""
@@ -489,49 +544,6 @@ class EnhancedSourceSelector:
         # For other sources, assume they cover the coordinates
         return True
     
-    async def _extract_elevation_with_multiple_files(self, lat: float, lon: float, use_credentials: bool = True) -> Optional[float]:
-        """Try multiple DEM files until one covers the coordinates"""
-        # Use targeted file selection instead of brute force
-        target_file = self.spatial_index_loader.find_au_file_for_coordinate(lat, lon)
-        if not target_file:
-            logger.warning(f"No AU DEM files found for coordinates ({lat}, {lon})")
-            return None
-        
-        logger.info(f"Trying targeted AU DEM file: {target_file}")
-        elevation = await self._extract_elevation_from_s3_file(target_file, lat, lon, use_credentials)
-        
-        if elevation is not None:
-            logger.info(f"SUCCESS: Found elevation {elevation}m in targeted file")
-            return elevation
-        
-        # If targeted file fails, try a few more files from the same UTM zone
-        index = self.spatial_index_loader.load_australian_index()
-        if not index:
-            return None
-            
-        utm_zone = self.spatial_index_loader._get_utm_zone_for_coordinate(lat, lon)
-        zone_key = f"z{utm_zone}"
-        
-        if zone_key in index.get("utm_zones", {}):
-            zone_files = index["utm_zones"][zone_key]["files"]
-            # Sort by size and try a few more
-            zone_files.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
-            
-            for i, candidate in enumerate(zone_files[:3]):  # Try top 3 files from zone
-                dem_file = candidate.get("file")
-                if dem_file == target_file:  # Skip if already tried
-                    continue
-                    
-                logger.info(f"Trying AU DEM file {i+1}/3: {candidate.get('filename')} ({candidate.get('size_mb', 0)}MB)")
-                
-                elevation = await self._extract_elevation_from_s3_file(dem_file, lat, lon, use_credentials)
-                if elevation is not None:
-                    logger.info(f"SUCCESS: Found elevation {elevation}m in {candidate.get('filename')}")
-                    return elevation
-        
-        logger.warning(f"No AU DEM files cover coordinates ({lat}, {lon}) - will fall back to GPXZ/Google")
-        return None
-
     async def _extract_elevation_from_s3_file(self, dem_file: str, lat: float, lon: float, use_credentials: bool = True) -> Optional[float]:
         """
         Extract elevation from S3 DEM file using industry best practices
@@ -615,7 +627,8 @@ class EnhancedSourceSelector:
                         return None
                         
             except RasterioIOError as e:
-                logger.error(f"Rasterio error accessing {dem_file}: {e}")
+                # This is a critical change: we now gracefully handle file-not-found or access errors
+                logger.warning(f"File-level access error for {dem_file}: {e}. This is a recoverable error.")
                 return None
             except Exception as e:
                 logger.error(f"Unexpected error accessing {dem_file}: {e}")
@@ -636,3 +649,5 @@ class EnhancedSourceSelector:
             await self.gpxz_client.close()
         if self.google_client:
             await self.google_client.close()
+
+        logger.info("EnhancedSourceSelector resources cleaned up.")
