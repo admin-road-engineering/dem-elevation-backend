@@ -9,11 +9,11 @@ import logging
 from typing import Optional
 from functools import lru_cache
 
-from src.config import Settings, get_settings
-from src.dataset_manager import DatasetManager
-from src.contour_service import ContourService
-from src.unified_elevation_service import UnifiedElevationService
-from src.dem_service import DEMService
+from .config import Settings, get_settings
+from .dataset_manager import DatasetManager
+from .contour_service import ContourService
+from .unified_elevation_service import UnifiedElevationService
+from .dem_service import DEMService
 
 logger = logging.getLogger(__name__)
 

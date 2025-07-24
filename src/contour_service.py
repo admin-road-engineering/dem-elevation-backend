@@ -13,8 +13,8 @@ from shapely.ops import unary_union
 from skimage.measure import find_contours
 from scipy.interpolate import griddata
 
-from src.dataset_manager import DatasetManager
-from src.dem_exceptions import DEMProcessingError, DEMCoordinateError
+from .dataset_manager import DatasetManager
+from .dem_exceptions import DEMProcessingError, DEMCoordinateError
 
 logger = logging.getLogger(__name__)
 

@@ -5,11 +5,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from src.config import get_settings, validate_environment_configuration
-from src.api.v1.endpoints import router as elevation_router
-from src.api.v1.dataset_endpoints import router as dataset_router
-from src.dependencies import init_service_container, close_service_container, get_dem_service
-from src.logging_config import setup_logging
+from .config import get_settings, validate_environment_configuration
+from .api.v1.endpoints import router as elevation_router
+from .api.v1.dataset_endpoints_simple import router as dataset_router
+from .dependencies import init_service_container, close_service_container, get_dem_service
+from .logging_config import setup_logging
 
 # Setup structured logging based on environment
 setup_logging(
@@ -17,6 +17,41 @@ setup_logging(
     service_name="dem-backend"
 )
 logger = logging.getLogger(__name__)
+
+async def validate_s3_indexes_if_required(settings):
+    """Validate S3 index access during startup if configured for S3 indexes"""
+    if (os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3" and 
+        os.getenv("RAILWAY_ENVIRONMENT") == "production"):
+        
+        logger.info("Production deployment with S3 indexes - validating S3 access...")
+        
+        try:
+            from .s3_index_loader import s3_index_loader
+            
+            # Test essential index access
+            health_check = s3_index_loader.health_check()
+            
+            if health_check['status'] != 'healthy':
+                error_msg = f"S3 index validation failed: {health_check.get('error', 'Unknown error')}"
+                logger.critical(error_msg, extra={"event": "s3_validation_failed"})
+                raise RuntimeError(error_msg)
+            
+            logger.info(
+                "S3 index validation successful", 
+                extra={
+                    "event": "s3_validation_success",
+                    "campaign_count": health_check.get('campaign_count', 0)
+                }
+            )
+            
+        except Exception as e:
+            logger.warning(
+                "Failed to validate S3 indexes during startup - falling back to local mode",
+                extra={"event": "s3_validation_warning", "error": str(e)},
+                exc_info=True
+            )
+            # Don't fail startup - just log the warning and continue with local indexes
+            logger.info("Continuing startup with local spatial indexes")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,6 +63,9 @@ async def lifespan(app: FastAPI):
         
         # Validate configuration and log results
         validate_environment_configuration(settings)
+        
+        # Validate S3 index access if configured for production
+        await validate_s3_indexes_if_required(settings)
         
         # Initialize dependency injection container
         service_container = init_service_container(settings)
@@ -100,13 +138,13 @@ app.include_router(elevation_router, prefix="/api")
 app.include_router(dataset_router, prefix="/api/v1")
 
 # Import models for legacy endpoint
-from src.models import PointsRequest, StandardResponse
+from .models import PointsRequest, StandardResponse
 
 # Legacy compatibility endpoint
 @app.post("/api/get_elevations", tags=["legacy"])
 async def get_elevations_legacy(request: dict):
     """Legacy batch elevation endpoint for backward compatibility."""
-    from src.api.v1.endpoints import get_elevation_points
+    from .api.v1.endpoints import get_elevation_points
     
     # Convert legacy format to new format
     coordinates = request.get("coordinates", [])
@@ -223,12 +261,12 @@ async def root():
 
 @app.get("/api/v1/health", tags=["health"])
 async def health_check():
-    """Standardized health check endpoint."""
+    """Standardized health check endpoint with S3 index status."""
     try:
         import time
         settings = get_settings()
         
-        return {
+        health_response = {
             "status": "healthy",
             "service": "DEM Backend API",
             "version": "v1.0.0",
@@ -236,6 +274,33 @@ async def health_check():
             "sources_available": len(settings.DEM_SOURCES),
             "last_check": f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}"
         }
+        
+        # Add S3 index status if using S3 indexes
+        if os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3":
+            try:
+                from .s3_index_loader import s3_index_loader
+                s3_health = s3_index_loader.health_check()
+                index_info = s3_index_loader.get_index_info()
+                
+                health_response["s3_indexes"] = {
+                    "status": s3_health.get("status", "unknown"),
+                    "bucket_accessible": s3_health.get("bucket_accessible", False),
+                    "campaign_index_loaded": s3_health.get("campaign_index_loaded", False),
+                    "cache_info": index_info.get("cache_info", {})
+                }
+                
+                if s3_health.get("status") != "healthy":
+                    health_response["status"] = "degraded"
+                    
+            except Exception as e:
+                health_response["s3_indexes"] = {
+                    "status": "error",
+                    "error": str(e)
+                }
+                health_response["status"] = "degraded"
+        
+        return health_response
+        
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")

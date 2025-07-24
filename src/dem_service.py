@@ -3,12 +3,12 @@ import rasterio
 from rasterio.env import Env
 from pyproj import Transformer, Geod
 from typing import Dict, List, Tuple, Optional, Any
-from src.config import Settings
+from .config import Settings
 import os
-from src.unified_elevation_service import UnifiedElevationService
-from src.dataset_manager import DatasetManager
-from src.contour_service import ContourService
-from src.dem_exceptions import (
+from .unified_elevation_service import UnifiedElevationService
+from .dataset_manager import DatasetManager
+from .contour_service import ContourService
+from .dem_exceptions import (
     DEMServiceError, DEMFileError, DEMCacheError, 
     DEMCoordinateError, DEMProcessingError
 )

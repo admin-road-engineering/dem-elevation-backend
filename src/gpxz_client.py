@@ -4,7 +4,7 @@ from typing import List, Dict, Optional, Tuple
 from pydantic import BaseModel
 import logging
 from datetime import datetime, timedelta
-from src.error_handling import RetryableError, NonRetryableError, SourceType
+from .error_handling import RetryableError, NonRetryableError, SourceType
 
 logger = logging.getLogger(__name__)
 

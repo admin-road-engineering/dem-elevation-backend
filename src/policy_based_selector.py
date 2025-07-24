@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from src.smart_dataset_selector import SmartDatasetSelector, DatasetMatch
+from .smart_dataset_selector import SmartDatasetSelector, DatasetMatch
 
 logger = logging.getLogger(__name__)
 

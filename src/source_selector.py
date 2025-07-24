@@ -12,8 +12,8 @@ from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
 import math
 
-from src.config import Settings
-from src.models import DEMSourceMetadata
+from .config import Settings
+from .models import DEMSourceMetadata
 
 logger = logging.getLogger(__name__)
 

@@ -16,8 +16,8 @@ from rasterio.env import Env
 from rasterio.errors import RasterioIOError
 import fiona
 
-from src.config import Settings, DEMSource
-from src.dem_exceptions import DEMFileError, DEMCacheError
+from .config import Settings, DEMSource
+from .dem_exceptions import DEMFileError, DEMCacheError
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 import jwt
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from src.config import get_settings
+from .config import get_settings
 
 logger = logging.getLogger(__name__)
 

@@ -37,12 +37,19 @@ class CampaignDatasetSelector:
     - Fallback to multiple campaigns when needed
     """
     
-    def __init__(self, config_dir: Path = None):
+    def __init__(self, config_dir: Path = None, use_s3_indexes: bool = None):
         self.config_dir = config_dir or Path(__file__).parent.parent / "config"
         self.campaign_index = None
         self.tiled_index = None
+        
+        # Determine if we should use S3 indexes (Railway deployment)
+        if use_s3_indexes is None:
+            use_s3_indexes = os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3"
+        self.use_s3_indexes = use_s3_indexes
+        
         self._load_campaign_index()
-        self._load_tiled_index()
+        # Don't load tiled index immediately - load on demand to save memory
+        self.tiled_index = None
         
         # Configurable scoring weights (can be overridden by environment variables)
         self.resolution_weight = float(os.getenv("RESOLUTION_WEIGHT", "0.5"))
@@ -51,8 +58,29 @@ class CampaignDatasetSelector:
         self.provider_weight = float(os.getenv("PROVIDER_WEIGHT", "0.05"))
     
     def _load_campaign_index(self) -> None:
-        """Load the campaign-based spatial index"""
+        """Load the campaign-based spatial index from S3 or local file"""
+        if self.use_s3_indexes:
+            try:
+                from .s3_index_loader import s3_index_loader
+                self.campaign_index = s3_index_loader.load_index('campaign')
+                logger.info(f"Loaded campaign index from S3 with {self.campaign_index.get('campaign_count', 0)} campaigns")
+                return
+            except Exception as e:
+                logger.error(f"Failed to load campaign index from S3: {e}")
+                # In production with S3 indexes, fail fast rather than falling back to non-existent local files
+                if os.getenv("RAILWAY_ENVIRONMENT") == "production":
+                    logger.critical("Production deployment configured for S3 indexes but S3 access failed. Service cannot start.")
+                    raise RuntimeError(f"S3 index loading failed in production: {e}")
+                logger.info("Falling back to local campaign index")
+        
+        # Local file loading with deploy_config fallback
         campaign_index_file = self.config_dir / "phase3_campaign_populated_index.json"
+        
+        # Check deploy_config directory for Railway deployment
+        if not campaign_index_file.exists():
+            deploy_config_file = Path(__file__).parent.parent / "deploy_config" / "phase3_campaign_populated_index.json"
+            if deploy_config_file.exists():
+                campaign_index_file = deploy_config_file
         
         if not campaign_index_file.exists():
             logger.warning(f"Campaign index not found at {campaign_index_file}")
@@ -77,7 +105,22 @@ class CampaignDatasetSelector:
             self.campaign_index = {"datasets": {}}
     
     def _load_tiled_index(self) -> None:
-        """Load the tiled spatial index for metro areas"""
+        """Load the tiled spatial index for metro areas from S3 or local file"""
+        if self.use_s3_indexes:
+            try:
+                from .s3_index_loader import s3_index_loader
+                self.tiled_index = s3_index_loader.load_index('tiled')
+                logger.info(f"Loaded tiled index from S3 with {len(self.tiled_index.get('datasets', {}))} tiles")
+                return
+            except Exception as e:
+                logger.error(f"Failed to load tiled index from S3: {e}")
+                # In production with S3 indexes, fail fast rather than falling back to non-existent local files
+                if os.getenv("RAILWAY_ENVIRONMENT") == "production":
+                    logger.critical("Production deployment configured for S3 indexes but S3 access failed. Service cannot start.")
+                    raise RuntimeError(f"S3 index loading failed in production: {e}")
+                logger.info("Falling back to local tiled index")
+        
+        # Local file loading
         tiled_index_file = self.config_dir / "phase3_brisbane_tiled_index.json"
         
         if tiled_index_file.exists():

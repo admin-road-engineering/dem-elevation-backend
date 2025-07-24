@@ -4,14 +4,14 @@ Provides transparency into the grouped dataset architecture
 """
 from fastapi import APIRouter, HTTPException
 from typing import Dict, List, Any
-from src.smart_dataset_selector import SmartDatasetSelector
+from ...campaign_dataset_selector import CampaignDatasetSelector
 from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.get("/datasets", summary="List all available datasets")
+@router.get("/campaigns", summary="List all available campaigns (Phase 3)")
 async def get_datasets() -> Dict[str, Any]:
     """
     Get comprehensive information about all available datasets in the grouped spatial index.
@@ -24,7 +24,7 @@ async def get_datasets() -> Dict[str, Any]:
     """
     try:
         config_dir = Path(__file__).parent.parent.parent / "config"
-        smart_selector = SmartDatasetSelector(config_dir)
+        smart_selector = CampaignDatasetSelector(config_dir)
         
         # Get performance statistics
         perf_stats = smart_selector.get_performance_stats()
@@ -97,7 +97,7 @@ async def get_dataset_details(dataset_id: str) -> Dict[str, Any]:
     """
     try:
         config_dir = Path(__file__).parent.parent.parent / "config"
-        smart_selector = SmartDatasetSelector(config_dir)
+        smart_selector = CampaignDatasetSelector(config_dir)
         
         if not smart_selector.grouped_index or "datasets" not in smart_selector.grouped_index:
             raise HTTPException(status_code=404, detail="No dataset index available")
@@ -260,7 +260,7 @@ async def preview_dataset_selection(latitude: float, longitude: float) -> Dict[s
     """
     try:
         config_dir = Path(__file__).parent.parent.parent / "config"
-        smart_selector = SmartDatasetSelector(config_dir)
+        smart_selector = CampaignDatasetSelector(config_dir)
         
         # Get dataset matches with confidence scores
         dataset_matches = smart_selector.select_datasets_for_coordinate(latitude, longitude)

@@ -158,3 +158,27 @@ config/*_report_*.md
 
 # AI Chat Files
 Gemini.md
+
+# Deployment and Build Files
+.build/
+.railwayignore
+deploy_config/
+start_railway.py
+simple_startup.py
+
+# Railway Deployment Scripts
+scripts/deploy_to_railway.py
+scripts/deploy_to_railway_clean.py
+scripts/railway_startup.py
+scripts/set_railway_*.py
+scripts/simple_railway_deploy.py
+scripts/simple_s3_upload.py
+scripts/upload_indexes_to_s3.py
+scripts/check_s3_access.py
+scripts/simple_startup.py
+
+# Auto-generated API Endpoints
+src/api/v1/dataset_endpoints_simple.py
+
+# S3 Index Loader (Production-specific)
+src/s3_index_loader.py

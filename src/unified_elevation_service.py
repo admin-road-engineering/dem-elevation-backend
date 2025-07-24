@@ -6,14 +6,14 @@ import logging
 from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass
 
-from src.enhanced_source_selector import EnhancedSourceSelector
-from src.source_selector import DEMSourceSelector
-from src.config import Settings
-from src.dem_exceptions import (
+from .enhanced_source_selector import EnhancedSourceSelector
+from .source_selector import DEMSourceSelector
+from .config import Settings
+from .dem_exceptions import (
     DEMServiceError, DEMSourceError, DEMAPIError, DEMS3Error,
     DEMCoordinateError, DEMConfigurationError
 )
-from src.gpxz_client import GPXZConfig
+from .gpxz_client import GPXZConfig
 
 logger = logging.getLogger(__name__)
 
@@ -146,11 +146,35 @@ class UnifiedElevationService:
             # Use automatic source selection with full fallback chain
             result = await self.source_selector.get_elevation_with_resilience(lat, lon)
             
+            # Enhanced response with campaign information
+            source_used = result.get('source', 'unknown')
+            campaign_info = result.get('campaign_info', {})
+            
+            # Create detailed message with campaign intelligence
+            attempted_sources = result.get('attempted_sources', [])
+            if campaign_info and source_used != 'gpxz_api' and source_used != 'google_api':
+                # Campaign-based message with performance info
+                speedup_factor = campaign_info.get('speedup_factor', 'unknown')
+                provider = campaign_info.get('provider', 'unknown')
+                resolution = campaign_info.get('resolution_m', 'unknown')
+                year = campaign_info.get('campaign_year', 'unknown')
+                
+                message = (f"Campaign: {source_used} | Provider: {provider} | "
+                          f"Resolution: {resolution}m | Year: {year} | "
+                          f"Performance: {speedup_factor}")
+            else:
+                # Standard fallback message
+                message = f"Attempted sources: {attempted_sources}"
+            
             return ElevationResult(
                 elevation_m=result.get('elevation_m'),
-                dem_source_used=result.get('source', 'unknown'),
-                message=f"Attempted sources: {result.get('attempted_sources')}",
-                metadata=result.get('metadata')
+                dem_source_used=source_used,
+                message=message,
+                metadata={
+                    **(result.get('metadata', {})),
+                    'campaign_info': campaign_info,
+                    'attempted_sources': attempted_sources
+                }
             )
             
         except Exception as e:

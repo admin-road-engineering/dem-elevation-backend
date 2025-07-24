@@ -4,7 +4,7 @@ Implements Phase 2 of SPATIAL_COVERAGE_IMPLEMENTATION_PLAN_V2.md
 """
 from typing import List, Dict, Optional, Tuple
 import logging
-from src.coverage_database import CoverageDatabase
+from .coverage_database import CoverageDatabase
 
 logger = logging.getLogger(__name__)
 

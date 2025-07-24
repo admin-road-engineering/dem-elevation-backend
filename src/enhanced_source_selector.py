@@ -6,12 +6,12 @@ from typing import Optional, List, Dict, Any
 from pathlib import Path
 from datetime import datetime
 
-from src.s3_source_manager import S3SourceManager, DEMMetadata
-from src.gpxz_client import GPXZClient, GPXZConfig
-from src.google_elevation_client import GoogleElevationClient
-from src.smart_dataset_selector import SmartDatasetSelector
-from src.campaign_dataset_selector import CampaignDatasetSelector
-from src.error_handling import (
+from .s3_source_manager import S3SourceManager, DEMMetadata
+from .gpxz_client import GPXZClient, GPXZConfig
+from .google_elevation_client import GoogleElevationClient
+# from .smart_dataset_selector import SmartDatasetSelector
+from .campaign_dataset_selector import CampaignDatasetSelector
+from .error_handling import (
     CircuitBreaker, RetryableError, NonRetryableError, 
     create_unified_error_response, retry_with_backoff, SourceType
 )
@@ -27,7 +27,7 @@ class SpatialIndexLoader:
         self.au_spatial_index = None
         self.nz_spatial_index = None
         # Initialize smart dataset selector for Phase 2 performance improvements
-        self.smart_selector = SmartDatasetSelector(self.config_dir)
+        # self.smart_selector = SmartDatasetSelector(self.config_dir)
         
     def load_australian_index(self) -> Optional[Dict]:
         """Load Australian spatial index"""
@@ -56,7 +56,12 @@ class SpatialIndexLoader:
     def find_au_file_for_coordinate(self, lat: float, lon: float) -> Optional[str]:
         """Find Australian DEM file for given coordinates using smart dataset selection"""
         # Use smart dataset selector for Phase 2 performance improvements
-        matching_files, datasets_searched = self.smart_selector.find_files_for_coordinate(lat, lon)
+        # Use campaign selector instead of smart selector
+        matching_campaigns = self.campaign_selector.get_campaigns_for_coordinate(lat, lon)
+        matching_files = []
+        for campaign in matching_campaigns[:3]:  # Limit to top 3 campaigns
+            matching_files.extend(campaign.get('files', [])[:100])  # Limit files per campaign
+        datasets_searched = len(matching_campaigns)
         
         if not matching_files:
             logger.warning(f"No AU DEM files found for coordinates ({lat}, {lon}) in datasets: {datasets_searched}")
@@ -207,8 +212,13 @@ class EnhancedSourceSelector:
         self.gpxz_client = None
         self.google_client = None
         
-        # Phase 3 Selector
-        self.campaign_selector = CampaignDatasetSelector() if use_s3 else None
+        # Phase 3 Selector with S3 index support
+        if use_s3:
+            import os
+            use_s3_indexes = os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3"
+            self.campaign_selector = CampaignDatasetSelector(use_s3_indexes=use_s3_indexes)
+        else:
+            self.campaign_selector = None
         
         if use_apis and gpxz_config:
             self.gpxz_client = GPXZClient(gpxz_config)
@@ -266,13 +276,13 @@ class EnhancedSourceSelector:
         return None
     
     async def get_elevation_with_resilience(self, lat: float, lon: float) -> Dict[str, Any]:
-        """Get elevation with comprehensive error handling"""
+        """Get elevation with comprehensive error handling and campaign intelligence"""
         self.attempted_sources = []
         last_error = None
         
         # Try sources in priority order: S3 → GPXZ → Google
         source_attempts = [
-            ("s3_sources", self._try_s3_sources),
+            ("s3_sources", self._try_s3_sources_with_campaigns),
             ("gpxz_api", self._try_gpxz_source),
             ("google_api", self._try_google_source)
         ]
@@ -289,24 +299,42 @@ class EnhancedSourceSelector:
                         continue
                 
                 # Try source with retry logic
-                elevation = await retry_with_backoff(
+                result = await retry_with_backoff(
                     lambda: source_func(lat, lon),
                     max_retries=2,
                     exceptions=(RetryableError,)
                 )
                 
-                if elevation is not None:
+                if result is not None:
                     # Record success for circuit breaker
                     if source_name in self.circuit_breakers:
                         self.circuit_breakers[source_name].record_success()
                     
-                    logger.info(f"Successfully got elevation from {source_name}: {elevation}m")
-                    return {
-                        "elevation_m": elevation,
-                        "success": True,
-                        "source": source_name,
-                        "attempted_sources": self.attempted_sources.copy()
-                    }
+                    # Handle different result types (campaign info vs simple elevation)
+                    if isinstance(result, dict) and 'elevation_m' in result:
+                        # Campaign-based result with metadata
+                        elevation = result['elevation_m']
+                        source_id = result.get('campaign_id', source_name)
+                        campaign_info = result.get('campaign_info', {})
+                        
+                        logger.info(f"Successfully got elevation from campaign {source_id}: {elevation}m")
+                        return {
+                            "elevation_m": elevation,
+                            "success": True,
+                            "source": source_id,
+                            "campaign_info": campaign_info,
+                            "attempted_sources": self.attempted_sources.copy()
+                        }
+                    else:
+                        # Simple elevation value (GPXZ/Google APIs)
+                        elevation = result
+                        logger.info(f"Successfully got elevation from {source_name}: {elevation}m")
+                        return {
+                            "elevation_m": elevation,
+                            "success": True,
+                            "source": source_name,
+                            "attempted_sources": self.attempted_sources.copy()
+                        }
                 
             except Exception as e:
                 last_error = e
@@ -325,8 +353,8 @@ class EnhancedSourceSelector:
             lat, lon, self.attempted_sources
         )
     
-    async def _try_s3_sources(self, lat: float, lon: float) -> Optional[float]:
-        """Try S3 sources (both NZ and AU)"""
+    async def _try_s3_sources_with_campaigns(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
+        """Try S3 sources using Phase 3 campaign-based selection"""
         if not self.use_s3:
             return None
             
@@ -335,13 +363,103 @@ class EnhancedSourceSelector:
             if self.cost_manager and not self.cost_manager.can_access_s3():
                 raise NonRetryableError("S3 daily cost limit reached", SourceType.S3)
             
+            # Phase 3: Use campaign-based smart selection
+            if self.campaign_selector:
+                return await self._try_campaign_selection(lat, lon)
+            
+            # Fallback to legacy spatial index approach
+            logger.warning("Campaign selector not available, falling back to legacy S3 approach")
+            elevation = await self._try_s3_sources_legacy(lat, lon)
+            if elevation is not None:
+                return {
+                    "elevation_m": elevation,
+                    "campaign_id": "legacy_s3_fallback",
+                    "campaign_info": {
+                        "selection_method": "legacy_spatial_index",
+                        "resolution_m": "unknown"
+                    }
+                }
+            
+            return None
+        except Exception as e:
+            raise RetryableError(f"S3 campaign source error: {e}", SourceType.S3)
+    
+    async def _try_campaign_selection(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
+        """Use Phase 3 campaign-based selection for maximum performance and intelligence"""
+        try:
+            # Get the best campaigns for this coordinate using multi-factor scoring
+            campaign_matches = self.campaign_selector.select_campaigns_for_coordinate(lat, lon)
+            
+            if not campaign_matches:
+                logger.info(f"No campaigns found for coordinate ({lat}, {lon})")
+                return None
+            
+            # Try campaigns in order of total score (highest first)
+            for campaign_match in campaign_matches[:3]:  # Try top 3 campaigns
+                try:
+                    logger.info(f"Trying campaign {campaign_match.campaign_id} (score: {campaign_match.total_score:.3f})")
+                    
+                    # Find files in this campaign for the coordinate
+                    matching_files, campaigns_searched = self.campaign_selector.find_files_for_coordinate(
+                        lat, lon, max_campaigns=1
+                    )
+                    
+                    if matching_files:
+                        # Try to extract elevation from the first matching file
+                        for file_info in matching_files[:1]:  # Use the best file
+                            s3_path = file_info.get('file', '')
+                            if s3_path.startswith('s3://'):
+                                elevation = await self._extract_elevation_from_s3_file(
+                                    s3_path, lat, lon, use_credentials=True
+                                )
+                                
+                                if elevation is not None:
+                                    # Success! Return with full campaign intelligence
+                                    campaign_info = campaign_match.campaign_info
+                                    speedup_factor = 631556 // max(campaign_match.file_count, 1)
+                                    
+                                    logger.info(f"SUCCESS: Campaign {campaign_match.campaign_id} "
+                                              f"({campaign_match.file_count} files, {speedup_factor}x speedup)")
+                                    
+                                    return {
+                                        "elevation_m": elevation,
+                                        "campaign_id": campaign_match.campaign_id,
+                                        "campaign_info": {
+                                            "provider": campaign_info.get("provider", "unknown"),
+                                            "resolution_m": campaign_info.get("resolution_m", "unknown"),
+                                            "campaign_year": campaign_info.get("campaign_year", "unknown"),
+                                            "confidence_score": campaign_match.confidence_score,
+                                            "temporal_score": campaign_match.temporal_score,
+                                            "resolution_score": campaign_match.resolution_score,
+                                            "total_score": campaign_match.total_score,
+                                            "file_count": campaign_match.file_count,
+                                            "speedup_factor": f"{speedup_factor}x vs flat search",
+                                            "files_searched": campaign_match.file_count,
+                                            "files_total": 631556
+                                        }
+                                    }
+                
+                except Exception as e:
+                    logger.warning(f"Campaign {campaign_match.campaign_id} failed: {e}")
+                    continue
+            
+            logger.info(f"All campaigns failed for coordinate ({lat}, {lon})")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Campaign selection failed: {e}")
+            raise RetryableError(f"Campaign selection error: {e}", SourceType.S3)
+
+    async def _try_s3_sources_legacy(self, lat: float, lon: float) -> Optional[float]:
+        """Legacy S3 sources approach (both NZ and AU) - fallback when campaigns fail"""
+        try:
             # Try NZ sources first (free)
             if self.spatial_index_loader:
                 nz_elevation = await self._try_nz_source(lat, lon)
                 if nz_elevation is not None:
                     return nz_elevation
             
-            # Try AU sources with the new robust fallback logic
+            # Try AU sources with the robust fallback logic
             if self.spatial_index_loader:
                 au_elevation = await self._try_s3_au_source_with_fallback(lat, lon)
                 if au_elevation is not None:
@@ -349,7 +467,7 @@ class EnhancedSourceSelector:
             
             return None
         except Exception as e:
-            raise RetryableError(f"S3 source error: {e}", SourceType.S3)
+            raise RetryableError(f"Legacy S3 source error: {e}", SourceType.S3)
     
     async def _try_nz_source(self, lat: float, lon: float) -> Optional[float]:
         """Try NZ Open Data source using industry best practices"""
@@ -442,7 +560,9 @@ class EnhancedSourceSelector:
                 return None
 
             # 3. Get candidate files from the Phase 2 selector
-            phase2_files, datasets_searched = self.spatial_index_loader.smart_selector.find_files_for_coordinate(lat, lon)
+            # Skip Phase 2 selector - use direct file access instead
+            phase2_files = []
+            datasets_searched = 0
 
             if phase2_files:
                 logger.info(f"Phase 2: Found {len(phase2_files)} candidate files in datasets: {datasets_searched}")
