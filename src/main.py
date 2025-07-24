@@ -7,6 +7,7 @@ import os
 
 from src.config import get_settings, validate_environment_configuration
 from src.api.v1.endpoints import router as elevation_router
+from src.api.v1.dataset_endpoints import router as dataset_router
 from src.dependencies import init_service_container, close_service_container, get_dem_service
 from src.logging_config import setup_logging
 
@@ -96,6 +97,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(elevation_router, prefix="/api")
+app.include_router(dataset_router, prefix="/api/v1")
 
 # Import models for legacy endpoint
 from src.models import PointsRequest, StandardResponse

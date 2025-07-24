@@ -1,0 +1,239 @@
+{
+  "benchmark_timestamp": "2025-07-24 09:37:23",
+  "total_locations_tested": 10,
+  "individual_results": [
+    {
+      "location": "brisbane_cbd",
+      "coordinates": [
+        -27.4698,
+        153.0251
+      ],
+      "flat_search": {
+        "avg_duration_ms": 240.85140228271484,
+        "files_searched": 631556,
+        "matches_found": 3
+      },
+      "smart_search": {
+        "avg_duration_ms": 16.37444496154785,
+        "files_searched": 31485,
+        "matches_found": 0
+      },
+      "performance_improvement": {
+        "speedup_factor": 14.7,
+        "search_reduction_factor": 20.1,
+        "time_saved_ms": 224.476957321167
+      }
+    },
+    {
+      "location": "sydney_harbor",
+      "coordinates": [
+        -33.8568,
+        151.2153
+      ],
+      "flat_search": {
+        "avg_duration_ms": 206.0385227203369,
+        "files_searched": 631556,
+        "matches_found": 2
+      },
+      "smart_search": {
+        "avg_duration_ms": 36.872291564941406,
+        "files_searched": 80686,
+        "matches_found": 2
+      },
+      "performance_improvement": {
+        "speedup_factor": 5.6,
+        "search_reduction_factor": 7.8,
+        "time_saved_ms": 169.1662311553955
+      }
+    },
+    {
+      "location": "melbourne_cbd",
+      "coordinates": [
+        -37.8136,
+        144.9631
+      ],
+      "flat_search": {
+        "avg_duration_ms": 176.6270637512207,
+        "files_searched": 631556,
+        "matches_found": 0
+      },
+      "smart_search": {
+        "avg_duration_ms": 9.313631057739258,
+        "files_searched": 21422,
+        "matches_found": 0
+      },
+      "performance_improvement": {
+        "speedup_factor": 19.0,
+        "search_reduction_factor": 29.5,
+        "time_saved_ms": 167.31343269348145
+      }
+    },
+    {
+      "location": "perth_city",
+      "coordinates": [
+        -31.9505,
+        115.8605
+      ],
+      "flat_search": {
+        "avg_duration_ms": 168.5474395751953,
+        "files_searched": 631556,
+        "matches_found": 0
+      },
+      "smart_search": {
+        "avg_duration_ms": 5.023765563964844,
+        "files_searched": 12340,
+        "matches_found": 0
+      },
+      "performance_improvement": {
+        "speedup_factor": 33.6,
+        "search_reduction_factor": 51.2,
+        "time_saved_ms": 163.52367401123047
+      }
+    },
+    {
+      "location": "adelaide_hills",
+      "coordinates": [
+        -34.9285,
+        138.6007
+      ],
+      "flat_search": {
+        "avg_duration_ms": 189.1493797302246,
+        "files_searched": 631556,
+        "matches_found": 1
+      },
+      "smart_search": {
+        "avg_duration_ms": 4.658699035644531,
+        "files_searched": 12340,
+        "matches_found": 1
+      },
+      "performance_improvement": {
+        "speedup_factor": 40.6,
+        "search_reduction_factor": 51.2,
+        "time_saved_ms": 184.49068069458008
+      }
+    },
+    {
+      "location": "cairns_coast",
+      "coordinates": [
+        -16.9186,
+        145.7781
+      ],
+      "flat_search": {
+        "avg_duration_ms": 193.02339553833008,
+        "files_searched": 631556,
+        "matches_found": 3
+      },
+      "smart_search": {
+        "avg_duration_ms": 94.65417861938477,
+        "files_searched": 216106,
+        "matches_found": 1
+      },
+      "performance_improvement": {
+        "speedup_factor": 2.0,
+        "search_reduction_factor": 2.9,
+        "time_saved_ms": 98.36921691894531
+      }
+    },
+    {
+      "location": "hobart_waterfront",
+      "coordinates": [
+        -42.8821,
+        147.3272
+      ],
+      "flat_search": {
+        "avg_duration_ms": 174.41401481628418,
+        "files_searched": 631556,
+        "matches_found": 3
+      },
+      "smart_search": {
+        "avg_duration_ms": 25.003814697265625,
+        "files_searched": 62538,
+        "matches_found": 2
+      },
+      "performance_improvement": {
+        "speedup_factor": 7.0,
+        "search_reduction_factor": 10.1,
+        "time_saved_ms": 149.41020011901855
+      }
+    },
+    {
+      "location": "canberra_parliament",
+      "coordinates": [
+        -35.3081,
+        149.1245
+      ],
+      "flat_search": {
+        "avg_duration_ms": 204.52518463134766,
+        "files_searched": 631556,
+        "matches_found": 1
+      },
+      "smart_search": {
+        "avg_duration_ms": 2.4672985076904297,
+        "files_searched": 4195,
+        "matches_found": 1
+      },
+      "performance_improvement": {
+        "speedup_factor": 82.9,
+        "search_reduction_factor": 150.5,
+        "time_saved_ms": 202.05788612365725
+      }
+    },
+    {
+      "location": "gold_coast",
+      "coordinates": [
+        -28.0167,
+        153.4
+      ],
+      "flat_search": {
+        "avg_duration_ms": 185.63342094421387,
+        "files_searched": 631556,
+        "matches_found": 2
+      },
+      "smart_search": {
+        "avg_duration_ms": 13.613748550415039,
+        "files_searched": 31485,
+        "matches_found": 0
+      },
+      "performance_improvement": {
+        "speedup_factor": 13.6,
+        "search_reduction_factor": 20.1,
+        "time_saved_ms": 172.01967239379883
+      }
+    },
+    {
+      "location": "newcastle",
+      "coordinates": [
+        -32.9283,
+        151.7817
+      ],
+      "flat_search": {
+        "avg_duration_ms": 165.13700485229492,
+        "files_searched": 631556,
+        "matches_found": 1
+      },
+      "smart_search": {
+        "avg_duration_ms": 40.27900695800781,
+        "files_searched": 80686,
+        "matches_found": 1
+      },
+      "performance_improvement": {
+        "speedup_factor": 4.1,
+        "search_reduction_factor": 7.8,
+        "time_saved_ms": 124.85799789428711
+      }
+    }
+  ],
+  "overall_performance": {
+    "average_speedup": 22.3,
+    "max_speedup": 82.9,
+    "min_speedup": 2.0,
+    "average_search_reduction": 35.1,
+    "max_search_reduction": 150.5,
+    "target_achievements": {
+      "brisbane_cbd_target": "316x speedup",
+      "brisbane_cbd_actual": "14.7x speedup",
+      "sydney_harbor_target": "42x speedup",
+      "sydney_harbor_actual": "5.6x speedup"
+    }
+  }
+}

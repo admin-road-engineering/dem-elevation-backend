@@ -26,17 +26,14 @@ class GDALErrorFilter(logging.Filter):
     def __init__(self):
         super().__init__()
         # List of error patterns to suppress
+        # These patterns target non-critical errors from the OpenFileGDB driver
+        # which can be noisy but do not prevent functionality.
         self.suppress_patterns = [
-            'Error occurred in C:\\vcpkg\\buildtrees\\gdal\\src\\v3.9.3-e3a570b154.clean\\ogr\\ogrsf_frmts\\openfilegdb\\filegdbtable.cpp',
-            'filegdbtable.cpp at line 1656',
-            'filegdbtable.cpp at line 1518',
-            'filegdbtable.cpp at line 1427',
-            'GDAL signalled an error: err_no=1',
-            'OpenFileGDB',
-            'FileGDB',
-            'ogr\\ogrsf_frmts\\openfilegdb',
-            'openfilegdb\\filegdbtable.cpp',
-            'Error occurred in C:'
+            "OpenFileGDB",
+            "FileGDB", 
+            "filegdbtable.cpp",
+            # Generic GDAL error that is often not critical for read operations
+            "GDAL signalled an error: err_no=1",
         ]
     
     def filter(self, record):
@@ -73,9 +70,12 @@ class DEMService:
         self.contour_service = ContourService(self.dataset_manager)
         
         # Set AWS environment variables globally for GDAL/rasterio
+        # Note: In production deployments (EC2, ECS, Lambda), prefer IAM roles 
+        # over static credentials for enhanced security
         import os
-        os.environ['AWS_ACCESS_KEY_ID'] = settings.AWS_ACCESS_KEY_ID
-        os.environ['AWS_SECRET_ACCESS_KEY'] = settings.AWS_SECRET_ACCESS_KEY
+        if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            os.environ['AWS_ACCESS_KEY_ID'] = settings.AWS_ACCESS_KEY_ID
+            os.environ['AWS_SECRET_ACCESS_KEY'] = settings.AWS_SECRET_ACCESS_KEY
         os.environ['AWS_DEFAULT_REGION'] = settings.AWS_DEFAULT_REGION
         
         # Initialize unified elevation service that handles all source selection logic

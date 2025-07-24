@@ -122,4 +122,4 @@ test_*.py
 *.bat
 
 # Generated Documentation (Keep only essential docs)
-# Note: docs/ folder documentation should be committed
+# Note: docs/ folder documentation should be committedconfig/grouped_spatial_index.json

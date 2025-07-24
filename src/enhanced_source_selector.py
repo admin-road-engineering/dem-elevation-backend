@@ -9,19 +9,24 @@ from datetime import datetime
 from src.s3_source_manager import S3SourceManager, DEMMetadata
 from src.gpxz_client import GPXZClient, GPXZConfig
 from src.google_elevation_client import GoogleElevationClient
+from src.smart_dataset_selector import SmartDatasetSelector
 from src.error_handling import (
     CircuitBreaker, RetryableError, NonRetryableError, 
     create_unified_error_response, retry_with_backoff, SourceType
 )
 
+logger = logging.getLogger(__name__)
+
 class SpatialIndexLoader:
-    """Loads and manages spatial index files for S3 DEM sources"""
+    """Loads and manages spatial index files for S3 DEM sources with smart dataset selection"""
     
     def __init__(self):
         self.project_root = Path(__file__).parent.parent
         self.config_dir = self.project_root / "config"
         self.au_spatial_index = None
         self.nz_spatial_index = None
+        # Initialize smart dataset selector for Phase 2 performance improvements
+        self.smart_selector = SmartDatasetSelector(self.config_dir)
         
     def load_australian_index(self) -> Optional[Dict]:
         """Load Australian spatial index"""
@@ -48,52 +53,63 @@ class SpatialIndexLoader:
         return self.nz_spatial_index
     
     def find_au_file_for_coordinate(self, lat: float, lon: float) -> Optional[str]:
-        """Find Australian DEM file for given coordinates using precise bounds matching"""
-        index = self.load_australian_index()
-        if not index:
-            return None
-            
-        # Search through all UTM zones to find files that contain the coordinate
-        matching_files = []
-        
-        for zone_key, zone_data in index.get("utm_zones", {}).items():
-            for file_info in zone_data.get("files", []):
-                bounds = file_info.get("bounds", {})
-                
-                # Skip files with fallback bounds (not precise)
-                min_lat = bounds.get("min_lat", 999)
-                max_lat = bounds.get("max_lat", -999)
-                min_lon = bounds.get("min_lon", 999)
-                max_lon = bounds.get("max_lon", -999)
-                
-                # Skip Queensland fallback bounds and Australia-wide fallback bounds
-                is_qld_fallback = (abs(min_lat - (-29.2)) < 0.1 and abs(max_lat - (-9.0)) < 0.1)
-                is_au_fallback = (abs(min_lat - (-44.0)) < 0.1 and abs(max_lat - (-9.0)) < 0.1)
-                
-                if not is_qld_fallback and not is_au_fallback:
-                    # Check if coordinate falls within precise bounds
-                    if (min_lat <= lat <= max_lat and min_lon <= lon <= max_lon):
-                        matching_files.append(file_info)
+        """Find Australian DEM file for given coordinates using smart dataset selection"""
+        # Use smart dataset selector for Phase 2 performance improvements
+        matching_files, datasets_searched = self.smart_selector.find_files_for_coordinate(lat, lon)
         
         if not matching_files:
-            logger.warning(f"No AU DEM files with precise bounds cover coordinates ({lat}, {lon})")
+            logger.warning(f"No AU DEM files found for coordinates ({lat}, {lon}) in datasets: {datasets_searched}")
             return None
         
-        # Sort by file size and prioritize Brisbane files for Brisbane coordinates
-        if abs(lat + 27.5) < 1.0:  # Brisbane area
-            brisbane_files = [f for f in matching_files if "brisbane" in f.get("filename", "").lower()]
-            if brisbane_files:
-                # Sort Brisbane files by size (larger files more likely to have good coverage)
-                brisbane_files.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
-                best_file = brisbane_files[0].get("file")
-                logger.info(f"Found Brisbane DEM file for ({lat}, {lon}): {brisbane_files[0].get('filename')}")
-                return best_file
+        # Prioritize files based on quality indicators
+        best_file = self._select_best_file_from_matches(matching_files, lat, lon)
         
-        # Sort all matching files by size and return the largest
-        matching_files.sort(key=lambda x: x.get("size_mb", 0), reverse=True)
-        best_file = matching_files[0].get("file")
-        logger.info(f"Found AU DEM file for ({lat}, {lon}): {matching_files[0].get('filename')}")
-        return best_file
+        if best_file:
+            filename = best_file.get("filename", "unknown")
+            key = best_file.get("key", best_file.get("file", ""))
+            logger.info(f"Smart selection found file for ({lat}, {lon}): {filename} from datasets {datasets_searched}")
+            return key
+        
+        return None
+    
+    def _select_best_file_from_matches(self, matching_files: List[Dict], lat: float, lon: float) -> Optional[Dict]:
+        """Select the best file from a list of matching files based on quality indicators"""
+        if not matching_files:
+            return None
+        
+        # Sort by priority factors:
+        # 1. Brisbane area preference for Brisbane coordinates
+        # 2. File size (larger often means better coverage)
+        # 3. Resolution preference (smaller pixel size)
+        
+        scored_files = []
+        is_brisbane_area = abs(lat + 27.5) < 1.0  # Brisbane area
+        
+        for file_info in matching_files:
+            score = 0.0
+            filename = file_info.get("filename", "").lower()
+            
+            # Brisbane area preference
+            if is_brisbane_area and "brisbane" in filename:
+                score += 10.0
+            
+            # File size preference (larger files often have better coverage)
+            size_mb = file_info.get("metadata", {}).get("size_mb", 0)
+            if size_mb > 0:
+                score += min(size_mb / 10.0, 5.0)  # Cap size bonus at 5.0
+            
+            # Resolution preference (smaller pixel size is better)
+            pixel_size = file_info.get("metadata", {}).get("pixel_size_x", 30)
+            if pixel_size <= 1.0:
+                score += 3.0  # High resolution bonus
+            elif pixel_size <= 5.0:
+                score += 1.0  # Medium resolution bonus
+            
+            scored_files.append((score, file_info))
+        
+        # Return the highest scoring file
+        scored_files.sort(key=lambda x: x[0], reverse=True)
+        return scored_files[0][1]
     
     def _get_utm_zone_for_coordinate(self, lat: float, lon: float) -> int:
         """Determine UTM zone for given coordinates"""

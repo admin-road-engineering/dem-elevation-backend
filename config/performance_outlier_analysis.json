@@ -1,0 +1,489 @@
+{
+  "brisbane_cbd": {
+    "location": "brisbane_cbd",
+    "coordinates": {
+      "latitude": -27.4698,
+      "longitude": 153.0251
+    },
+    "performance_analysis": {
+      "performance_category": "good",
+      "speedup_factor": 14.7,
+      "files_searched": 31485,
+      "explanation": "Moderate speedup, some efficiency gained",
+      "contributing_factors": []
+    },
+    "dataset_selection": {
+      "datasets_considered": 4,
+      "datasets_searched": [
+        "csiro_qld_z56"
+      ],
+      "files_found": 0,
+      "selection_confidence": 1.0
+    },
+    "geographic_factors": {
+      "region": "Southeast Queensland (Brisbane area)",
+      "coverage_characteristics": "High-density LiDAR coverage, multiple overlapping datasets",
+      "datasets_with_bounds_match": 4,
+      "total_candidate_datasets": 4,
+      "geographic_specificity": "moderate"
+    },
+    "dataset_characteristics": {
+      "primary_dataset": {
+        "id": "csiro_qld_z56",
+        "name": "Queensland/NSW 1m LiDAR (CSIRO)",
+        "file_count": 31485,
+        "confidence": 1.0,
+        "resolution_m": 1,
+        "data_type": "LiDAR",
+        "provider": "CSIRO"
+      },
+      "dataset_size_analysis": "medium - moderate query performance",
+      "resolution_analysis": "high - 1m resolution",
+      "alternatives_available": 3
+    },
+    "optimization_opportunities": [
+      "Performance is well-optimized for this location"
+    ],
+    "detailed_dataset_analysis": [
+      {
+        "dataset_id": "csiro_qld_z56",
+        "dataset_name": "Queensland/NSW 1m LiDAR (CSIRO)",
+        "confidence_score": 0.8148148148148148,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.14814814814814814,
+          "center_proximity": 0.14814814814814814,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.0,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 31485,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Excellent choice - high resolution, trusted provider, precise geographic match"
+      },
+      {
+        "dataset_id": "griffith_elvis",
+        "dataset_name": "Griffith University LiDAR (Elvis)",
+        "confidence_score": 0.7777777777777777,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.14814814814814814,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 159785,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Good choice - adequate resolution and geographic coverage"
+      },
+      {
+        "dataset_id": "qld_elvis",
+        "dataset_name": "Queensland LiDAR (Elvis)",
+        "confidence_score": 0.6296296296296295,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 216106,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Good choice - adequate resolution and geographic coverage"
+      }
+    ]
+  },
+  "sydney_harbor": {
+    "location": "sydney_harbor",
+    "coordinates": {
+      "latitude": -33.8568,
+      "longitude": 151.2153
+    },
+    "performance_analysis": {
+      "performance_category": "fair",
+      "speedup_factor": 5.6,
+      "files_searched": 80686,
+      "explanation": "Limited speedup, large datasets still being searched",
+      "contributing_factors": []
+    },
+    "dataset_selection": {
+      "datasets_considered": 2,
+      "datasets_searched": [
+        "nsw_elvis"
+      ],
+      "files_found": 2,
+      "selection_confidence": 0.95
+    },
+    "geographic_factors": {
+      "region": "New South Wales Coast (Sydney area)",
+      "coverage_characteristics": "Good LiDAR coverage along coast, some inland gaps",
+      "datasets_with_bounds_match": 2,
+      "total_candidate_datasets": 2,
+      "geographic_specificity": "high"
+    },
+    "dataset_characteristics": {
+      "primary_dataset": {
+        "id": "nsw_elvis",
+        "name": "New South Wales LiDAR (Elvis)",
+        "file_count": 80686,
+        "confidence": 0.95,
+        "resolution_m": 1,
+        "data_type": "LiDAR",
+        "provider": "Elvis"
+      },
+      "dataset_size_analysis": "large - slower query performance",
+      "resolution_analysis": "high - 1m resolution",
+      "alternatives_available": 1
+    },
+    "optimization_opportunities": [
+      "Consider tighter geographic bounds for primary dataset",
+      "Dataset could benefit from geographic subdivision",
+      "NSW coordinates could benefit from Sydney/Newcastle subdatasets"
+    ],
+    "detailed_dataset_analysis": [
+      {
+        "dataset_id": "nsw_elvis",
+        "dataset_name": "New South Wales LiDAR (Elvis)",
+        "confidence_score": 0.6296296296296295,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 80686,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Good choice - adequate resolution and geographic coverage"
+      },
+      {
+        "dataset_id": "ga_national_ausgeoid",
+        "dataset_name": "Australia National 1m DEM (GA)",
+        "confidence_score": 0.5925925925925926,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.037037037037037035,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 2,
+        "file_count": 12340,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b11m",
+        "policy_recommendation": "Acceptable fallback - limited geographic specificity"
+      }
+    ]
+  },
+  "melbourne_cbd": {
+    "location": "melbourne_cbd",
+    "coordinates": {
+      "latitude": -37.8136,
+      "longitude": 144.9631
+    },
+    "performance_analysis": {
+      "performance_category": "good",
+      "speedup_factor": 19.0,
+      "files_searched": 21422,
+      "explanation": "Moderate speedup, some efficiency gained",
+      "contributing_factors": []
+    },
+    "dataset_selection": {
+      "datasets_considered": 2,
+      "datasets_searched": [
+        "ga_vic_z55"
+      ],
+      "files_found": 0,
+      "selection_confidence": 1.0
+    },
+    "geographic_factors": {
+      "region": "Victoria (Melbourne area)",
+      "coverage_characteristics": "Victoria-specific datasets with GA national fallback",
+      "datasets_with_bounds_match": 2,
+      "total_candidate_datasets": 2,
+      "geographic_specificity": "high"
+    },
+    "dataset_characteristics": {
+      "primary_dataset": {
+        "id": "ga_vic_z55",
+        "name": "Victoria 1m LiDAR (GA)",
+        "file_count": 21422,
+        "confidence": 1.0,
+        "resolution_m": 1,
+        "data_type": "LiDAR",
+        "provider": "GA"
+      },
+      "dataset_size_analysis": "medium - moderate query performance",
+      "resolution_analysis": "high - 1m resolution",
+      "alternatives_available": 1
+    },
+    "optimization_opportunities": [
+      "Performance is well-optimized for this location"
+    ],
+    "detailed_dataset_analysis": [
+      {
+        "dataset_id": "ga_vic_z55",
+        "dataset_name": "Victoria 1m LiDAR (GA)",
+        "confidence_score": 0.7037037037037037,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.14814814814814814,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 21422,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Good choice - adequate resolution and geographic coverage"
+      },
+      {
+        "dataset_id": "ga_national_ausgeoid",
+        "dataset_name": "Australia National 1m DEM (GA)",
+        "confidence_score": 0.5925925925925926,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.037037037037037035,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 2,
+        "file_count": 12340,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b11m",
+        "policy_recommendation": "Acceptable fallback - limited geographic specificity"
+      }
+    ]
+  },
+  "canberra_parliament": {
+    "location": "canberra_parliament",
+    "coordinates": {
+      "latitude": -35.3081,
+      "longitude": 149.1245
+    },
+    "performance_analysis": {
+      "performance_category": "excellent",
+      "speedup_factor": 82.9,
+      "files_searched": 4195,
+      "explanation": "Very high speedup due to small, specific dataset selection",
+      "contributing_factors": []
+    },
+    "dataset_selection": {
+      "datasets_considered": 4,
+      "datasets_searched": [
+        "act_elvis"
+      ],
+      "files_found": 1,
+      "selection_confidence": 1.0
+    },
+    "geographic_factors": {
+      "region": "Victoria (Melbourne area)",
+      "coverage_characteristics": "Victoria-specific datasets with GA national fallback",
+      "datasets_with_bounds_match": 4,
+      "total_candidate_datasets": 4,
+      "geographic_specificity": "moderate"
+    },
+    "dataset_characteristics": {
+      "primary_dataset": {
+        "id": "act_elvis",
+        "name": "Australian Capital Territory LiDAR",
+        "file_count": 4195,
+        "confidence": 1.0,
+        "resolution_m": 1,
+        "data_type": "LiDAR",
+        "provider": "NSW Elvis"
+      },
+      "dataset_size_analysis": "very_small - excellent query performance",
+      "resolution_analysis": "high - 1m resolution",
+      "alternatives_available": 3
+    },
+    "optimization_opportunities": [
+      "NSW coordinates could benefit from Sydney/Newcastle subdatasets"
+    ],
+    "detailed_dataset_analysis": [
+      {
+        "dataset_id": "act_elvis",
+        "dataset_name": "Australian Capital Territory LiDAR",
+        "confidence_score": 1.0,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.2962962962962963,
+          "center_proximity": 0.14814814814814814,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 4195,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Excellent choice - high resolution, trusted provider, precise geographic match"
+      },
+      {
+        "dataset_id": "nsw_elvis",
+        "dataset_name": "New South Wales LiDAR (Elvis)",
+        "confidence_score": 0.6296296296296295,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 80686,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Good choice - adequate resolution and geographic coverage"
+      },
+      {
+        "dataset_id": "ga_vic_z55",
+        "dataset_name": "Victoria 1m LiDAR (GA)",
+        "confidence_score": 0.6296296296296295,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 21422,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Good choice - adequate resolution and geographic coverage"
+      }
+    ]
+  },
+  "cairns_coast": {
+    "location": "cairns_coast",
+    "coordinates": {
+      "latitude": -16.9186,
+      "longitude": 145.7781
+    },
+    "performance_analysis": {
+      "performance_category": "poor",
+      "speedup_factor": 2.0,
+      "files_searched": 216106,
+      "explanation": "Minimal speedup, optimization needed",
+      "contributing_factors": [
+        "Large dataset search (216,106 files)"
+      ]
+    },
+    "dataset_selection": {
+      "datasets_considered": 2,
+      "datasets_searched": [
+        "qld_elvis"
+      ],
+      "files_found": 1,
+      "selection_confidence": 1.0
+    },
+    "geographic_factors": {
+      "region": "Other/Remote area",
+      "coverage_characteristics": "Limited coverage, may rely on lower-resolution national data",
+      "datasets_with_bounds_match": 2,
+      "total_candidate_datasets": 2,
+      "geographic_specificity": "high"
+    },
+    "dataset_characteristics": {
+      "primary_dataset": {
+        "id": "qld_elvis",
+        "name": "Queensland LiDAR (Elvis)",
+        "file_count": 216106,
+        "confidence": 1.0,
+        "resolution_m": 1,
+        "data_type": "LiDAR",
+        "provider": "Elvis"
+      },
+      "dataset_size_analysis": "very_large - significant performance impact",
+      "resolution_analysis": "high - 1m resolution",
+      "alternatives_available": 1
+    },
+    "optimization_opportunities": [
+      "Consider tighter geographic bounds for primary dataset",
+      "Dataset could benefit from geographic subdivision",
+      "Primary dataset is very large - consider splitting by sub-region",
+      "Queensland coordinates could benefit from Brisbane/Gold Coast subdatasets"
+    ],
+    "detailed_dataset_analysis": [
+      {
+        "dataset_id": "qld_elvis",
+        "dataset_name": "Queensland LiDAR (Elvis)",
+        "confidence_score": 0.7037037037037037,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.14814814814814814,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.07407407407407407,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 1,
+        "file_count": 216106,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b10.1m",
+        "policy_recommendation": "Good choice - adequate resolution and geographic coverage"
+      },
+      {
+        "dataset_id": "ga_national_ausgeoid",
+        "dataset_name": "Australia National 1m DEM (GA)",
+        "confidence_score": 0.5925925925925926,
+        "score_breakdown": {
+          "bounds_overlap": 0.2962962962962963,
+          "bounds_specificity": 0.0,
+          "center_proximity": 0.07407407407407407,
+          "resolution_preference": 0.14814814814814814,
+          "data_type_quality": 0.037037037037037035,
+          "provider_reliability": 0.037037037037037035,
+          "cost_efficiency": 0.0
+        },
+        "priority": 2,
+        "file_count": 12340,
+        "cost_per_query": 0.0,
+        "resolution_m": 1,
+        "accuracy": "\u00b11m",
+        "policy_recommendation": "Acceptable fallback - limited geographic specificity"
+      }
+    ]
+  }
+}

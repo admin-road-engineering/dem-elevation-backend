@@ -62,11 +62,127 @@
       }
     },
     {
-      "id": "dawe_qld_z56_burnett",
-      "name": "Queensland 50cm LiDAR (DAWE)",
+      "id": "qld_elvis",
+      "name": "Queensland LiDAR (Elvis)",
       "source_type": "s3",
-      "path": "s3://road-engineering-elevation-data/dawe-elvis/elevation/50cm-dem/z56/",
-      "crs": "EPSG:32756",
+      "path": "s3://road-engineering-elevation-data/qld-elvis/",
+      "crs": "EPSG:3577",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "Elvis",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -29.0,
+        "max_lat": -9.0,
+        "min_lon": 138.0,
+        "max_lon": 154.0
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2018-2023",
+        "point_density": "4 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00AA00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "nsw_elvis",
+      "name": "New South Wales LiDAR (Elvis)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/nsw-elvis/",
+      "crs": "EPSG:3577",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "Elvis",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -37.5,
+        "max_lat": -28.0,
+        "min_lon": 140.9,
+        "max_lon": 154.0
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2018-2023",
+        "point_density": "4 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00AA00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "tas_elvis",
+      "name": "Tasmania LiDAR (Elvis)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/tas-elvis/",
+      "crs": "EPSG:3577",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "Elvis",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -43.6,
+        "max_lat": -39.2,
+        "min_lon": 143.8,
+        "max_lon": 148.5
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2018-2023",
+        "point_density": "4 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00AA00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "griffith_elvis",
+      "name": "Griffith University LiDAR (Elvis)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/griffith-elvis/",
+      "crs": "EPSG:3577",
+      "resolution_m": 1,
+      "data_type": "LiDAR",
+      "provider": "Elvis",
+      "priority": 1,
+      "bounds": {
+        "type": "bbox",
+        "min_lat": -28.0,
+        "max_lat": -25.0,
+        "min_lon": 152.0,
+        "max_lon": 154.0
+      },
+      "cost_per_query": 0.001,
+      "accuracy": "±0.1m",
+      "enabled": true,
+      "visible_in_coverage": true,
+      "metadata": {
+        "capture_date": "2018-2023",
+        "point_density": "4 points/m²",
+        "vertical_datum": "AHD",
+        "color": "#00AA00",
+        "opacity": 0.4
+      }
+    },
+    {
+      "id": "dawe_elvis",
+      "name": "DAWE LiDAR (Elvis)",
+      "source_type": "s3",
+      "path": "s3://road-engineering-elevation-data/dawe-elvis/",
+      "crs": "EPSG:3577",
       "resolution_m": 0.5,
       "data_type": "LiDAR",
       "provider": "DAWE",

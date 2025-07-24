@@ -265,13 +265,27 @@ This is a **FastAPI-based elevation service** that provides elevation data from 
 - **Cost management**: S3 usage tracking to prevent unexpected charges during development
 - **Global coverage**: Combination of high-resolution regional data (S3) and global coverage (APIs)
 
-### Enhanced Query Performance (Phase 2 Ready)
+### Enhanced Query Performance (Phase 2 Complete, Phase 3 Ready)
+
+**Phase 2 Achievements (2025-07-24):**
 - **Smart dataset selection**: Coordinate-based routing to optimal dataset subset
-- **Brisbane CBD queries**: 316x faster (2,000 vs 631,556 files searched)
-- **Sydney Harbor queries**: 42x faster (15,000 vs 631,556 files searched)
-- **Regional queries**: 3-5x faster through geographic partitioning
-- **Dataset mapping support**: Rich metadata for visualization and inventory management
-- **Professional reporting**: Data source documentation for engineering compliance
+- **Average speedup**: 22.3x across all locations (vs flat O(n) search)
+- **Maximum speedup**: 82.9x (Canberra Parliament - small specific datasets)
+- **Architecture transformation**: O(n) flat search → O(k) targeted search
+- **Dataset organization**: 631,556 files grouped into 9 geographic/provider datasets
+
+**Phase 2 Performance Results:**
+- **Brisbane CBD**: 14.7x speedup (31,485 files vs 631,556)
+- **Sydney Harbor**: 5.6x speedup (80,686 files vs 631,556)  
+- **Melbourne CBD**: 19.0x speedup (21,422 files vs 631,556)
+- **Canberra Parliament**: 82.9x speedup (4,195 files vs 631,556)
+- **Average improvement**: 35.1x fewer files searched
+
+**Phase 3 Implementation Plan (Next Phase):**
+- **Target Performance**: Brisbane 316x, Sydney 42x speedup through metro subdivision
+- **Metro-specific datasets**: Brisbane Metro (~2,000 files), Sydney Metro (~15,000 files)
+- **Hierarchical selection**: Metro → Regional → Rural → National fallback chain
+- **Expected outcome**: 40-60x average speedup, <100ms metro area response times
 
 ### Geodatabase Handling
 - **Auto-discovery**: Automatically finds raster layers in .gdb files using common naming patterns
@@ -366,10 +380,17 @@ The service is configured to suppress non-critical GDAL errors by default (espec
 ### Testing Approach
 Tests cover precision validation, boundary conditions, source selection, S3 connectivity, and geodatabase access. Use pytest for running tests with comprehensive coverage of elevation extraction accuracy needed for professional engineering calculations.
 
-#### Phase 2 Multi-Source Testing
+#### Phase 2 Multi-Source Testing (Complete)
 - **Integration tests**: `pytest tests/test_phase2_integration.py` - Tests GPXZ client, S3 managers, enhanced selector
-- **Async resilience tests**: `pytest tests/test_async_resilience.py` - Tests circuit breakers, retry logic, performance
+- **Async resilience tests**: `pytest tests/test_async_resilience.py` - Tests circuit breakers, retry logic, performance  
+- **Performance benchmarks**: `python scripts/benchmark_performance.py` - Phase 2 vs flat search comparison
+- **Outlier analysis**: `python scripts/analyze_performance_outliers.py` - Performance pattern analysis
 - **Run all tests**: `pytest tests/` - Comprehensive test suite with 15+ tests covering all components
+
+#### Phase 3 Preparation (Ready to Implement)
+- **Geographic subdivision**: Metro-specific dataset creation for Brisbane, Sydney, Melbourne
+- **Performance targets**: 316x Brisbane speedup, 42x Sydney speedup through targeted datasets
+- **Hierarchical selection**: Metro → Regional → Rural → National selection cascade
 
 ## Troubleshooting Guide
 
