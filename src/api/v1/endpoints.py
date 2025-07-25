@@ -546,6 +546,93 @@ async def get_coverage_summary(
         logger.error(f"Error getting coverage summary: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting coverage summary: {str(e)}")
 
+@router.get("/debug/source-selection", summary="Debug source selection configuration")
+async def debug_source_selection(
+    lat: float = -27.4698,
+    lon: float = 153.0251,
+    service: DEMService = Depends(get_dem_service)
+) -> Dict[str, Any]:
+    """
+    Debug endpoint to show source selection configuration and process.
+    This helps diagnose why attempted_sources might be empty.
+    """
+    try:
+        logger.info(f"=== Debug Source Selection Endpoint Called ===")
+        logger.info(f"Testing coordinates: ({lat}, {lon})")
+        
+        debug_info = {
+            "request_coordinates": {"lat": lat, "lon": lon},
+            "timestamp": datetime.utcnow().isoformat(),
+            "service_info": {},
+            "source_selection_debug": {},
+            "elevation_attempt": {}
+        }
+        
+        # Get service information
+        if hasattr(service, 'elevation_service') and service.elevation_service:
+            elevation_service = service.elevation_service
+            debug_info["service_info"]["elevation_service_type"] = type(elevation_service).__name__
+            
+            # Check if it has an enhanced source selector
+            if hasattr(elevation_service, 'source_selector'):
+                selector = elevation_service.source_selector
+                debug_info["service_info"]["source_selector_type"] = type(selector).__name__
+                
+                # Debug source selector configuration
+                if hasattr(selector, 'config'):
+                    debug_info["source_selection_debug"]["configured_sources"] = list(selector.config.keys())
+                
+                if hasattr(selector, 'use_s3'):
+                    debug_info["source_selection_debug"]["use_s3"] = selector.use_s3
+                
+                if hasattr(selector, 'use_apis'):
+                    debug_info["source_selection_debug"]["use_apis"] = selector.use_apis
+                
+                if hasattr(selector, 'campaign_selector'):
+                    debug_info["source_selection_debug"]["campaign_selector_available"] = selector.campaign_selector is not None
+                
+                if hasattr(selector, 'gpxz_client'):
+                    debug_info["source_selection_debug"]["gpxz_client_available"] = selector.gpxz_client is not None
+                
+                if hasattr(selector, 'google_client'):
+                    debug_info["source_selection_debug"]["google_client_available"] = selector.google_client is not None
+                
+                # Check circuit breakers
+                if hasattr(selector, 'circuit_breakers'):
+                    cb_status = {}
+                    for name, cb in selector.circuit_breakers.items():
+                        cb_status[name] = {
+                            "available": cb.is_available(),
+                            "failures": cb.failure_count,
+                            "threshold": cb.failure_threshold
+                        }
+                    debug_info["source_selection_debug"]["circuit_breakers"] = cb_status
+        
+        # Try to get elevation and capture the process
+        try:
+            logger.info("Attempting elevation query for debugging...")
+            elevation, dem_source_used, message = await service.get_elevation_unified(lat, lon)
+            
+            debug_info["elevation_attempt"] = {
+                "elevation_m": elevation,
+                "dem_source_used": dem_source_used,
+                "message": message,
+                "success": elevation is not None
+            }
+            
+        except Exception as e:
+            debug_info["elevation_attempt"] = {
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "success": False
+            }
+        
+        return debug_info
+        
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Debug endpoint error: {str(e)}")
+
 # =============================================================================
 # NEW STANDARDIZED API ENDPOINTS
 # =============================================================================
