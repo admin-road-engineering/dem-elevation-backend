@@ -99,10 +99,23 @@ async def list_dem_sources(
                 "is_default": source_id == settings.DEFAULT_DEM_ID
             }
         
+        # Add environment debug information
+        import os
+        env_debug = {
+            "USE_S3_SOURCES": getattr(settings, 'USE_S3_SOURCES', False),
+            "USE_API_SOURCES": getattr(settings, 'USE_API_SOURCES', False),
+            "SPATIAL_INDEX_SOURCE": os.getenv("SPATIAL_INDEX_SOURCE", "local"),
+            "has_aws_credentials": bool(os.getenv("AWS_ACCESS_KEY_ID")),
+            "has_gpxz_key": bool(os.getenv("GPXZ_API_KEY")),
+            "railway_env": bool(os.getenv("RAILWAY_ENVIRONMENT")),
+            "dem_sources_length": len(str(os.getenv("DEM_SOURCES", "")))
+        }
+        
         return {
             "sources": sources_info,
             "default_source": settings.DEFAULT_DEM_ID,
-            "total_sources": len(sources_info)
+            "total_sources": len(sources_info),
+            "environment_debug": env_debug
         }
         
     except Exception as e:
