@@ -203,6 +203,15 @@ class EnhancedSourceSelector:
     """Enhanced source selector with S3 → GPXZ → Google fallback chain"""
     
     def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None):
+        logger.info("=== EnhancedSourceSelector Initialization ===")
+        logger.info(f"Parameters:")
+        logger.info(f"  use_s3: {use_s3}")
+        logger.info(f"  use_apis: {use_apis}")
+        logger.info(f"  config sources: {list(config.keys())}")
+        logger.info(f"  gpxz_config: {gpxz_config is not None}")
+        logger.info(f"  google_api_key: {'set' if google_api_key else 'missing'}")
+        logger.info(f"  aws_credentials: {'set' if aws_credentials else 'missing'}")
+        
         self.config = config
         self.use_s3 = use_s3
         self.use_apis = use_apis
@@ -216,15 +225,45 @@ class EnhancedSourceSelector:
         if use_s3:
             import os
             use_s3_indexes = os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3"
-            self.campaign_selector = CampaignDatasetSelector(use_s3_indexes=use_s3_indexes)
+            logger.info(f"Initializing CampaignDatasetSelector with S3 indexes: {use_s3_indexes}")
+            try:
+                self.campaign_selector = CampaignDatasetSelector(use_s3_indexes=use_s3_indexes)
+                logger.info(f"Campaign selector initialized: {self.campaign_selector is not None}")
+                if self.campaign_selector and hasattr(self.campaign_selector, 'campaign_index'):
+                    campaign_count = len(self.campaign_selector.campaign_index.get('datasets', {})) if self.campaign_selector.campaign_index else 0
+                    logger.info(f"Campaign selector loaded {campaign_count} campaigns")
+            except Exception as e:
+                logger.error(f"Failed to initialize campaign selector: {e}")
+                self.campaign_selector = None
         else:
             self.campaign_selector = None
+            logger.info("Campaign selector not initialized (S3 disabled)")
         
+        # Check GPXZ client
         if use_apis and gpxz_config:
-            self.gpxz_client = GPXZClient(gpxz_config)
+            logger.info("Initializing GPXZ client...")
+            try:
+                self.gpxz_client = GPXZClient(gpxz_config)
+                logger.info(f"GPXZ client initialized: {self.gpxz_client is not None}")
+            except Exception as e:
+                logger.error(f"Failed to initialize GPXZ client: {e}")
+                self.gpxz_client = None
+        else:
+            logger.warning(f"GPXZ client NOT initialized (use_apis={use_apis}, "
+                          f"gpxz_config={gpxz_config is not None})")
         
+        # Check Google client
         if use_apis and google_api_key:
-            self.google_client = GoogleElevationClient(google_api_key)
+            logger.info("Initializing Google client...")
+            try:
+                self.google_client = GoogleElevationClient(google_api_key)
+                logger.info(f"Google client initialized: {self.google_client is not None}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Google client: {e}")
+                self.google_client = None
+        else:
+            logger.warning(f"Google client NOT initialized (use_apis={use_apis}, "
+                          f"google_api_key={'set' if google_api_key else 'missing'})")
         
         # Circuit breakers for external services
         self.circuit_breakers = {
@@ -233,8 +272,47 @@ class EnhancedSourceSelector:
             "s3_nz": CircuitBreaker(failure_threshold=5, recovery_timeout=180),
             "s3_au": CircuitBreaker(failure_threshold=5, recovery_timeout=180)
         }
+        logger.info(f"Circuit breakers initialized: {list(self.circuit_breakers.keys())}")
         
         self.attempted_sources = []
+        
+        # Log GDAL environment variables for debugging
+        import os
+        logger.info("GDAL environment variables:")
+        for key, value in os.environ.items():
+            if key.startswith(('GDAL_', 'CPL_', 'AWS_')):
+                # Mask sensitive values
+                if 'KEY' in key or 'SECRET' in key:
+                    value = '***masked***'
+                logger.info(f"  {key}={value}")
+        
+        # Check rasterio/GDAL version compatibility
+        try:
+            import rasterio
+            logger.info(f"Rasterio version: {rasterio.__version__}")
+            logger.info(f"GDAL version: {rasterio.__gdal_version__}")
+        except ImportError as e:
+            logger.error(f"Rasterio not available: {e}")
+        
+        logger.info("=== Initialization Complete ===")
+    
+    def _log_circuit_breaker_status(self):
+        """Log status of all circuit breakers"""
+        logger.info("Circuit breaker status:")
+        for name, cb in self.circuit_breakers.items():
+            state = "OPEN" if not cb.is_available() else "CLOSED"
+            logger.info(f"  {name}: {state} (failures: {cb.failure_count}/{cb.failure_threshold})")
+            if not cb.is_available():
+                import time
+                recovery_time = cb.last_failure_time + cb.recovery_timeout - time.time()
+                logger.info(f"    Recovery in: {recovery_time:.1f} seconds")
+
+    def reset_all_circuit_breakers(self):
+        """Reset all circuit breakers for debugging"""
+        logger.warning("Manually resetting all circuit breakers")
+        for name, cb in self.circuit_breakers.items():
+            cb.reset()
+            logger.info(f"  Reset {name}")
     
     def select_best_source(self, lat: float, lon: float) -> Optional[str]:
         """Select best source using priority-based fallback: S3 → GPXZ → Google"""
@@ -277,6 +355,7 @@ class EnhancedSourceSelector:
     
     async def get_elevation_with_resilience(self, lat: float, lon: float) -> Dict[str, Any]:
         """Get elevation with comprehensive error handling and campaign intelligence"""
+        logger.info(f"=== Starting elevation query for ({lat}, {lon}) ===")
         self.attempted_sources = []
         last_error = None
         
@@ -287,23 +366,46 @@ class EnhancedSourceSelector:
             ("google_api", self._try_google_source)
         ]
         
+        logger.info(f"Configured source attempts: {[name for name, func in source_attempts]}")
+        logger.info(f"Source functions available:")
+        for name, func in source_attempts:
+            logger.info(f"  {name}: {func is not None} ({func.__name__ if func else 'None'})")
+        
+        # Check what's enabled
+        logger.info(f"Source availability:")
+        logger.info(f"  S3 enabled: {self.use_s3}, campaign_selector: {self.campaign_selector is not None}")
+        logger.info(f"  GPXZ enabled: {self.use_apis}, client: {self.gpxz_client is not None}")
+        logger.info(f"  Google enabled: {self.use_apis}, client: {self.google_client is not None}")
+        
+        # Log circuit breaker status
+        self._log_circuit_breaker_status()
+        
         for source_name, source_func in source_attempts:
             try:
+                logger.info(f"--- Attempting source: {source_name} ---")
                 self.attempted_sources.append(source_name)
                 
                 # Check circuit breaker
                 if source_name in self.circuit_breakers:
                     cb = self.circuit_breakers[source_name]
                     if not cb.is_available():
-                        logger.info(f"Circuit breaker open for {source_name}, skipping")
+                        logger.warning(f"Circuit breaker open for {source_name}, skipping")
                         continue
                 
+                # Check if source function is available
+                if source_func is None:
+                    logger.warning(f"Source function not available for {source_name}")
+                    continue
+                
                 # Try source with retry logic
+                logger.info(f"Calling {source_name} with retry logic...")
                 result = await retry_with_backoff(
                     lambda: source_func(lat, lon),
                     max_retries=2,
                     exceptions=(RetryableError,)
                 )
+                
+                logger.info(f"Result from {source_name}: {type(result)} = {result}")
                 
                 if result is not None:
                     # Record success for circuit breaker
@@ -335,10 +437,13 @@ class EnhancedSourceSelector:
                             "source": source_name,
                             "attempted_sources": self.attempted_sources.copy()
                         }
+                else:
+                    logger.warning(f"Source {source_name} returned None")
                 
             except Exception as e:
                 last_error = e
-                logger.warning(f"Source {source_name} failed: {e}")
+                logger.error(f"Source {source_name} failed: {type(e).__name__}: {e}")
+                logger.error(f"Full exception details:", exc_info=True)
                 
                 # Record failure for circuit breaker
                 if source_name in self.circuit_breakers:
@@ -348,6 +453,8 @@ class EnhancedSourceSelector:
         
         # All sources failed
         logger.error(f"All elevation sources failed for ({lat}, {lon})")
+        logger.error(f"Attempted sources: {self.attempted_sources}")
+        logger.error(f"Last error: {last_error}")
         return create_unified_error_response(
             last_error or Exception("No sources available"),
             lat, lon, self.attempted_sources
@@ -666,46 +773,70 @@ class EnhancedSourceSelector:
     
     async def _extract_elevation_from_s3_file(self, dem_file: str, lat: float, lon: float, use_credentials: bool = True) -> Optional[float]:
         """
-        Extract elevation from S3 DEM file using industry best practices
+        Extract elevation from S3 DEM file with comprehensive error logging
         
-        Applies GDAL Virtual File System (VFS) best practices:
-        - Uses /vsis3/ for private buckets with credentials
-        - Uses /vsicurl/ for public buckets
-        - Implements proper error handling and resource management
+        IMPORTANT CORRECTION: dem_file is an S3 key, not a full s3:// URL
         """
         import asyncio
         import os
-        import tempfile
+        import boto3
+        from botocore.exceptions import ClientError
+        import numpy as np
+        
+        logger.info(f"Starting S3 extraction: key={dem_file} for ({lat}, {lon})")
         
         def _sync_extract_elevation():
-            """Synchronous elevation extraction using GDAL VFS"""
+            """Synchronous elevation extraction with enhanced logging"""
             try:
                 import rasterio
                 from rasterio.errors import RasterioIOError
+                import psutil
                 
-                # Apply industry best practices for S3 access
+                # S3 bucket is configured, not part of dem_file
+                bucket_name = "road-engineering-elevation-data"  # Or from config
+                logger.info(f"S3 bucket: {bucket_name}, key: {dem_file}")
+                
+                # Test S3 accessibility
                 if use_credentials:
-                    # Private bucket - use /vsis3/ with credentials
+                    s3_client = boto3.client('s3', 
+                        aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+                        aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+                        region_name=os.getenv('AWS_DEFAULT_REGION', 'ap-southeast-2')
+                    )
+                    
+                    # Check if file exists
+                    try:
+                        response = s3_client.head_object(Bucket=bucket_name, Key=dem_file)
+                        logger.info(f"S3 file exists: size={response['ContentLength']} bytes, "
+                                   f"type={response.get('ContentType', 'unknown')}, "
+                                   f"modified={response['LastModified']}")
+                    except ClientError as e:
+                        error_code = e.response['Error']['Code']
+                        logger.error(f"S3 access error: {error_code} - {e}")
+                        if error_code == '404':
+                            logger.error(f"File not found in S3: {bucket_name}/{dem_file}")
+                        elif error_code == '403':
+                            logger.error(f"Access denied to S3 file (check IAM permissions)")
+                        return None
+                
+                # Construct VSI path for GDAL
+                vsi_path = f"/vsis3/{bucket_name}/{dem_file}"
+                logger.info(f"Opening rasterio dataset from VSI path: {vsi_path}")
+                
+                # Monitor memory before opening large file
+                process = psutil.Process()
+                memory_before = process.memory_info().rss / 1024 / 1024
+                logger.info(f"Memory before S3 open: {memory_before:.2f} MB")
+                
+                # Set AWS environment variables if needed
+                if use_credentials:
                     if self.aws_credentials:
-                        # Set AWS credentials for GDAL
                         os.environ['AWS_ACCESS_KEY_ID'] = self.aws_credentials['access_key_id']
                         os.environ['AWS_SECRET_ACCESS_KEY'] = self.aws_credentials['secret_access_key']
                         os.environ['AWS_DEFAULT_REGION'] = self.aws_credentials.get('region', 'ap-southeast-2')
-                    
-                    # Convert s3:// URL to /vsis3/ path
-                    if dem_file.startswith('s3://'):
-                        vsi_path = dem_file.replace('s3://', '/vsis3/')
                     else:
-                        vsi_path = f"/vsis3/{dem_file}"
-                else:
-                    # Public bucket - use /vsicurl/ for HTTP access
-                    if dem_file.startswith('s3://'):
-                        # Convert s3:// URL to HTTPS URL for public access
-                        bucket_name = dem_file.split('/')[2]
-                        key_path = '/'.join(dem_file.split('/')[3:])
-                        vsi_path = f"/vsicurl/https://{bucket_name}.s3.ap-southeast-2.amazonaws.com/{key_path}"
-                    else:
-                        vsi_path = f"/vsicurl/{dem_file}"
+                        # Use environment variables directly
+                        logger.info("Using AWS credentials from environment variables")
                 
                 # Configure GDAL for optimal cloud access
                 os.environ['GDAL_DISABLE_READDIR_ON_OPEN'] = 'EMPTY_DIR'
@@ -713,46 +844,81 @@ class EnhancedSourceSelector:
                 os.environ['GDAL_HTTP_TIMEOUT'] = '30'
                 os.environ['GDAL_HTTP_CONNECTTIMEOUT'] = '10'
                 
-                # Open the dataset using GDAL VFS
                 with rasterio.open(vsi_path) as dataset:
-                    # Check if we need coordinate transformation
-                    if dataset.crs and dataset.crs != 'EPSG:4326':
-                        # Transform lat/lon to dataset CRS
-                        from rasterio.warp import transform
-                        xs, ys = transform('EPSG:4326', dataset.crs, [lon], [lat])
-                        x, y = xs[0], ys[0]
-                        logger.debug(f"Transformed ({lat}, {lon}) to ({x}, {y}) in {dataset.crs}")
-                    else:
-                        x, y = lon, lat
+                    # Log dataset properties
+                    logger.info(f"Dataset opened successfully")
+                    logger.info(f"  Driver: {dataset.driver}")
+                    logger.info(f"  CRS: {dataset.crs}")
+                    logger.info(f"  Bounds: {dataset.bounds}")
+                    logger.info(f"  Shape: {dataset.shape}")
+                    logger.info(f"  Transform: {dataset.transform}")
+                    logger.info(f"  Bands: {dataset.count}")
+                    logger.info(f"  Data types: {dataset.dtypes}")
+                    logger.info(f"  Nodata value: {dataset.nodata}")
                     
-                    # Get row/col indices for the transformed coordinates
-                    row, col = dataset.index(x, y)
+                    # Check if coordinate is within bounds
+                    if not (dataset.bounds.left <= lon <= dataset.bounds.right and 
+                            dataset.bounds.bottom <= lat <= dataset.bounds.top):
+                        logger.warning(f"Coordinate ({lat}, {lon}) outside dataset bounds")
+                        logger.warning(f"  Bounds: left={dataset.bounds.left}, right={dataset.bounds.right}, "
+                                      f"bottom={dataset.bounds.bottom}, top={dataset.bounds.top}")
+                        return None
                     
-                    # Check if coordinates are within bounds
-                    if 0 <= row < dataset.height and 0 <= col < dataset.width:
-                        # Read the elevation value
-                        elevation_array = dataset.read(1, window=((row, row + 1), (col, col + 1)))
-                        elevation = float(elevation_array[0, 0])
+                    # Transform coordinate to pixel indices
+                    try:
+                        row, col = dataset.index(lon, lat)
+                        logger.info(f"Pixel coordinates: row={row}, col={col}")
                         
-                        # Check for no-data values
+                        # Validate pixel indices
+                        if row < 0 or col < 0 or row >= dataset.shape[0] or col >= dataset.shape[1]:
+                            logger.error(f"Pixel indices out of bounds: row={row}, col={col}, "
+                                        f"shape={dataset.shape}")
+                            return None
+                            
+                    except Exception as e:
+                        logger.error(f"Coordinate transformation failed: {e}")
+                        return None
+                    
+                    # Read elevation value
+                    try:
+                        elevation = dataset.read(1)[row, col]
+                        logger.info(f"Raw elevation value: {elevation}, type: {type(elevation)}")
+                        
+                        # Check for nodata
                         if dataset.nodata is not None and elevation == dataset.nodata:
-                            logger.warning(f"No-data value found at ({lat}, {lon}) in {dem_file}")
+                            logger.warning(f"Elevation is nodata value: {dataset.nodata}")
                             return None
                         
-                        logger.info(f"Successfully extracted elevation {elevation}m from {dem_file}")
-                        return elevation
-                    else:
-                        logger.warning(f"Coordinates ({lat}, {lon}) are outside bounds of {dem_file}")
-                        logger.debug(f"Row {row} not in [0, {dataset.height}), Col {col} not in [0, {dataset.width})")
+                        # Check for invalid values
+                        if np.isnan(elevation) or np.isinf(elevation):
+                            logger.warning(f"Invalid elevation value: {elevation}")
+                            return None
+                            
+                        return float(elevation)
+                        
+                    except IndexError as e:
+                        logger.error(f"Index error reading elevation: {e}")
+                        logger.error(f"Attempted to read row={row}, col={col} from shape={dataset.shape}")
                         return None
                         
-            except RasterioIOError as e:
-                # This is a critical change: we now gracefully handle file-not-found or access errors
-                logger.warning(f"File-level access error for {dem_file}: {e}. This is a recoverable error.")
+            except ImportError as e:
+                logger.error(f"Rasterio import error: {e}")
+                logger.error("Check if rasterio is installed in requirements.txt")
+                return None
+            except MemoryError as e:
+                memory_current = process.memory_info().rss / 1024 / 1024
+                logger.error(f"Memory error: current usage {memory_current:.2f} MB")
+                logger.error(f"Memory increase: {memory_current - memory_before:.2f} MB")
                 return None
             except Exception as e:
-                logger.error(f"Unexpected error accessing {dem_file}: {e}")
+                logger.error(f"S3 extraction failed: {type(e).__name__}: {e}")
+                logger.error(f"Full traceback:", exc_info=True)
                 return None
+            finally:
+                # Log memory after operation
+                if 'process' in locals():
+                    memory_after = process.memory_info().rss / 1024 / 1024
+                    logger.info(f"Memory after S3 operation: {memory_after:.2f} MB")
         
         try:
             # Run the synchronous function in a thread pool to avoid blocking

@@ -135,7 +135,11 @@ app.add_middleware(
 
 # Include routers
 app.include_router(elevation_router, prefix="/api")
-app.include_router(dataset_router, prefix="/api/v1")
+app.include_router(dataset_router, prefix="/api/v1/datasets")
+
+logger.info("API routes registered:")
+logger.info("  Elevation endpoints: /api/v1/elevation/*")
+logger.info("  Dataset endpoints: /api/v1/datasets/*")
 
 # Import models for legacy endpoint
 from .models import PointsRequest, StandardResponse

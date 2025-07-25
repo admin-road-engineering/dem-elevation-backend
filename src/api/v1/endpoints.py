@@ -28,6 +28,39 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/elevation", tags=["elevation"])
 
+def _process_elevation_point(point_data):
+    """Extract lat, lon, elevation from various data structures"""
+    
+    # Handle tuple/list
+    if isinstance(point_data, (tuple, list)):
+        if len(point_data) == 2:
+            lat, lon = point_data
+            return lat, lon, None  # Elevation to be fetched
+        elif len(point_data) == 3:
+            return point_data  # lat, lon, elevation
+        else:
+            raise ValueError(f"Expected 2 or 3 elements, got {len(point_data)}")
+    
+    # Handle dict/object
+    elif isinstance(point_data, dict):
+        lat = point_data.get('lat') or point_data.get('latitude')
+        lon = point_data.get('lon') or point_data.get('longitude')
+        elevation = point_data.get('elevation') or point_data.get('elevation_m')
+        
+        if lat is None or lon is None:
+            raise ValueError(f"Missing lat/lon in dict: {list(point_data.keys())}")
+        
+        return lat, lon, elevation
+    
+    # Handle custom objects
+    elif hasattr(point_data, 'lat') and hasattr(point_data, 'lon'):
+        return point_data.lat, point_data.lon, getattr(point_data, 'elevation', None)
+    elif hasattr(point_data, 'latitude') and hasattr(point_data, 'longitude'):
+        return point_data.latitude, point_data.longitude, getattr(point_data, 'elevation_m', None)
+    
+    else:
+        raise ValueError(f"Unsupported point data type: {type(point_data)}")
+
 def create_error_response(status_code: int, message: str, details: Optional[str] = None) -> StandardErrorResponse:
     """Create a standardized error response."""
     return StandardErrorResponse(
@@ -250,6 +283,11 @@ async def generate_contour_data(
     This endpoint returns native DEM points as a grid for frontend contour processing,
     matching the exact format expected by the main backend's contour service.
     """
+    import traceback
+    
+    logger.info(f"=== Starting contour data generation ===")
+    logger.info(f"Request data: {request.dict()}")
+    
     try:
         if not request.area_bounds.polygon_coordinates:
             raise HTTPException(status_code=400, detail="Polygon coordinates cannot be empty")
@@ -259,24 +297,55 @@ async def generate_contour_data(
         
         # Convert coordinates to the format expected by the service
         polygon_coords = [(coord.latitude, coord.longitude) for coord in request.area_bounds.polygon_coordinates]
+        logger.info(f"Converted polygon coordinates: {polygon_coords}")
+        logger.info(f"Source: {request.source or 'auto'}")
         
         # Use DEMService delegation method (which calls ContourService internally)
+        logger.info("Calling service.get_dem_points_in_polygon...")
         dem_points, dem_source_used, error_message = service.get_dem_points_in_polygon(
             polygon_coords,
             request.source or "auto",
             50000  # max_points
         )
         
+        logger.info(f"Service call completed:")
+        logger.info(f"  dem_points type: {type(dem_points)}")
+        logger.info(f"  dem_points length: {len(dem_points) if dem_points else 'None'}")
+        logger.info(f"  dem_source_used: {dem_source_used}")
+        logger.info(f"  error_message: {error_message}")
+        
         if error_message:
+            logger.error(f"Service returned error: {error_message}")
             raise HTTPException(status_code=400, detail=error_message)
         
         if not dem_points:
+            logger.error("No elevation points generated")
             raise HTTPException(status_code=400, detail="No elevation points could be generated for the specified area")
         
-        # Convert to response model format
+        # Convert to response model format with enhanced error handling
         response_points = []
-        for point in dem_points:
-            response_points.append(DEMPoint(**point))
+        for i, point in enumerate(dem_points):
+            try:
+                logger.debug(f"Processing point {i}: {point}")
+                
+                # Flexible point data handling
+                point_data = _process_elevation_point(point)
+                lat, lon, elevation = point_data
+                
+                response_points.append(DEMPoint(
+                    latitude=lat,
+                    longitude=lon,
+                    elevation_m=elevation,
+                    x_crs=point.get("x_crs", lon),
+                    y_crs=point.get("y_crs", lat)
+                ))
+                
+            except Exception as e:
+                logger.error(f"Failed to process point {i}: {type(e).__name__}: {e}")
+                logger.error(f"Point data: {repr(point)}")
+                continue
+        
+        logger.info(f"Successfully processed {len(response_points)} points")
         
         return FrontendContourDataResponse(
             status="OK",
@@ -291,10 +360,17 @@ async def generate_contour_data(
     except HTTPException:
         raise
     except ValueError as e:
-        logger.error(f"ValueError in contour data generation: {e}")
+        logger.error(f"=== Contour ValueError ===")
+        logger.error(f"Error message: {e}")
+        logger.error(f"Full traceback:")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Unexpected error in contour data generation: {e}")
+        logger.error(f"=== Contour Unexpected Error ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {e}")
+        logger.error(f"Full traceback:")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/contour-data/geojson", response_model=ContourDataResponse)
