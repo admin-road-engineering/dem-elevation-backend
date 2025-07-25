@@ -163,7 +163,6 @@ Gemini.md
 .build/
 .railwayignore
 deploy_config/
-start_railway.py
 simple_startup.py
 
 # Railway Deployment Scripts
