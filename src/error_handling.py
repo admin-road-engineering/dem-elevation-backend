@@ -54,14 +54,23 @@ async def retry_with_backoff(
             await asyncio.sleep(delay)
 
 class CircuitBreaker:
-    """Circuit breaker pattern for external services"""
+    """Circuit breaker pattern for external services with latency-based triggers"""
     
-    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60):
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60, 
+                 latency_threshold_ms: float = 2000, slow_request_threshold: int = 3):
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
+        self.latency_threshold_ms = latency_threshold_ms
+        self.slow_request_threshold = slow_request_threshold
+        
         self.failure_count = 0
+        self.slow_request_count = 0
         self.last_failure_time = None
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
+        
+        # Track latency history for better decision making
+        self.recent_latencies = []
+        self.max_latency_history = 10
     
     def is_available(self) -> bool:
         """Check if service is available"""
@@ -77,19 +86,40 @@ class CircuitBreaker:
         # HALF_OPEN state
         return True
     
-    def record_success(self):
-        """Record successful operation"""
+    def record_success(self, response_time_ms: float = None):
+        """Record successful operation with optional latency tracking"""
         self.failure_count = 0
+        self.slow_request_count = 0
         self.state = "CLOSED"
+        
+        # Track response time
+        if response_time_ms is not None:
+            self.recent_latencies.append(response_time_ms)
+            if len(self.recent_latencies) > self.max_latency_history:
+                self.recent_latencies.pop(0)
     
-    def record_failure(self):
-        """Record failed operation"""
+    def record_failure(self, response_time_ms: float = None):
+        """Record failed operation with optional latency tracking"""
         self.failure_count += 1
         self.last_failure_time = time.time()
         
-        if self.failure_count >= self.failure_threshold:
+        # Also track if this was a timeout/slow response
+        if response_time_ms is not None and response_time_ms >= self.latency_threshold_ms:
+            self.slow_request_count += 1
+            logger.warning(f"Slow request detected: {response_time_ms:.2f}ms (threshold: {self.latency_threshold_ms}ms)")
+        
+        # Open circuit if too many failures OR too many slow requests
+        if (self.failure_count >= self.failure_threshold or 
+            self.slow_request_count >= self.slow_request_threshold):
             self.state = "OPEN"
-            logger.warning(f"Circuit breaker opened after {self.failure_count} failures")
+            trigger_reason = "failures" if self.failure_count >= self.failure_threshold else "slow_requests"
+            logger.warning(f"Circuit breaker opened after {self.failure_count} failures "
+                          f"and {self.slow_request_count} slow requests (trigger: {trigger_reason})")
+    
+    def record_timeout(self, timeout_ms: float):
+        """Record timeout as both failure and slow request"""
+        logger.warning(f"Request timeout after {timeout_ms:.2f}ms")
+        self.record_failure(response_time_ms=timeout_ms)
 
 def create_unified_error_response(
     error: Exception,
