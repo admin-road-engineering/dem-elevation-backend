@@ -647,20 +647,117 @@ curl "https://dem-elevation-backend-production.up.railway.app/api/v1/health"
 4. **Choose Hobby Plan**: $5/month, 8GB RAM, 100GB network egress
 5. **Confirm Upgrade**: Apply billing changes
 
-#### Post-Upgrade Configuration Switch
+#### Proven Railway Deployment Process ✅
+
+**Current Production Status:**
+- **URL**: `https://dem-elevation-backend-production.up.railway.app`
+- **Project**: `loving-possibility`
+- **Service ID**: `cda12ccf-822d-4bb9-b804-44099401b462`
+- **Plan**: Railway Hobby ($5/month, 8GB RAM) - Successfully upgraded ✅
+
+**Step-by-Step Deployment (PROVEN WORKING PROCESS):**
 ```bash
-# Connect to Railway project
-railway login
-railway link
+# 1. Verify Railway authentication
+railway whoami
+# Should show: Logged in as admin@road.engineering 👋
 
-# Update environment variable to enable S3 indexes
-railway variables set SPATIAL_INDEX_SOURCE=s3
+# 2. Deploy directly to service (no linking required)
+railway up --detach --service cda12ccf-822d-4bb9-b804-44099401b462
+# This uses the service ID to deploy directly to the DEM backend service
 
-# Redeploy with S3 spatial indexes
-railway up --detach
+# 3. Set environment variables (if needed) - correct syntax:
+railway variables --set "SPATIAL_INDEX_SOURCE=s3" --service cda12ccf-822d-4bb9-b804-44099401b462
+railway variables --set "USE_S3_SOURCES=true" --service cda12ccf-822d-4bb9-b804-44099401b462
+railway variables --set "USE_API_SOURCES=true" --service cda12ccf-822d-4bb9-b804-44099401b462
 
-# Verify S3 index loading
-curl "https://dem-elevation-backend-production.up.railway.app/api/v1/health" | jq .
+# 4. Monitor deployment progress
+# Build logs URL will be provided in terminal output
+
+# 5. Wait for deployment (typically 2-3 minutes)
+sleep 120
+
+# 6. Verify deployment health
+curl "https://dem-elevation-backend-production.up.railway.app/api/v1/health"
+
+# 7. Test Brisbane elevation (54,000x speedup target)
+curl -X POST "https://dem-elevation-backend-production.up.railway.app/api/v1/elevation/point" \
+  -H "Content-Type: application/json" \
+  -d '{"latitude": -27.4698, "longitude": 153.0251}' \
+  -w "Response time: %{time_total}s\n"
+
+# 8. Check deployment logs (if needed)
+railway logs --service cda12ccf-822d-4bb9-b804-44099401b462
+```
+
+**Critical Railway CLI Command Syntax:**
+- **Deploy**: `railway up --detach --service cda12ccf-822d-4bb9-b804-44099401b462`
+- **Set variables**: `railway variables --set "KEY=value" --service cda12ccf-822d-4bb9-b804-44099401b462`  
+- **View variables**: `railway variables --service cda12ccf-822d-4bb9-b804-44099401b462`
+- **View logs**: `railway logs --service cda12ccf-822d-4bb9-b804-44099401b462`
+- **Check status**: `railway status --service cda12ccf-822d-4bb9-b804-44099401b462`
+
+**Important Notes:**
+- **No linking required**: Use service ID directly in commands
+- **Service ID**: `cda12ccf-822d-4bb9-b804-44099401b462` (DEM Backend)
+- **Project**: `loving-possibility` (ad5eee31-02ee-4af7-91ed-60666f580e5c)
+- **Deployment URL**: Build logs provided in terminal output during deployment
+
+#### Railway Deployment Troubleshooting
+
+**Common Issues and Solutions:**
+
+1. **"Multiple services found" error:**
+   ```bash
+   # Always use service ID to specify exact service
+   railway up --detach --service cda12ccf-822d-4bb9-b804-44099401b462
+   ```
+
+2. **"No service linked" error:**
+   ```bash
+   # Don't use `railway link` - use service ID directly
+   railway variables --set "KEY=value" --service cda12ccf-822d-4bb9-b804-44099401b462
+   ```
+
+3. **Environment variables not updating:**
+   ```bash
+   # Set via Railway dashboard for sensitive variables (AWS_ACCESS_KEY_ID, etc.)
+   # Or use correct CLI syntax:
+   railway variables --set "SPATIAL_INDEX_SOURCE=s3" --service cda12ccf-822d-4bb9-b804-44099401b462
+   ```
+
+4. **Deployment not triggered:**
+   ```bash
+   # Create empty commit to force deployment
+   git commit --allow-empty -m "trigger: Force Railway deployment"
+   git push
+   # Then deploy:
+   railway up --detach --service cda12ccf-822d-4bb9-b804-44099401b462
+   ```
+
+5. **Check deployment status:**
+   ```bash
+   # View current deployment status
+   railway status --service cda12ccf-822d-4bb9-b804-44099401b462
+   
+   # View deployment logs
+   railway logs --service cda12ccf-822d-4bb9-b804-44099401b462
+   ```
+
+**Environment Variables Setup (Railway Dashboard):**
+```bash
+# Security-sensitive (set via Railway dashboard):
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_DEFAULT_REGION=ap-southeast-2
+GPXZ_API_KEY=your_gpxz_api_key
+
+# Service configuration (can use CLI):
+SPATIAL_INDEX_SOURCE=s3
+USE_S3_SOURCES=true
+USE_API_SOURCES=true
+SUPPRESS_GDAL_ERRORS=true
+LOG_LEVEL=INFO
+PYTHONPATH=/app
 ```
 
 #### Expected Performance After Upgrade
