@@ -181,3 +181,4 @@ src/api/v1/dataset_endpoints_simple.py
 
 # S3 Index Loader (Production-specific)
 src/s3_index_loader.py
+DEM_BACKEND_DEVELOPMENT_REVIEW_PLAN.md
