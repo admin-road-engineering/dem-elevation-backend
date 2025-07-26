@@ -14,6 +14,11 @@ class DEMSource(BaseModel):
     class Config:
         extra = "allow"  # Allow additional fields for future extensibility
 
+# Global cache for index-driven sources with TTL
+_sources_cache = None
+_cache_timestamp = None
+_CACHE_TTL_SECONDS = 600  # 10 minutes TTL
+
 def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
     """
     Load DEM sources dynamically from S3 spatial indices - index-driven approach.
@@ -26,9 +31,21 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
     - Always in sync with actual S3 contents  
     - Single source of truth (spatial index)
     - No manual configuration maintenance needed
+    - TTL caching for performance (10min cache)
     """
     import logging
+    import time
     logger = logging.getLogger(__name__)
+    
+    global _sources_cache, _cache_timestamp
+    
+    # Check cache validity
+    current_time = time.time()
+    if (_sources_cache is not None and 
+        _cache_timestamp is not None and 
+        (current_time - _cache_timestamp) < _CACHE_TTL_SECONDS):
+        logger.debug(f"Returning cached DEM sources (age: {current_time - _cache_timestamp:.1f}s)")
+        return _sources_cache
     
     logger.info("Loading DEM sources from spatial indices (index-driven approach)")
     
@@ -60,11 +77,19 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
                         # Create source entry from campaign metadata
                         campaign_files = campaign_data.get('files', [])
                         if campaign_files:
-                            # Use first file path as representative source path
-                            first_file = campaign_files[0]
+                            # Use campaign prefix for multi-file campaigns, specific file for single-file
+                            if len(campaign_files) == 1:
+                                # Single file - use specific file path
+                                campaign_path = f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/{campaign_files[0]}"
+                            else:
+                                # Multi-file campaign - use common prefix directory
+                                first_file = campaign_files[0]
+                                # Extract common directory prefix from first file
+                                campaign_prefix = "/".join(first_file.split("/")[:-1]) + "/"
+                                campaign_path = f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/{campaign_prefix}"
                             
                             sources[campaign_id] = {
-                                "path": f"s3://road-engineering-elevation-data/{first_file}",
+                                "path": campaign_path,
                                 "layer": None,
                                 "crs": campaign_data.get('crs', 'EPSG:4326'),
                                 "description": campaign_data.get('description', f"Campaign {campaign_id}"),
@@ -83,15 +108,16 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
                     logger.info(f"Successfully loaded {len(sources)} S3 campaign sources")
                     
                 except Exception as campaign_error:
-                    logger.warning(f"Failed to load campaign index: {campaign_error}")
+                    logger.error(f"Failed to load campaign index: {campaign_error}", exc_info=True)
                     
             else:
-                logger.warning(f"S3 indices not accessible: {health_check.get('reason', 'Unknown error')}")
+                logger.warning(f"S3 indices not accessible: {health_check.get('reason', 'Unknown error')}. "
+                             f"Status: {health_check.get('status', 'unknown')}. Falling back to API sources only.")
                 
     except ImportError:
-        logger.warning("S3 index loader not available - using fallback sources")
+        logger.warning("S3 index loader not available - using API fallback sources")
     except Exception as s3_error:
-        logger.warning(f"Failed to load S3 sources: {s3_error}")
+        logger.error(f"Failed to load S3 sources: {s3_error}. Falling back to API sources only.", exc_info=True)
     
     # Add API sources as fallback (always available)
     api_sources = {
@@ -140,7 +166,7 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
     if len(sources) == 0:
         logger.error("No DEM sources available - this should not happen")
         # Emergency fallback
-        return {
+        sources = {
             "emergency_fallback": {
                 "path": "api://gpxz",
                 "description": "Emergency GPXZ fallback",
@@ -148,6 +174,11 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
                 "source_type": "api"
             }
         }
+    
+    # Update cache
+    _sources_cache = sources
+    _cache_timestamp = current_time
+    logger.debug(f"Updated DEM sources cache with {len(sources)} sources")
     
     return sources
 
@@ -232,7 +263,13 @@ class Settings(BaseSettings):
         import logging
         logger = logging.getLogger(__name__)
         logger.info("Refreshing DEM sources cache")
-        self._dem_sources_cache = None  # Clear cache
+        
+        # Clear both instance cache and global TTL cache
+        self._dem_sources_cache = None
+        global _sources_cache, _cache_timestamp
+        _sources_cache = None
+        _cache_timestamp = None
+        
         _ = self.DEM_SOURCES  # Trigger reload
 
 def runtime_config_check(settings: Settings) -> Dict[str, Any]:
