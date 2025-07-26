@@ -24,15 +24,23 @@ def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]
     config_file = Path(base_dir) / "config" / "dem_sources.json"
     
     if not config_file.exists():
-        # Fallback to minimal local source if config file doesn't exist
+        # Fallback to minimal API sources if config file doesn't exist (Railway compatible)
         return {
-            "local_fallback": {
-                "path": "./data/DTM.gdb",
+            "gpxz_api": {
+                "path": "api://gpxz",
                 "layer": None,
                 "crs": None,
-                "description": "Local fallback geodatabase",
-                "priority": 4,
-                "source_type": "file"
+                "description": "GPXZ API global coverage",
+                "priority": 2,
+                "source_type": "api"
+            },
+            "google_elevation": {
+                "path": "api://google",
+                "layer": None,
+                "crs": None,
+                "description": "Google Elevation API fallback",
+                "priority": 3,
+                "source_type": "api"
             }
         }
     
@@ -69,10 +77,10 @@ def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]
         return sources
         
     except Exception as e:
-        # Return minimal config on error
+        # Return minimal config on error - only API sources for Railway
         return {
-            "gpxz_api": {"path": "api://gpxz", "priority": 2},
-            "local_fallback": {"path": "./data/DTM.gdb", "priority": 4}
+            "gpxz_api": {"path": "api://gpxz", "priority": 2, "description": "GPXZ API fallback"},
+            "google_elevation": {"path": "api://google", "priority": 3, "description": "Google Elevation API fallback"}
         }
 
 class Settings(BaseSettings):
