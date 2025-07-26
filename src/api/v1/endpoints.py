@@ -96,11 +96,25 @@ async def list_dem_sources(
                 "layer": source_config.get("layer"),
                 "description": source_config.get("description"),
                 "is_geodatabase": source_config["path"].lower().endswith('.gdb'),
-                "is_default": source_id == settings.DEFAULT_DEM_ID
+                "is_default": source_id == settings.DEFAULT_DEM_ID,
+                # Enhanced info for index-driven sources
+                "source_type": source_config.get("source_type", "file"),
+                "priority": source_config.get("priority", 3),
+                "resolution_m": source_config.get("resolution_m"),
+                "data_type": source_config.get("data_type"),
+                "provider": source_config.get("provider"),
+                "file_count": source_config.get("file_count"),
+                "campaign_id": source_config.get("campaign_id"),
+                "bounds": source_config.get("bounds"),
+                "accuracy": source_config.get("accuracy"),
+                "cost_per_query": source_config.get("cost_per_query")
             }
         
         # Add environment debug information
         import os
+        s3_sources = [s for s in sources_info.values() if s.get('source_type') == 's3']
+        api_sources = [s for s in sources_info.values() if s.get('source_type') == 'api']
+        
         env_debug = {
             "USE_S3_SOURCES": getattr(settings, 'USE_S3_SOURCES', False),
             "USE_API_SOURCES": getattr(settings, 'USE_API_SOURCES', False),
@@ -108,7 +122,11 @@ async def list_dem_sources(
             "has_aws_credentials": bool(os.getenv("AWS_ACCESS_KEY_ID")),
             "has_gpxz_key": bool(os.getenv("GPXZ_API_KEY")),
             "railway_env": bool(os.getenv("RAILWAY_ENVIRONMENT")),
-            "dem_sources_length": len(str(os.getenv("DEM_SOURCES", "")))
+            "dem_sources_env_var": os.getenv("DEM_SOURCES", "not_set"),
+            "index_driven_approach": True,
+            "s3_campaign_count": len(s3_sources),
+            "api_fallback_count": len(api_sources),
+            "source_discovery_method": "spatial_index" if len(s3_sources) > 0 else "api_fallback"
         }
         
         return {

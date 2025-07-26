@@ -14,117 +14,152 @@ class DEMSource(BaseModel):
     class Config:
         extra = "allow"  # Allow additional fields for future extensibility
 
-def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]:
+def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
     """
-    Load DEM sources from external configuration file as single source of truth.
+    Load DEM sources dynamically from S3 spatial indices - index-driven approach.
     
-    This function now uses dem_sources.json as the definitive source configuration,
-    eliminating programmatic hardcoding of API sources for better maintainability.
+    This eliminates the need for separate dem_sources.json configuration by using
+    the spatial indices as the single source of truth for available DEM sources.
+    
+    Benefits:
+    - Automatic discovery of new S3 DEM files
+    - Always in sync with actual S3 contents  
+    - Single source of truth (spatial index)
+    - No manual configuration maintenance needed
     """
     import logging
     logger = logging.getLogger(__name__)
     
-    # Try multiple possible locations for Railway deployment compatibility
-    possible_locations = [
-        Path(base_dir) / "config" / "dem_sources.json",  # Standard location
-        Path(".") / "config" / "dem_sources.json",       # Current dir
-        Path("/app/config/dem_sources.json"),            # Railway absolute path
-        Path(".") / "dem_sources.json",                  # Root fallback
-        Path("/app/dem_sources.json")                    # Railway root fallback
-    ]
+    logger.info("Loading DEM sources from spatial indices (index-driven approach)")
     
-    # Enhanced debugging for Railway deployment
-    logger.info(f"Base directory: {base_dir}")
-    logger.info(f"Working directory: {os.getcwd()}")
-    logger.info(f"App directory contents: {list(Path('/app').glob('*')) if Path('/app').exists() else 'N/A'}")
+    sources = {}
     
-    config_file = None
-    for location in possible_locations:
-        logger.info(f"Checking config location: {location}")
-        if location.exists():
-            logger.info(f"Found config file at: {location} (size: {location.stat().st_size} bytes)")
-            config_file = location
-            break
-        else:
-            logger.info(f"Config file not found at: {location}")
-    
-    if config_file is None:
-        # List directory contents for debugging
-        config_dir = Path(base_dir) / "config"
-        logger.warning(f"Config directory exists: {config_dir.exists()}")
-        if config_dir.exists():
-            logger.warning(f"Config directory contents: {list(config_dir.glob('*'))}")
-        
-        # List app directory if we're in Railway
-        if Path('/app').exists():
-            logger.warning(f"Railway /app directory contents: {list(Path('/app').glob('*'))}")
-            app_config = Path('/app/config')
-            if app_config.exists():
-                logger.warning(f"Railway /app/config contents: {list(app_config.glob('*'))}")
-    
-    if config_file is None or not config_file.exists():
-        logger.warning("Config file not found - using minimal API sources fallback")
-        # Fallback to minimal API sources if config file doesn't exist (Railway compatible)
-        return {
-            "gpxz_api": {
-                "path": "api://gpxz",
-                "layer": None,
-                "crs": None,
-                "description": "GPXZ API global coverage",
-                "priority": 2,
-                "source_type": "api"
-            },
-            "google_elevation": {
-                "path": "api://google",
-                "layer": None,
-                "crs": None,
-                "description": "Google Elevation API fallback",
-                "priority": 3,
-                "source_type": "api"
-            }
-        }
-    
+    # Try to load from S3 spatial indices if available
     try:
-        with open(config_file, 'r') as f:
-            data = json.load(f)
-        
-        # Convert the comprehensive JSON structure to the format expected by current system
-        sources = {}
-        
-        for source_config in data.get("elevation_sources", []):
-            # Skip disabled sources
-            if not source_config.get("enabled", True):
-                continue
+        # Check if we're configured for S3 indices
+        if os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3":
+            logger.info("Attempting to load sources from S3 spatial indices...")
+            
+            # Import S3 index loader
+            from .s3_index_loader import s3_index_loader
+            
+            # Test S3 connectivity first
+            health_check = s3_index_loader.health_check()
+            if health_check.get('status') == 'healthy':
+                logger.info("S3 indices accessible - loading campaign sources")
                 
-            source_id = source_config["id"]
-            sources[source_id] = {
-                "path": source_config["path"],
-                "layer": source_config.get("layer"),
-                "crs": source_config.get("crs"),
-                "description": source_config.get("name", source_config.get("description", "")),
-                "priority": source_config.get("priority", 3),
-                "source_type": source_config.get("source_type", "file"),
-                "bounds": source_config.get("bounds"),
-                "resolution_m": source_config.get("resolution_m"),
-                "data_type": source_config.get("data_type"),
-                "provider": source_config.get("provider"),
-                "cost_per_query": source_config.get("cost_per_query", 0.0),
-                "accuracy": source_config.get("accuracy")
-            }
-        
-        # dem_sources.json is now the single source of truth - no programmatic additions needed
-        logger.info(f"Successfully loaded {len(sources)} DEM sources from config file")
-        for source_id, source_config in sources.items():
-            logger.info(f"  - {source_id}: {source_config.get('description', 'No description')} (priority: {source_config.get('priority', 'N/A')})")
-        
-        return sources
-        
-    except Exception as e:
-        # Return minimal config on error - only API sources for Railway
-        return {
-            "gpxz_api": {"path": "api://gpxz", "priority": 2, "description": "GPXZ API fallback"},
-            "google_elevation": {"path": "api://google", "priority": 3, "description": "Google Elevation API fallback"}
+                # Load campaign index for source discovery
+                try:
+                    campaign_index = s3_index_loader.load_index('campaign')
+                    
+                    # Extract sources from campaign data
+                    campaigns = campaign_index.get('campaigns', {})
+                    logger.info(f"Found {len(campaigns)} campaigns in S3 index")
+                    
+                    for campaign_id, campaign_data in campaigns.items():
+                        # Create source entry from campaign metadata
+                        campaign_files = campaign_data.get('files', [])
+                        if campaign_files:
+                            # Use first file path as representative source path
+                            first_file = campaign_files[0]
+                            
+                            sources[campaign_id] = {
+                                "path": f"s3://road-engineering-elevation-data/{first_file}",
+                                "layer": None,
+                                "crs": campaign_data.get('crs', 'EPSG:4326'),
+                                "description": campaign_data.get('description', f"Campaign {campaign_id}"),
+                                "priority": 1,  # S3 sources get highest priority
+                                "source_type": "s3",
+                                "bounds": campaign_data.get('bounds', {}),
+                                "resolution_m": campaign_data.get('resolution_m', 1.0),
+                                "data_type": campaign_data.get('data_type', 'LiDAR'),
+                                "provider": campaign_data.get('provider', 'Unknown'),
+                                "campaign_id": campaign_id,
+                                "file_count": len(campaign_files),
+                                "cost_per_query": 0.001,  # S3 cost estimate
+                                "accuracy": campaign_data.get('accuracy', '±1m')
+                            }
+                    
+                    logger.info(f"Successfully loaded {len(sources)} S3 campaign sources")
+                    
+                except Exception as campaign_error:
+                    logger.warning(f"Failed to load campaign index: {campaign_error}")
+                    
+            else:
+                logger.warning(f"S3 indices not accessible: {health_check.get('reason', 'Unknown error')}")
+                
+    except ImportError:
+        logger.warning("S3 index loader not available - using fallback sources")
+    except Exception as s3_error:
+        logger.warning(f"Failed to load S3 sources: {s3_error}")
+    
+    # Add API sources as fallback (always available)
+    api_sources = {
+        "gpxz_api": {
+            "path": "api://gpxz",
+            "layer": None,
+            "crs": None,
+            "description": "GPXZ API global coverage",
+            "priority": 2,
+            "source_type": "api",
+            "bounds": {"global": True},
+            "resolution_m": 30.0,  # SRTM resolution
+            "data_type": "SRTM",
+            "provider": "GPXZ.io",
+            "cost_per_query": 0.01,
+            "accuracy": "±10m"
+        },
+        "google_elevation": {
+            "path": "api://google",
+            "layer": None,
+            "crs": None,
+            "description": "Google Elevation API fallback",
+            "priority": 3,
+            "source_type": "api",
+            "bounds": {"global": True},
+            "resolution_m": 30.0,  # Google uses SRTM
+            "data_type": "SRTM",
+            "provider": "Google",
+            "cost_per_query": 0.005,
+            "accuracy": "±10m"
         }
+    }
+    
+    # Merge API sources
+    sources.update(api_sources)
+    
+    # Log final source summary
+    s3_count = sum(1 for s in sources.values() if s.get('source_type') == 's3')
+    api_count = sum(1 for s in sources.values() if s.get('source_type') == 'api')
+    
+    logger.info(f"Index-driven source loading complete:")
+    logger.info(f"  - S3 campaigns: {s3_count}")
+    logger.info(f"  - API sources: {api_count}")
+    logger.info(f"  - Total sources: {len(sources)}")
+    
+    if len(sources) == 0:
+        logger.error("No DEM sources available - this should not happen")
+        # Emergency fallback
+        return {
+            "emergency_fallback": {
+                "path": "api://gpxz",
+                "description": "Emergency GPXZ fallback",
+                "priority": 9,
+                "source_type": "api"
+            }
+        }
+    
+    return sources
+
+# Legacy function name for compatibility during transition
+def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]:
+    """
+    Legacy compatibility wrapper - now uses index-driven approach.
+    
+    This maintains API compatibility while switching to the superior
+    index-driven source discovery approach.
+    """
+    return load_dem_sources_from_spatial_index()
 
 class Settings(BaseSettings):
     # Load DEM sources from external file instead of environment
@@ -187,10 +222,18 @@ class Settings(BaseSettings):
     
     @property
     def DEM_SOURCES(self) -> Dict[str, Dict[str, Any]]:
-        """Load DEM sources from external configuration file"""
+        """Load DEM sources using index-driven approach from spatial indices"""
         if self._dem_sources_cache is None:
-            self._dem_sources_cache = load_dem_sources_from_file(self.BASE_DIR)
+            self._dem_sources_cache = load_dem_sources_from_spatial_index()
         return self._dem_sources_cache
+    
+    def refresh_dem_sources(self) -> None:
+        """Refresh DEM sources cache - useful when S3 indices are updated"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("Refreshing DEM sources cache")
+        self._dem_sources_cache = None  # Clear cache
+        _ = self.DEM_SOURCES  # Trigger reload
 
 def runtime_config_check(settings: Settings) -> Dict[str, Any]:
     """Runtime configuration check with fallback capabilities"""
