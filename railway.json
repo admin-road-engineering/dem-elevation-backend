@@ -20,7 +20,7 @@
         "GDAL_DISABLE_READDIR_ON_OPEN": "YES",
         "GDAL_HTTP_TIMEOUT": "60",
         "GDAL_HTTP_CONNECTTIMEOUT": "30",
-        "SPATIAL_INDEX_SOURCE": "local",
+        "SPATIAL_INDEX_SOURCE": "s3",
         "CPL_VSIL_CURL_CACHE_SIZE": "300000000",
         "AWS_DEFAULT_REGION": "ap-southeast-2",
         "USE_S3_SOURCES": "true",
