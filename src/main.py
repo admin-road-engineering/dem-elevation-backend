@@ -314,4 +314,4 @@ setattr(health_check, '_start_time', time.time())
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001) 
+    uvicorn.run(app, host="0.0.0.0", port=8001) # Force Railway rebuild Sat, Jul 26, 2025 11:29:16 PM
