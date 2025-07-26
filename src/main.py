@@ -7,7 +7,7 @@ import os
 
 from .config import get_settings, validate_environment_configuration
 from .api.v1.endpoints import router as elevation_router
-from .api.v1.dataset_endpoints_simple import router as dataset_router
+from .api.v1.dataset_endpoints import router as dataset_router
 from .dependencies import init_service_container, close_service_container, get_dem_service
 from .logging_config import setup_logging
 
