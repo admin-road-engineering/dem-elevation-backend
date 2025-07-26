@@ -21,9 +21,49 @@ def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]
     This function now uses dem_sources.json as the definitive source configuration,
     eliminating programmatic hardcoding of API sources for better maintainability.
     """
-    config_file = Path(base_dir) / "config" / "dem_sources.json"
+    import logging
+    logger = logging.getLogger(__name__)
     
-    if not config_file.exists():
+    # Try multiple possible locations for Railway deployment compatibility
+    possible_locations = [
+        Path(base_dir) / "config" / "dem_sources.json",  # Standard location
+        Path(".") / "config" / "dem_sources.json",       # Current dir
+        Path("/app/config/dem_sources.json"),            # Railway absolute path
+        Path(".") / "dem_sources.json",                  # Root fallback
+        Path("/app/dem_sources.json")                    # Railway root fallback
+    ]
+    
+    # Enhanced debugging for Railway deployment
+    logger.info(f"Base directory: {base_dir}")
+    logger.info(f"Working directory: {os.getcwd()}")
+    logger.info(f"App directory contents: {list(Path('/app').glob('*')) if Path('/app').exists() else 'N/A'}")
+    
+    config_file = None
+    for location in possible_locations:
+        logger.info(f"Checking config location: {location}")
+        if location.exists():
+            logger.info(f"Found config file at: {location} (size: {location.stat().st_size} bytes)")
+            config_file = location
+            break
+        else:
+            logger.info(f"Config file not found at: {location}")
+    
+    if config_file is None:
+        # List directory contents for debugging
+        config_dir = Path(base_dir) / "config"
+        logger.warning(f"Config directory exists: {config_dir.exists()}")
+        if config_dir.exists():
+            logger.warning(f"Config directory contents: {list(config_dir.glob('*'))}")
+        
+        # List app directory if we're in Railway
+        if Path('/app').exists():
+            logger.warning(f"Railway /app directory contents: {list(Path('/app').glob('*'))}")
+            app_config = Path('/app/config')
+            if app_config.exists():
+                logger.warning(f"Railway /app/config contents: {list(app_config.glob('*'))}")
+    
+    if config_file is None or not config_file.exists():
+        logger.warning("Config file not found - using minimal API sources fallback")
         # Fallback to minimal API sources if config file doesn't exist (Railway compatible)
         return {
             "gpxz_api": {
@@ -73,6 +113,9 @@ def load_dem_sources_from_file(base_dir: str = ".") -> Dict[str, Dict[str, Any]]
             }
         
         # dem_sources.json is now the single source of truth - no programmatic additions needed
+        logger.info(f"Successfully loaded {len(sources)} DEM sources from config file")
+        for source_id, source_config in sources.items():
+            logger.info(f"  - {source_id}: {source_config.get('description', 'No description')} (priority: {source_config.get('priority', 'N/A')})")
         
         return sources
         
