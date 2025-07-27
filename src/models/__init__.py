@@ -137,6 +137,31 @@ class DEMSourceMetadata(BaseModel):
     layer: Optional[str] = None
     description: Optional[str] = None
 
+# Standardized models for GPXZ-style API
+class StandardCoordinate(BaseModel):
+    """Standardized coordinate model for new API endpoints."""
+    lat: float = Field(..., ge=-90, le=90)
+    lon: float = Field(..., ge=-180, le=180)
+
+class PointsRequest(BaseModel):
+    """Request model for batch points endpoint."""
+    points: List[StandardCoordinate]
+    source: Optional[str] = None
+
+class LineRequest_Standard(BaseModel):
+    """Request model for line sampling endpoint."""
+    start: StandardCoordinate
+    end: StandardCoordinate
+    num_points: int = Field(..., ge=2, le=1000)
+    source: Optional[str] = None
+
+class PathRequest_Standard(BaseModel):
+    """Request model for complex path sampling endpoint."""
+    path: List[StandardCoordinate] = Field(..., min_items=2)
+    num_points: int = Field(..., ge=2, le=1000)
+    interpolation: str = Field(default="geodesic", pattern="^(geodesic|linear)$")
+    source: Optional[str] = None
+
 # Additional frontend models
 class PolygonBounds(BaseModel):
     """Represents a polygon area for contour data generation."""
