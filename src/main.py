@@ -85,6 +85,11 @@ async def lifespan(app: FastAPI):
         # Validate configuration and log results
         validate_environment_configuration(settings)
         
+        # CRITICAL: Force DEM_SOURCES property access to trigger S3 campaign loading
+        # This ensures S3 campaigns are loaded before ServiceContainer initialization
+        source_count = len(settings.DEM_SOURCES)
+        logger.info(f"Forced DEM_SOURCES loading: {source_count} sources loaded during startup")
+        
         # Validate index-driven sources (replaces legacy S3 validation)
         # This MUST happen before ServiceContainer initialization to load S3 campaigns
         validation_success = await validate_index_driven_sources(settings)
