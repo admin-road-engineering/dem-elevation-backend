@@ -162,6 +162,32 @@ class PathRequest_Standard(BaseModel):
     interpolation: str = Field(default="geodesic", pattern="^(geodesic|linear)$")
     source: Optional[str] = None
 
+class StandardElevationResult(BaseModel):
+    """Standardized elevation result for new API endpoints."""
+    lat: float
+    lon: float
+    elevation: Optional[float]
+    data_source: str
+
+class StandardMetadata(BaseModel):
+    """Standardized metadata for new API responses."""
+    total_points: int
+    successful_points: int
+    crs: str = "EPSG:4326"
+    units: str = "meters"
+
+class StandardErrorDetail(BaseModel):
+    """Standardized error detail structure."""
+    code: int = Field(description="HTTP status code")
+    message: str = Field(description="Human-readable error message")
+    details: Optional[str] = Field(None, description="Additional error details")
+    timestamp: str = Field(description="ISO 8601 timestamp of the error")
+
+class StandardErrorResponse(BaseModel):
+    """Standardized error response format."""
+    status: str = "ERROR"
+    error: StandardErrorDetail
+
 # Additional frontend models
 class PolygonBounds(BaseModel):
     """Represents a polygon area for contour data generation."""

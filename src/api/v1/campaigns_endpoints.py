@@ -4,11 +4,11 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 
-from ....models.campaign_models import (
+from ...models.campaign_models import (
     CampaignData, CampaignQuery, CampaignResponse, CampaignFilters,
     CampaignClusterResponse, Bounds, DataType, Provider
 )
-from ....services.campaign_service import campaign_service
+from ...services.campaign_service import campaign_service
 
 logger = logging.getLogger(__name__)
 
