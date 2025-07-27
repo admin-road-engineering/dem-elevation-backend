@@ -63,17 +63,29 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
         if os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3":
             logger.info("Attempting to load sources from S3 spatial indices...")
             
-            # Import S3 index loader with detailed error tracking
+            # Import S3 index loader with detailed error tracking and fallback
+            s3_index_loader = None
             try:
                 from .s3_index_loader import s3_index_loader
-                logger.info("Successfully imported s3_index_loader")
-            except ImportError as import_error:
-                import traceback
-                logger.error(f"Failed to import s3_index_loader. Full traceback:\n{traceback.format_exc()}")
-                logger.error(f"ImportError details: {import_error}")
-                logger.error(f"Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
-                logger.error(f"Current working directory: {os.getcwd()}")
-                raise ImportError(f"S3 index loader import failed: {import_error}") from import_error
+                logger.info("Successfully imported s3_index_loader via relative import")
+            except ImportError as relative_error:
+                logger.warning(f"Relative import failed: {relative_error}. Trying absolute import...")
+                try:
+                    from src.s3_index_loader import s3_index_loader
+                    logger.info("Successfully imported s3_index_loader via absolute import")
+                except ImportError as absolute_error:
+                    import traceback
+                    logger.error(f"Both relative and absolute imports failed.")
+                    logger.error(f"Relative error: {relative_error}")
+                    logger.error(f"Absolute error: {absolute_error}")
+                    logger.error(f"Full traceback:\n{traceback.format_exc()}")
+                    logger.error(f"Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
+                    logger.error(f"Current working directory: {os.getcwd()}")
+                    logger.error(f"Available modules: {[m for m in os.listdir('/app/src') if m.endswith('.py')]}")
+                    raise ImportError(f"S3 index loader import failed: {absolute_error}") from absolute_error
+            
+            if s3_index_loader is None:
+                raise ImportError("s3_index_loader is None after import attempts")
             
             # Test S3 connectivity first
             health_check = s3_index_loader.health_check()
