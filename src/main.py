@@ -86,11 +86,12 @@ async def lifespan(app: FastAPI):
         validate_environment_configuration(settings)
         
         # Validate index-driven sources (replaces legacy S3 validation)
+        # This MUST happen before ServiceContainer initialization to load S3 campaigns
         validation_success = await validate_index_driven_sources(settings)
         if not validation_success:
             logger.warning("Source validation had issues, but continuing startup with available sources")
         
-        # Initialize dependency injection container
+        # Initialize dependency injection container AFTER S3 campaigns are loaded
         service_container = init_service_container(settings)
         logger.info(
             "DEM Elevation Service started successfully",
