@@ -83,10 +83,12 @@ def raise_standard_http_exception(status_code: int, message: str, details: Optio
 
 @router.get("/sources", summary="List available DEM sources")
 async def list_dem_sources(
-    settings: Settings = Depends(get_settings_cached)
+    service: DEMService = Depends(get_dem_service)
 ) -> Dict[str, Any]:
     """List all configured DEM sources with their basic information."""
     try:
+        # Use the same Settings instance from ServiceContainer that other services use
+        settings = service.settings
         sources_info = {}
         
         for source_id, source_config in settings.DEM_SOURCES.items():
