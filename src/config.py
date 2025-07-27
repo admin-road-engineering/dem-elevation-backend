@@ -63,8 +63,17 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
         if os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3":
             logger.info("Attempting to load sources from S3 spatial indices...")
             
-            # Import S3 index loader
-            from .s3_index_loader import s3_index_loader
+            # Import S3 index loader with detailed error tracking
+            try:
+                from .s3_index_loader import s3_index_loader
+                logger.info("Successfully imported s3_index_loader")
+            except ImportError as import_error:
+                import traceback
+                logger.error(f"Failed to import s3_index_loader. Full traceback:\n{traceback.format_exc()}")
+                logger.error(f"ImportError details: {import_error}")
+                logger.error(f"Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
+                logger.error(f"Current working directory: {os.getcwd()}")
+                raise ImportError(f"S3 index loader import failed: {import_error}") from import_error
             
             # Test S3 connectivity first
             health_check = s3_index_loader.health_check()
