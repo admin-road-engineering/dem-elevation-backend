@@ -54,6 +54,24 @@ class UnifiedElevationService:
                 self.source_selector = IndexDrivenSourceSelector(settings.DEM_SOURCES)
                 self.using_enhanced_selector = True
                 self.using_index_driven_selector = True
+                
+                # Also initialize enhanced selector for actual data extraction
+                gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
+                google_api_key = settings.GOOGLE_ELEVATION_API_KEY
+                aws_creds = {
+                    "access_key_id": settings.AWS_ACCESS_KEY_ID,
+                    "secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                    "region": settings.AWS_DEFAULT_REGION
+                } if settings.AWS_ACCESS_KEY_ID else None
+
+                self._enhanced_selector = EnhancedSourceSelector(
+                    config=settings.DEM_SOURCES,
+                    use_s3=True,
+                    use_apis=True,
+                    gpxz_config=gpxz_config,
+                    google_api_key=google_api_key,
+                    aws_credentials=aws_creds
+                )
             elif use_s3 or use_apis:
                 logger.info("Initializing enhanced source selector with S3/API support")
                 
@@ -229,37 +247,68 @@ class UnifiedElevationService:
                 campaign_id = selected_source_id
                 resolution_m = source_info.get('resolution_m', 1.0)
                 
-                # TODO: Integrate with actual S3 DEM file reading
-                # For now, return placeholder showing campaign selection worked
-                return ElevationResult(
-                    elevation_m=11.52,  # Brisbane test elevation
-                    dem_source_used=campaign_id,
-                    message=f"Index-driven S3 campaign selection: {campaign_id} (resolution: {resolution_m}m)",
-                    metadata={
-                        'source_type': 's3',
-                        'resolution_m': resolution_m,
-                        'campaign_id': campaign_id,
-                        'selection_method': 'spatial_index',
-                        'performance_note': '54,000x speedup via campaign selection'
-                    }
-                )
+                # Delegate to enhanced source selector for actual S3 data extraction
+                if hasattr(self, '_enhanced_selector'):
+                    enhanced_result = await self._enhanced_selector.get_elevation_async(lat, lon, campaign_id)
+                    return ElevationResult(
+                        elevation_m=enhanced_result.get('elevation_m'),
+                        dem_source_used=campaign_id,
+                        message=f"Index-driven S3 campaign: {campaign_id} (resolution: {resolution_m}m)",
+                        metadata={
+                            'source_type': 's3',
+                            'resolution_m': resolution_m,
+                            'campaign_id': campaign_id,
+                            'selection_method': 'spatial_index',
+                            'performance_note': '54,000x speedup via campaign selection',
+                            **(enhanced_result.get('metadata', {}))
+                        }
+                    )
+                else:
+                    # Fallback: Return info that we selected the right campaign but can't extract yet
+                    return ElevationResult(
+                        elevation_m=None,
+                        dem_source_used=campaign_id,
+                        message=f"Index-driven S3 campaign selected: {campaign_id} (extraction needs enhanced selector integration)",
+                        metadata={
+                            'source_type': 's3',
+                            'resolution_m': resolution_m,
+                            'campaign_id': campaign_id,
+                            'selection_method': 'spatial_index',
+                            'status': 'selected_but_needs_integration'
+                        }
+                    )
             
             elif source_type == 'api':
                 # API fallback source (GPXZ, Google, etc.)
                 api_source = selected_source_id
                 
-                # TODO: Integrate with actual API clients
-                # For now, return placeholder showing API fallback
-                return ElevationResult(
-                    elevation_m=None,
-                    dem_source_used=api_source,
-                    message=f"Index-driven API fallback: {api_source}",
-                    metadata={
-                        'source_type': 'api',
-                        'api_source': api_source,
-                        'selection_method': 'fallback_chain'
-                    }
-                )
+                # Delegate to enhanced source selector for actual API calls
+                if hasattr(self, '_enhanced_selector'):
+                    enhanced_result = await self._enhanced_selector.get_elevation_async(lat, lon, api_source)
+                    return ElevationResult(
+                        elevation_m=enhanced_result.get('elevation_m'),
+                        dem_source_used=api_source,
+                        message=f"Index-driven API fallback: {api_source}",
+                        metadata={
+                            'source_type': 'api',
+                            'api_source': api_source,
+                            'selection_method': 'fallback_chain',
+                            **(enhanced_result.get('metadata', {}))
+                        }
+                    )
+                else:
+                    # Fallback: API not available
+                    return ElevationResult(
+                        elevation_m=None,
+                        dem_source_used=api_source,
+                        message=f"Index-driven API fallback selected: {api_source} (extraction needs enhanced selector)",
+                        metadata={
+                            'source_type': 'api',
+                            'api_source': api_source,
+                            'selection_method': 'fallback_chain',
+                            'status': 'selected_but_needs_integration'
+                        }
+                    )
             
             else:
                 return ElevationResult(
