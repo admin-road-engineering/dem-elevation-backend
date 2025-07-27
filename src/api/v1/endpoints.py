@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional
 from ...config import Settings
 from ...dem_service import DEMService
 from ...dem_exceptions import DEMCoordinateError, DEMServiceError
-from ...dependencies import get_dem_service, get_contour_service, get_dataset_manager, get_settings_cached, get_elevation_service
+from ...dependencies import get_dem_service, get_contour_service, get_dataset_manager, get_elevation_service
 from ...dataset_manager import DatasetManager
 from ...contour_service import ContourService
 from ...unified_elevation_service import UnifiedElevationService

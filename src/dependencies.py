@@ -136,10 +136,9 @@ async def close_service_container():
 
 
 # FastAPI dependency functions
-@lru_cache()
 def get_settings_cached() -> Settings:
-    """Cached settings dependency to avoid re-reading configuration."""
-    return get_settings()
+    """Get settings from the service container to ensure consistency."""
+    return get_service_container().settings
 
 
 def get_dataset_manager() -> DatasetManager:

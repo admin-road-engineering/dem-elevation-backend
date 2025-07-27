@@ -294,12 +294,43 @@ async def root():
         ]
     }
 
+@app.get("/debug-sources", tags=["debug"])
+async def debug_sources():
+    """Debug endpoint to verify source count from ServiceContainer."""
+    try:
+        from .dependencies import get_service_container
+        from .config import get_settings
+        import time
+        
+        # Get sources from ServiceContainer (what the API uses)
+        container_settings = get_service_container().settings
+        container_sources = len(container_settings.DEM_SOURCES)
+        
+        # Get sources from fresh Settings instance (what startup uses)
+        fresh_settings = get_settings()
+        fresh_sources = len(fresh_settings.DEM_SOURCES)
+        
+        return {
+            "timestamp": time.time(),
+            "container_settings_id": id(container_settings),
+            "fresh_settings_id": id(fresh_settings),
+            "container_sources": container_sources,
+            "fresh_sources": fresh_sources,
+            "settings_match": id(container_settings) == id(fresh_settings),
+            "source_counts_match": container_sources == fresh_sources,
+            "first_few_container_sources": list(container_settings.DEM_SOURCES.keys())[:5],
+            "first_few_fresh_sources": list(fresh_settings.DEM_SOURCES.keys())[:5]
+        }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
 @app.get("/api/v1/health", tags=["health"])
 async def health_check():
     """Standardized health check endpoint with S3 index status."""
     try:
         import time
-        settings = get_settings()
+        from .dependencies import get_service_container
+        settings = get_service_container().settings
         
         health_response = {
             "status": "healthy",
