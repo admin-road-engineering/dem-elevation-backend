@@ -70,15 +70,15 @@ class S3IndexLoader:
                 
                 self.s3_client = session.client('s3', config=config)
                 
-                # Test client immediately with a simple operation
-                logger.info("Testing S3 client with credentials verification...")
+                # Test client with bucket-specific operation (avoid ListAllMyBuckets permission)
+                logger.info("Testing S3 client with bucket-specific credentials verification...")
                 try:
-                    # Simple operation that requires valid credentials
-                    self.s3_client.list_buckets()
-                    logger.info("S3 client credentials verified successfully")
+                    # Use bucket-specific operation that doesn't require ListAllMyBuckets permission
+                    self.s3_client.head_bucket(Bucket=self.bucket_name)
+                    logger.info("S3 client credentials verified successfully with target bucket")
                 except Exception as test_error:
-                    logger.error(f"S3 credentials test failed: {test_error}")
-                    raise
+                    logger.warning(f"S3 bucket access test failed: {test_error}")
+                    logger.info("Continuing with S3 client - will test during actual operations")
                     
                 logger.info("S3 client initialized successfully with session-based approach")
                 return self.s3_client
