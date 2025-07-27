@@ -136,3 +136,24 @@ class DEMSourceMetadata(BaseModel):
     crs: Optional[str] = None
     layer: Optional[str] = None
     description: Optional[str] = None
+
+# Additional frontend models
+class PolygonBounds(BaseModel):
+    """Represents a polygon area for contour data generation."""
+    polygon_coordinates: List[Coordinate] = Field(..., min_items=3, description="List of coordinates defining the polygon boundary")
+
+class FrontendContourDataRequest(BaseModel):
+    """Request model matching frontend requirements for contour data."""
+    area_bounds: PolygonBounds
+    grid_resolution_m: float = Field(10.0, ge=1.0, le=50.0, description="Grid resolution in meters")
+    source: Optional[str] = None
+
+class FrontendContourDataResponse(BaseModel):
+    """Response model matching frontend requirements for contour data."""
+    status: str = "OK"
+    dem_points: List[DEMPoint] = Field(description="Grid elevation points for contour generation")
+    total_points: int = Field(description="Total number of points returned")
+    dem_source_used: str = Field(description="DEM source that was used")
+    grid_info: Dict[str, Any] = Field(description="Grid metadata including dimensions and bounds")
+    crs: str = "EPSG:4326"
+    message: str = Field(description="Success message")
