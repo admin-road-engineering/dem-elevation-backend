@@ -69,9 +69,10 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
                 try:
                     campaign_index = s3_index_loader.load_index('campaign')
                     
-                    # Extract sources from campaign data
-                    campaigns = campaign_index.get('campaigns', {})
-                    logger.info(f"Found {len(campaigns)} campaigns in S3 index")
+                    # Extract sources from campaign data (handle both 'campaigns' and 'datasets' keys)
+                    campaigns = campaign_index.get('campaigns', campaign_index.get('datasets', {}))
+                    total_campaigns = campaign_index.get('total_campaigns', len(campaigns))
+                    logger.info(f"Found {len(campaigns)} campaigns in S3 index (total: {total_campaigns})")
                     
                     for campaign_id, campaign_data in campaigns.items():
                         # Create source entry from campaign metadata
