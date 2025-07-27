@@ -8,6 +8,7 @@ import os
 from .config import get_settings, validate_environment_configuration
 from .api.v1.endpoints import router as elevation_router
 from .api.v1.dataset_endpoints import router as dataset_router
+from .api.v1.endpoints.campaigns import router as campaign_router
 from .dependencies import init_service_container, close_service_container, get_dem_service
 from .logging_config import setup_logging
 
@@ -18,40 +19,60 @@ setup_logging(
 )
 logger = logging.getLogger(__name__)
 
-async def validate_s3_indexes_if_required(settings):
-    """Validate S3 index access during startup if configured for S3 indexes"""
-    if (os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3" and 
-        os.getenv("RAILWAY_ENVIRONMENT") == "production"):
+async def validate_index_driven_sources(settings):
+    """Validate index-driven source configuration and connectivity"""
+    logger.info("Validating index-driven DEM sources...")
+    
+    try:
+        # Check that sources were loaded successfully via index-driven approach
+        source_count = len(settings.DEM_SOURCES)
+        if source_count == 0:
+            logger.warning("No DEM sources loaded from index-driven configuration")
+            return False
         
-        logger.info("Production deployment with S3 indexes - validating S3 access...")
+        # Count S3 vs API sources for validation reporting
+        s3_sources = sum(1 for source in settings.DEM_SOURCES.values() 
+                        if source.get('source_type') == 's3')
+        api_sources = sum(1 for source in settings.DEM_SOURCES.values() 
+                         if source.get('source_type') == 'api')
         
-        try:
-            from .s3_index_loader import s3_index_loader
-            
-            # Test essential index access
-            health_check = s3_index_loader.health_check()
-            
-            if health_check['status'] != 'healthy':
-                error_msg = f"S3 index validation failed: {health_check.get('error', 'Unknown error')}"
-                logger.critical(error_msg, extra={"event": "s3_validation_failed"})
-                raise RuntimeError(error_msg)
-            
-            logger.info(
-                "S3 index validation successful", 
-                extra={
-                    "event": "s3_validation_success",
-                    "campaign_count": health_check.get('campaign_count', 0)
-                }
-            )
-            
-        except Exception as e:
-            logger.warning(
-                "Failed to validate S3 indexes during startup - falling back to local mode",
-                extra={"event": "s3_validation_warning", "error": str(e)},
-                exc_info=True
-            )
-            # Don't fail startup - just log the warning and continue with local indexes
-            logger.info("Continuing startup with local spatial indexes")
+        logger.info(
+            "Index-driven source validation successful",
+            extra={
+                "event": "index_validation_success",
+                "total_sources": source_count,
+                "s3_sources": s3_sources,
+                "api_sources": api_sources
+            }
+        )
+        
+        # If we have S3 sources, validate S3 connectivity using existing loader
+        if s3_sources > 0 and os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3":
+            logger.info("Validating S3 connectivity for index-driven S3 sources...")
+            try:
+                from .s3_index_loader import s3_index_loader
+                health_check = s3_index_loader.health_check()
+                
+                if health_check['status'] == 'healthy':
+                    logger.info(f"S3 connectivity confirmed for {s3_sources} campaign sources")
+                else:
+                    logger.warning(f"S3 connectivity issue, but {s3_sources} sources available via index")
+                    
+            except Exception as e:
+                logger.warning(
+                    f"S3 connectivity test failed, but {s3_sources} index-driven sources still available",
+                    extra={"error": str(e)}
+                )
+        
+        return True
+        
+    except Exception as e:
+        logger.error(
+            "Index-driven source validation failed",
+            extra={"event": "index_validation_failed", "error": str(e)},
+            exc_info=True
+        )
+        return False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,8 +85,10 @@ async def lifespan(app: FastAPI):
         # Validate configuration and log results
         validate_environment_configuration(settings)
         
-        # Validate S3 index access if configured for production
-        await validate_s3_indexes_if_required(settings)
+        # Validate index-driven sources (replaces legacy S3 validation)
+        validation_success = await validate_index_driven_sources(settings)
+        if not validation_success:
+            logger.warning("Source validation had issues, but continuing startup with available sources")
         
         # Initialize dependency injection container
         service_container = init_service_container(settings)
@@ -136,10 +159,12 @@ app.add_middleware(
 # Include routers
 app.include_router(elevation_router, prefix="/api")
 app.include_router(dataset_router, prefix="/api/v1/datasets")
+app.include_router(campaign_router, prefix="/api/v1")
 
 logger.info("API routes registered:")
 logger.info("  Elevation endpoints: /api/v1/elevation/*")
 logger.info("  Dataset endpoints: /api/v1/datasets/*")
+logger.info("  Campaign endpoints: /api/v1/campaigns/*")
 
 # Import models for legacy endpoint
 from .models import PointsRequest, StandardResponse
