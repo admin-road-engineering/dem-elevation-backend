@@ -13,7 +13,17 @@ from shapely.geometry.polygon import Polygon
 import math
 
 from .config import Settings
-from .models import DEMSourceMetadata
+
+# Temporary inline model definition to avoid import issues
+from pydantic import BaseModel
+from typing import Optional
+
+class DEMSourceMetadata(BaseModel):
+    """Extended metadata for DEM sources with spatial bounds and priority."""
+    path: str
+    crs: Optional[str] = None
+    layer: Optional[str] = None
+    description: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 

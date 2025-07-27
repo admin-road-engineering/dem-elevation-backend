@@ -4,6 +4,10 @@ from typing import Dict, Any, Optional, List
 import os
 import json
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Explicitly load .env file to ensure environment variables are available
+load_dotenv()
 
 class DEMSource(BaseModel):
     path: str
@@ -51,8 +55,10 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
     
     sources = {}
     
-    # Try to load from S3 spatial indices if available
+    # Try to load from spatial indices - S3 or local
     try:
+        campaign_index = None
+        
         # Check if we're configured for S3 indices
         if os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3":
             logger.info("Attempting to load sources from S3 spatial indices...")
@@ -68,52 +74,87 @@ def load_dem_sources_from_spatial_index() -> Dict[str, Dict[str, Any]]:
                 # Load campaign index for source discovery
                 try:
                     campaign_index = s3_index_loader.load_index('campaign')
-                    
-                    # Extract sources from campaign data (handle both 'campaigns' and 'datasets' keys)
-                    campaigns = campaign_index.get('campaigns', campaign_index.get('datasets', {}))
-                    total_campaigns = campaign_index.get('total_campaigns', len(campaigns))
-                    logger.info(f"Found {len(campaigns)} campaigns in S3 index (total: {total_campaigns})")
-                    
-                    for campaign_id, campaign_data in campaigns.items():
-                        # Create source entry from campaign metadata
-                        campaign_files = campaign_data.get('files', [])
-                        if campaign_files:
-                            # Use campaign prefix for multi-file campaigns, specific file for single-file
-                            if len(campaign_files) == 1:
-                                # Single file - use specific file path
-                                campaign_path = f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/{campaign_files[0]}"
-                            else:
-                                # Multi-file campaign - use common prefix directory
-                                first_file = campaign_files[0]
-                                # Extract common directory prefix from first file
-                                campaign_prefix = "/".join(first_file.split("/")[:-1]) + "/"
-                                campaign_path = f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/{campaign_prefix}"
-                            
-                            sources[campaign_id] = {
-                                "path": campaign_path,
-                                "layer": None,
-                                "crs": campaign_data.get('crs', 'EPSG:4326'),
-                                "description": campaign_data.get('description', f"Campaign {campaign_id}"),
-                                "priority": 1,  # S3 sources get highest priority
-                                "source_type": "s3",
-                                "bounds": campaign_data.get('bounds', {}),
-                                "resolution_m": campaign_data.get('resolution_m', 1.0),
-                                "data_type": campaign_data.get('data_type', 'LiDAR'),
-                                "provider": campaign_data.get('provider', 'Unknown'),
-                                "campaign_id": campaign_id,
-                                "file_count": len(campaign_files),
-                                "cost_per_query": 0.001,  # S3 cost estimate
-                                "accuracy": campaign_data.get('accuracy', '±1m')
-                            }
-                    
-                    logger.info(f"Successfully loaded {len(sources)} S3 campaign sources")
-                    
                 except Exception as campaign_error:
-                    logger.error(f"Failed to load campaign index: {campaign_error}", exc_info=True)
+                    logger.error(f"Failed to load campaign index from S3: {campaign_error}", exc_info=True)
+                    campaign_index = None
                     
             else:
                 logger.warning(f"S3 indices not accessible: {health_check.get('reason', 'Unknown error')}. "
-                             f"Status: {health_check.get('status', 'unknown')}. Falling back to API sources only.")
+                             f"Status: {health_check.get('status', 'unknown')}. Falling back to local indices.")
+        
+        # Fall back to local campaign index if S3 failed or not configured
+        if campaign_index is None:
+            logger.info("Loading campaign sources from local indices...")
+            local_campaign_file = Path(__file__).parent.parent / "config" / "phase3_campaign_populated_index.json"
+            
+            if local_campaign_file.exists():
+                try:
+                    with open(local_campaign_file, 'r') as f:
+                        campaign_index = json.load(f)
+                    logger.info(f"Local campaign index loaded: {local_campaign_file}")
+                except Exception as local_error:
+                    logger.error(f"Failed to load local campaign index: {local_error}")
+                    campaign_index = None
+            else:
+                logger.warning(f"Local campaign index file not found: {local_campaign_file}")
+        
+        # Process campaign index data if we have it
+        if campaign_index:
+            # Extract sources from campaign data (handle both 'campaigns' and 'datasets' keys)
+            campaigns = campaign_index.get('campaigns', campaign_index.get('datasets', {}))
+            total_campaigns = campaign_index.get('total_campaigns', len(campaigns))
+            logger.info(f"Found {len(campaigns)} campaigns in index (total: {total_campaigns})")
+            
+            for campaign_id, campaign_data in campaigns.items():
+                # Create source entry from campaign metadata
+                campaign_files = campaign_data.get('files', [])
+                if campaign_files:
+                    # Handle different file formats - objects with 'key' field or direct paths
+                    if isinstance(campaign_files[0], dict) and 'key' in campaign_files[0]:
+                        # Files are objects with key field - use the key directly
+                        if len(campaign_files) == 1:
+                            # Single file - use specific file key
+                            campaign_path = campaign_files[0]['key']
+                        else:
+                            # Multi-file campaign - use the common S3 path structure
+                            first_key = campaign_files[0]['key']
+                            # Extract path from s3://bucket/path format
+                            if first_key.startswith('s3://'):
+                                s3_path = first_key.split('/', 3)[3] if len(first_key.split('/', 3)) > 3 else first_key
+                                # Use campaign path from the data if available, otherwise derive prefix
+                                campaign_path = campaign_data.get('path', f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/")
+                            else:
+                                campaign_path = f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/{first_key}"
+                    else:
+                        # Files are direct paths (legacy format)
+                        if len(campaign_files) == 1:
+                            campaign_path = f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/{campaign_files[0]}"
+                        else:
+                            first_file = campaign_files[0]
+                            campaign_prefix = "/".join(first_file.split("/")[:-1]) + "/"
+                            campaign_path = f"s3://{os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data')}/{campaign_prefix}"
+                    
+                    sources[campaign_id] = {
+                        "path": campaign_path,
+                        "layer": None,
+                        "crs": campaign_data.get('crs', 'EPSG:4326'),
+                        "description": campaign_data.get('description', f"Campaign {campaign_id}"),
+                        "priority": 1,  # S3 sources get highest priority
+                        "source_type": "s3",
+                        "bounds": campaign_data.get('bounds', {}),
+                        "resolution_m": campaign_data.get('resolution_m', 1.0),
+                        "data_type": campaign_data.get('data_type', 'LiDAR'),
+                        "provider": campaign_data.get('provider', 'Unknown'),
+                        "campaign_id": campaign_id,
+                        "file_count": len(campaign_files),
+                        "cost_per_query": 0.001,  # S3 cost estimate
+                        "accuracy": campaign_data.get('accuracy', '±1m')
+                    }
+            
+            if sources:
+                logger.info(f"Successfully loaded {len(sources)} S3 campaign sources from index")
+            else:
+                logger.warning("No campaign sources found in index")
                 
     except ImportError:
         logger.warning("S3 index loader not available - using API fallback sources")
