@@ -594,6 +594,50 @@ async def get_coverage_summary(
         logger.error(f"Error getting coverage summary: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting coverage summary: {str(e)}")
 
+@router.get("/internal-debug", summary="Debug service container state and settings objects")
+async def internal_debug(service: DEMService = Depends(get_dem_service)) -> Dict[str, Any]:
+    """Debug endpoint to diagnose service container state and settings object identity."""
+    try:
+        from ...dependencies import get_service_container
+        from ...config import get_settings
+        
+        # Get global instances for comparison
+        container = get_service_container()
+        global_settings = get_settings()
+        
+        debug_info = {
+            # Service State
+            "service_settings_source_count": len(service.settings.DEM_SOURCES),
+            "service_settings_object_id": id(service.settings),
+            "elevation_service_type": type(service.elevation_service).__name__,
+            "using_index_driven": getattr(service.elevation_service, 'using_index_driven_selector', False),
+            "source_selector_type": type(service.elevation_service.source_selector).__name__ if hasattr(service.elevation_service, 'source_selector') else 'None',
+            
+            # Global State for Comparison  
+            "global_settings_source_count": len(global_settings.DEM_SOURCES),
+            "global_settings_object_id": id(global_settings),
+            
+            # Container State for Comparison
+            "container_settings_object_id": id(container.settings),
+            "container_service_object_id": id(container.dem_service),
+            
+            # Additional diagnosis
+            "service_elevation_service_id": id(service.elevation_service),
+            "container_elevation_service_id": id(container.elevation_service),
+            "settings_objects_match": id(service.settings) == id(global_settings),
+            "services_match": id(service) == id(container.dem_service),
+            
+            # S3 Source Analysis
+            "s3_sources_in_service_settings": [k for k, v in service.settings.DEM_SOURCES.items() if v.get('source_type') == 's3'],
+            "s3_sources_in_global_settings": [k for k, v in global_settings.DEM_SOURCES.items() if v.get('source_type') == 's3'],
+        }
+        
+        return debug_info
+        
+    except Exception as e:
+        logger.error(f"Error in internal debug endpoint: {e}", exc_info=True)
+        return {"error": str(e), "error_type": type(e).__name__}
+
 @router.get("/debug/source-selection", summary="Debug source selection configuration")
 async def debug_source_selection(
     lat: float = -27.4698,
