@@ -296,6 +296,20 @@ class Settings(BaseSettings):
     @property
     def DEM_SOURCES(self) -> Dict[str, Dict[str, Any]]:
         """Load DEM sources using index-driven approach from spatial indices"""
+        import os
+        import json
+        
+        # Check if DEM_SOURCES environment variable is set and non-empty
+        env_dem_sources = os.getenv('DEM_SOURCES', '').strip()
+        if env_dem_sources and env_dem_sources != '{}':
+            try:
+                parsed_sources = json.loads(env_dem_sources)
+                if isinstance(parsed_sources, dict) and len(parsed_sources) > 0:
+                    return parsed_sources
+            except (json.JSONDecodeError, TypeError):
+                pass  # Fall back to index-driven approach
+        
+        # Use index-driven approach (cache for performance)
         if self._dem_sources_cache is None:
             self._dem_sources_cache = load_dem_sources_from_spatial_index()
         return self._dem_sources_cache
