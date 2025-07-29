@@ -1,8 +1,11 @@
 import logging
 import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import os
 
 from .config import get_settings, validate_environment_configuration
@@ -125,6 +128,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("Error during shutdown", extra={"event": "shutdown_failed"}, exc_info=True)
 
+# Create rate limiter for API protection
+limiter = Limiter(key_func=get_remote_address)
+
 # Create FastAPI application
 app = FastAPI(
     title="DEM Elevation Service",
@@ -132,6 +138,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Add rate limiting error handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add CORS middleware
 settings = get_settings()
