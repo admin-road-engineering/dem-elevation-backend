@@ -838,11 +838,15 @@ class EnhancedSourceSelector:
                         # Use environment variables directly
                         logger.info("Using AWS credentials from environment variables")
                 
-                # Configure GDAL for optimal cloud access
+                # Configure GDAL for optimal cloud access with connection pooling
                 os.environ['GDAL_DISABLE_READDIR_ON_OPEN'] = 'EMPTY_DIR'
                 os.environ['CPL_VSIL_CURL_CACHE_SIZE'] = '200000000'  # 200MB cache
-                os.environ['GDAL_HTTP_TIMEOUT'] = '30'
-                os.environ['GDAL_HTTP_CONNECTTIMEOUT'] = '10'
+                os.environ['GDAL_HTTP_TIMEOUT'] = '2'
+                os.environ['GDAL_HTTP_CONNECTTIMEOUT'] = '2'
+                os.environ['CPL_VSIL_CURL_ALLOWED_EXTENSIONS'] = '.tif,.tiff,.vrt'
+                os.environ['CPL_VSIL_CURL_USE_HEAD'] = 'NO'  # Skip HEAD requests for faster startup
+                os.environ['GDAL_HTTP_MAX_RETRY'] = '1'  # Fast fail with single retry
+                os.environ['CPL_CURL_VERBOSE'] = 'NO'  # Reduce logging overhead
                 
                 with rasterio.open(vsi_path) as dataset:
                     # Log dataset properties

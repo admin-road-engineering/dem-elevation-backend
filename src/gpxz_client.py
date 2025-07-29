@@ -12,7 +12,7 @@ class GPXZConfig(BaseModel):
     """GPXZ.io API configuration"""
     api_key: str
     base_url: str = "https://api.gpxz.io"
-    timeout: int = 10
+    timeout: int = 8
     daily_limit: int = 100  # Free tier limit
     rate_limit_per_second: int = 1  # Free tier limit
 

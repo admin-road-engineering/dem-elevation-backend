@@ -41,7 +41,22 @@ The DEM Backend has achieved functional index-driven source integration with 54,
 
 ## 🛠️ Critical Fixes Implementation Plan
 
-### Fix 1: Timeout Strategy Inversion (CRITICAL)
+### ⚠️ **REVISED STRATEGY: Bundled Critical Fix (Gemini Security Review)**
+
+**Gemini Review Result**: Fix 1 timeout changes create **Denial of Service vulnerabilities** when deployed in isolation on Railway's multi-worker environment.
+
+**Critical Security Issues Identified**:
+1. **API Key Revocation Risk**: 4 workers × rate limiters = 4x API violations → key suspension
+2. **Resource Leak DoS**: Per-request client creation → file descriptor exhaustion
+3. **Data Corruption**: JSON file race conditions → cost tracking failure
+
+**🎯 New Approach: Atomic Bundle Deployment**
+
+Instead of sequential fixes, implement **Fix 1 + Fix 2 + Lifecycle Management** as single deployment unit.
+
+### Bundle Components (Must Deploy Together)
+
+#### ✅ Component 1: Timeout Strategy Inversion (IMPLEMENTED)
 
 **Problem**: Current timeouts prevent effective fallback chain
 - S3: 30 seconds (longest - should be shortest)
@@ -50,20 +65,70 @@ The DEM Backend has achieved functional index-driven source integration with 54,
 
 **Solution**: Invert timeout priorities for fail-fast behavior
 ```python
-# Target timeout configuration
+# Target timeout configuration - IMPLEMENTED
 TIMEOUTS = {
-    's3_sources': 2,      # Fail fast on primary source
-    'gpxz_api': 8,        # Moderate timeout  
-    'google_api': 15      # Final fallback gets longest
+    's3_sources': 2,      # Fail fast on primary source (GDAL_HTTP_TIMEOUT)
+    'gpxz_api': 8,        # Moderate timeout (GPXZConfig.timeout)
+    'google_api': 15      # Final fallback gets longest (httpx timeout)
 }
 ```
 
-**Implementation**:
-- File: `src/enhanced_source_selector.py`
-- Update timeout values in fallback chain logic
-- Test failover behavior during S3 outages
+**Status**: ✅ **COMPLETE**
+- `src/gpxz_client.py:15` - Updated to 8s timeout
+- `src/google_elevation_client.py:39` - Updated to 15s timeout  
+- `src/enhanced_source_selector.py:844-845` - GDAL S3 timeouts set to 2s
+- Additional GDAL optimizations for connection reuse added
 
-### Fix 2: Race-Safe Usage Tracking (CRITICAL)
+#### 🔄 Component 2: Race-Safe Usage Tracking (REQUIRED)
+
+**Problem**: JSON file usage tracking has race conditions
+- Multiple FastAPI workers cause data loss
+- `.s3_usage.json` read-modify-write cycles unsafe  
+- Circuit breaker state becomes unreliable
+- **Security Risk**: 4 workers = 4x API rate violations → key suspension
+
+**Solution**: Replace with Redis atomic operations + singleton clients
+```python
+# Replace JSON file with Redis
+import redis
+r = redis.Redis(host='railway-redis-host')
+r.incr('s3_daily_usage')       # Atomic increment
+r.setex('circuit_breaker', 300, 'open')  # Expiring state
+```
+
+**Status**: 🔄 **REQUIRED FOR BUNDLE**
+
+#### 🔄 Component 3: Singleton Client Lifecycle (REQUIRED)
+
+**Problem**: Per-request client creation causes resource leaks
+- New `httpx.AsyncClient` instances per request
+- Connection pooling benefits lost
+- File descriptor exhaustion under load
+- Rate limiters not shared across workers
+
+**Solution**: FastAPI lifespan-managed singleton clients
+```python
+@asynccontx.asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    global elevation_service
+    elevation_service = UnifiedElevationService(settings)
+    yield
+    # Shutdown  
+    await elevation_service.close()
+```
+
+**Status**: 🔄 **REQUIRED FOR BUNDLE**
+
+### 🚨 Deployment Safety Rule
+
+**CRITICAL**: Components 1, 2, and 3 MUST be deployed together as atomic unit. Deploying timeout fix alone creates DoS vulnerabilities.
+
+---
+
+## 📋 Original Individual Fixes (Reference Only)
+
+### Fix 2: Race-Safe Usage Tracking (ABSORBED INTO BUNDLE)
 
 **Problem**: JSON file usage tracking has race conditions
 - Multiple FastAPI workers cause data loss

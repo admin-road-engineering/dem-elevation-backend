@@ -36,7 +36,7 @@ class GoogleElevationClient:
     def client(self) -> httpx.AsyncClient:
         """Lazy initialization of HTTP client"""
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=10.0)
+            self._client = httpx.AsyncClient(timeout=15.0)
         return self._client
     
     async def get_elevation(self, lat: float, lon: float) -> Optional[float]:
