@@ -184,24 +184,25 @@ async def get_source_info(
 @router.post("/point", response_model=PointResponse)
 async def get_elevation_point(
     request: PointRequest,
-    service: DEMService = Depends(get_dem_service),
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
+    service: DEMService = Depends(get_dem_service)
 ) -> PointResponse:
     """Get elevation for a single point using the unified elevation service."""
     try:
-        # Use the new, fully async unified service method
-        elevation, dem_source_used, message = await service.get_elevation_unified(
+        # Use the same approach as the working test endpoint
+        result = await service.elevation_service.get_elevation(
             request.latitude,
             request.longitude,
-            dem_source_id=request.dem_source_id
+            request.dem_source_id
         )
         
+        # Create response directly - try both elevation and elevation_m
         return PointResponse(
             latitude=request.latitude,
             longitude=request.longitude,
-            elevation_m=elevation,
-            dem_source_used=dem_source_used,
-            message=message
+            elevation=result.elevation_m,  # Try elevation instead of elevation_m
+            elevation_m=result.elevation_m,
+            dem_source_used=result.dem_source_used,
+            message=result.message
         )
         
     except DEMCoordinateError as e:

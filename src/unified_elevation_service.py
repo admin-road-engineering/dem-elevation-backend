@@ -249,7 +249,7 @@ class UnifiedElevationService:
                 
                 # Delegate to enhanced source selector for actual S3 data extraction
                 if hasattr(self, '_enhanced_selector'):
-                    enhanced_result = await self._enhanced_selector.get_elevation_async(lat, lon, campaign_id)
+                    enhanced_result = await self._enhanced_selector.get_elevation_with_resilience(lat, lon)
                     return ElevationResult(
                         elevation_m=enhanced_result.get('elevation_m'),
                         dem_source_used=campaign_id,
@@ -284,7 +284,7 @@ class UnifiedElevationService:
                 
                 # Delegate to enhanced source selector for actual API calls
                 if hasattr(self, '_enhanced_selector'):
-                    enhanced_result = await self._enhanced_selector.get_elevation_async(lat, lon, api_source)
+                    enhanced_result = await self._enhanced_selector.get_elevation_with_resilience(lat, lon)
                     return ElevationResult(
                         elevation_m=enhanced_result.get('elevation_m'),
                         dem_source_used=api_source,

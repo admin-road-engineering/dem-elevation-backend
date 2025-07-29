@@ -324,6 +324,93 @@ async def debug_sources():
     except Exception as e:
         return {"error": str(e), "type": type(e).__name__}
 
+@app.get("/debug-elevation-service", tags=["debug"])
+async def debug_elevation_service():
+    """Debug the elevation service configuration."""
+    try:
+        from .dependencies import get_service_container
+        
+        container = get_service_container()
+        elevation_service = container.elevation_service
+        
+        # Check elevation service configuration
+        debug_info = {
+            "elevation_service_type": type(elevation_service).__name__,
+            "using_index_driven": getattr(elevation_service, 'using_index_driven_selector', False),
+            "using_enhanced": getattr(elevation_service, 'using_enhanced_selector', False),
+            "has_enhanced_selector": hasattr(elevation_service, '_enhanced_selector'),
+            "source_selector_type": type(elevation_service.source_selector).__name__ if hasattr(elevation_service, 'source_selector') else None,
+        }
+        
+        # Try to get elevation for Brisbane to see what happens
+        try:
+            result = await elevation_service.get_elevation(-27.4698, 153.0251)
+            debug_info["test_elevation_result"] = {
+                "elevation_m": result.elevation_m,
+                "dem_source_used": result.dem_source_used,
+                "message": result.message
+            }
+            debug_info["test_success"] = True
+        except Exception as e:
+            debug_info["test_error"] = str(e)
+            debug_info["test_error_type"] = type(e).__name__
+            debug_info["test_success"] = False
+        
+        return debug_info
+        
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+@app.get("/test-elevation", tags=["debug"])
+async def test_elevation_simple():
+    """Simple test elevation endpoint bypassing all models."""
+    try:
+        from .dependencies import get_service_container
+        from .models import PointResponse
+        
+        container = get_service_container()
+        service = container.dem_service
+        
+        # Test Brisbane coordinates directly
+        result = await service.elevation_service.get_elevation(-27.4698, 153.0251)
+        
+        # Test creating PointResponse like the endpoint does
+        try:
+            response = PointResponse(
+                latitude=-27.4698,
+                longitude=153.0251,
+                elevation_m=result.elevation_m,
+                dem_source_used=result.dem_source_used,
+                message=result.message
+            )
+            return {
+                "success": True,
+                "response_dict": response.dict(),
+                "raw_result": {
+                    "elevation_m": result.elevation_m,
+                    "dem_source_used": result.dem_source_used,
+                    "message": result.message
+                }
+            }
+        except Exception as model_error:
+            return {
+                "success": False,
+                "model_error": str(model_error),
+                "raw_result": {
+                    "elevation_m": result.elevation_m,
+                    "dem_source_used": result.dem_source_used,
+                    "message": result.message
+                }
+            }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e), 
+            "type": type(e).__name__,
+            "traceback": traceback.format_exc()
+        }
+
 @app.get("/api/v1/health", tags=["health"])
 async def health_check():
     """Standardized health check endpoint with S3 index status."""
