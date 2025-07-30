@@ -243,6 +243,20 @@ class RedisCircuitBreaker:
             
         except Exception as e:
             logger.error(f"Error resetting circuit breaker for {self.service_name}: {e}")
+    
+    @property
+    def failure_count(self) -> int:
+        """Get current failure count from Redis"""
+        try:
+            redis_client = self.redis_manager._get_redis_client()
+            if redis_client is None:
+                return 0
+            
+            return int(redis_client.get(self.failure_key) or "0")
+            
+        except Exception as e:
+            logger.error(f"Error getting failure count for {self.service_name}: {e}")
+            return 0
 
 class RedisRateLimiter:
     """Redis-based rate limiter for API clients"""
