@@ -1,24 +1,25 @@
-# DEM Backend - Phase 3 Campaign-Based Architecture + 54,000x Performance Gains
+# DEM Backend - Production-Secure Architecture + Global Coverage
 
-**Status**: ✅ **PHASE 3 COMPLETED - PRODUCTION READY**  
-**Architecture**: Campaign-Based Selection + Runtime Tiling + Robust Fallback Chain  
-**Performance**: 54,000x Brisbane speedup, 672x Sydney speedup  
-**Coverage**: Global (1,151 campaigns + 6,816 tiles + APIs)  
+**Status**: ✅ **BUNDLED SECURITY FIX COMPLETE - PRODUCTION SECURE**  
+**Security**: Process-safe Redis state management for Railway multi-worker deployment  
+**Performance**: 1,000-54,000x speedup for Australian coordinates (global API coverage)  
+**Coverage**: Global (1,151 S3 campaigns + rate-limited API fallbacks)  
+**Architecture**: Redis-managed singleton clients with fail-fast timeout strategy
 
-A production-ready Digital Elevation Model (DEM) backend service delivering **world-class query performance** through intelligent campaign-based dataset selection, runtime spatial tiling, and comprehensive fallback chains for professional road engineering applications.
+A production-ready Digital Elevation Model (DEM) backend service delivering **secure global coverage** through Redis state management, intelligent campaign-based dataset selection, and comprehensive API fallback chains for professional road engineering applications.
 
-## 🚀 Key Features - PHASE 3 COMPLETE
+## 🚀 Key Features - PRODUCTION SECURE
 
-- **🚀 54,000x PERFORMANCE GAINS** - Brisbane CBD: 216,106 → 4 files searched
+- **🔒 SECURITY FIRST** - All Gemini security review issues resolved via bundled fix
+- **⚡ Redis State Management** - Process-safe atomic operations for Railway multi-worker deployment
+- **🛡️ Rate Limiting Protection** - Multi-layer geographic-aware abuse prevention
+- **🚀 1,000-54,000x PERFORMANCE** - Australian coordinates via S3 campaign selection
 - **🎯 Campaign-Based Selection** - 1,151 survey campaigns with intelligent scoring
-- **⚡ Runtime Spatial Tiling** - 6,816 Brisbane metro tiles for ultra-fast queries
-- **🏗️ Multi-Factor Scoring** - Resolution (50%) + temporal (30%) + spatial (15%) + provider (5%)
-- **🔄 Robust Fallback Chain** - Phase 3 → Phase 2 → External APIs with file-level recovery
-- **🎛️ Configurable Thresholds** - High/medium/low confidence determines selection strategy
-- **📊 Production Metrics** - P95 <75ms, 83.3% success criteria achieved
-- **🔧 Manual Update System** - Cost-controlled S3 updates via manual workflow
-- **🌐 Global Coverage** - S3 regional data + GPXZ + Google API fallbacks
-- **✅ Enterprise Ready** - Comprehensive error handling and monitoring
+- **🌐 Global Coverage** - S3 regional data + rate-limited GPXZ/Google API fallbacks
+- **⚡ Fail-Fast Timeouts** - S3(2s) → GPXZ(8s) → Google(15s) strategy
+- **🔄 Singleton Clients** - FastAPI lifespan-managed clients prevent resource leaks
+- **🏗️ Circuit Breakers** - Redis-backed failure state shared across workers
+- **✅ Production Ready** - Comprehensive error handling and monitoring
 
 ## 🏗️ Architecture
 

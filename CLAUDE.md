@@ -2,12 +2,13 @@
 
 DEM Backend - FastAPI elevation service for Road Engineering SaaS platform.
 
-## 🚀 INTEGRATION COMPLETE - PRODUCTION READY
+## 🚀 BUNDLED FIX COMPLETE - PRODUCTION SECURE
 
-**Status**: Index-driven source integration successfully implemented and validated  
-**Performance**: 54,000x speedup for Brisbane coordinates via S3 campaign selection  
-**Coverage**: 1,151 S3 campaigns + API fallback chain (GPXZ → Google)  
-**Architecture**: Unified spatial indexing with O(log N) geographic lookups
+**Status**: ✅ **Gemini Security Review - All Critical Issues Resolved**  
+**Security**: Process-safe Redis state management for Railway multi-worker deployment  
+**Performance**: 1,000-54,000x speedup for Australian coordinates (global coverage via APIs)  
+**Coverage**: 1,151 S3 campaigns + rate-limited API fallback chain (GPXZ → Google)  
+**Architecture**: Redis-managed singleton clients with fail-fast timeout strategy
 
 ## 🚨 CRITICAL RULES
 - **NEVER start uvicorn** without user permission - check `netstat -ano | findstr :8001` first
@@ -27,11 +28,17 @@ DEM Backend - FastAPI elevation service for Road Engineering SaaS platform.
 ## Production Deployment
 
 **Railway Status**: `https://dem-elevation-backend-production.up.railway.app` ✅  
-**Service ID**: `cda12ccf-822d-4bb9-b804-44099401b462`  
-**Plan**: Hobby ($5/month, 8GB RAM)
+**Redis Status**: **REQUIRED** - Railway Redis addon for process-safe state management  
+**Plan**: Hobby ($5/month, 8GB RAM) + Redis ($5/month)
 
-**Deploy**: `railway up --detach --service cda12ccf-822d-4bb9-b804-44099401b462`  
-**Variables**: `railway variables --set "KEY=value" --service cda12ccf-822d-4bb9-b804-44099401b462`
+**Deploy**: `railway up --detach`  
+**Add Redis**: `railway add --database redis` (required for multi-worker safety)  
+**Variables**: `railway variables --set "KEY=value"`
+
+### Redis Requirements
+- **Critical**: Redis addon must be provisioned for production deployment
+- **Environment Variables**: `REDIS_URL` and `REDIS_PRIVATE_URL` auto-configured by Railway
+- **Fallback**: Graceful degradation to in-memory state if Redis unavailable (dev only)
 
 ## Testing
 
@@ -45,16 +52,23 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
   -d '{"latitude": -27.4698, "longitude": 153.0251}'
 ```
 
-## ⚡ Index-Driven Source Integration
+## 🔒 Security & Performance Architecture
 
-**Implementation Status**: ✅ Complete and Production-Ready
+**Bundled Fix Status**: ✅ **All Gemini Security Issues Resolved**
 
-### Key Features
+### Security Fixes Implemented
+- **✅ Timeout Strategy Inversion**: S3(2s) → GPXZ(8s) → Google(15s) fail-fast chain
+- **✅ Redis State Management**: Process-safe atomic operations replace JSON file race conditions  
+- **✅ Singleton Client Lifecycle**: FastAPI lifespan prevents resource leaks & shared rate limiters
+- **✅ Rate Limiting Protection**: Multi-layer geographic-aware abuse prevention
+- **✅ Circuit Breaker Reliability**: Redis-backed failure state shared across workers
+
+### Performance Features
 - **1,151 S3 Campaigns**: Loaded from `phase3_campaign_populated_index.json`
 - **Spatial Indexing**: 50x50 grid with 849/2500 occupied cells, avg 4.5 campaigns/cell
 - **Geographic Selection**: Brisbane → Brisbane2009LGA (1m resolution S3 campaign)
 - **Fallback Chain**: Ocean coordinates → GPXZ API → Google API
-- **Performance**: 54,000x speedup for covered areas vs API calls
+- **Performance**: 1,000-54,000x speedup for Australian coordinates vs API calls
 
 ### Architecture Components
 - **IndexDrivenSourceSelector**: Spatial indexing with overlap resolution
@@ -108,9 +122,10 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
 - **DEM Service**: `src/dem_service.py` - Core elevation logic
 - **Endpoints**: `src/api/v1/endpoints.py` - `/point`, `/points`, `/path`, `/contour-data`
 - **Config**: `src/config.py` - Environment management
-- **Source Selector**: `src/enhanced_source_selector.py` - Fallback chain
+- **Source Selector**: `src/enhanced_source_selector.py` - Redis-managed fallback chain
 - **Campaign Selector**: `src/campaign_dataset_selector.py` - Smart S3 selection
-- **S3 Loader**: `src/s3_index_loader.py` - Spatial indexing
+- **S3 Loader**: `src/s3_index_loader.py` - Spatial indexing  
+- **Redis State**: `src/redis_state_manager.py` - Process-safe state management
 
 ## Performance
 
@@ -146,8 +161,13 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
 
 **Performance issues**:
 - Use batch endpoints for multiple points
-- Check network connectivity
+- Check network connectivity  
 - Wait for circuit breaker recovery (60-300s)
+
+**Redis connection issues**:
+- Check Railway Redis addon is provisioned
+- Verify REDIS_URL environment variable is set
+- Service will fallback to in-memory state (dev only - not process-safe)
 
 **Diagnostic Commands**:
 ```bash
