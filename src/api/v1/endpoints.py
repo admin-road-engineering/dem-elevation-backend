@@ -197,19 +197,19 @@ async def get_source_info(
 @router.post("/point", response_model=PointResponse)
 @limiter.limit("60/minute")  # Generous for S3, restrictive for API abuse
 async def get_elevation_point(
-    request_http: Request,
-    request: PointRequest,
+    request: Request,
+    point_request: PointRequest,
     service: DEMService = Depends(get_dem_service)
 ) -> PointResponse:
     """Get elevation for a single point using the unified elevation service."""
     try:
         # Check for API fallback abuse (more restrictive rate limiting)
-        if is_api_fallback_coordinate(request.latitude, request.longitude):
+        if is_api_fallback_coordinate(point_request.latitude, point_request.longitude):
             # Apply stricter rate limiting for expensive API coordinates
             from slowapi.errors import RateLimitExceeded
             import time
             current_minute = int(time.time() // 60)
-            rate_key = f"api_fallback:{get_remote_address(request_http)}:{current_minute}"
+            rate_key = f"api_fallback:{get_remote_address(request)}:{current_minute}"
             
             # Simple in-memory rate limiting for API coordinates (10/minute)
             if not hasattr(get_elevation_point, '_api_rate_cache'):
@@ -217,7 +217,7 @@ async def get_elevation_point(
             
             current_count = get_elevation_point._api_rate_cache.get(rate_key, 0)
             if current_count >= 10:
-                logger.warning(f"API fallback rate limit exceeded for {get_remote_address(request_http)}")
+                logger.warning(f"API fallback rate limit exceeded for {get_remote_address(request)}")
                 raise HTTPException(
                     status_code=429, 
                     detail="Rate limit exceeded for non-Australian coordinates (10/minute). These coordinates require expensive API calls."
@@ -230,15 +230,15 @@ async def get_elevation_point(
         
         # Use the same approach as the working test endpoint
         result = await service.elevation_service.get_elevation(
-            request.latitude,
-            request.longitude,
-            request.dem_source_id
+            point_request.latitude,
+            point_request.longitude,
+            point_request.dem_source_id
         )
         
         # Create response directly - try both elevation and elevation_m
         return PointResponse(
-            latitude=request.latitude,
-            longitude=request.longitude,
+            latitude=point_request.latitude,
+            longitude=point_request.longitude,
             elevation=result.elevation_m,  # Try elevation instead of elevation_m
             elevation_m=result.elevation_m,
             dem_source_used=result.dem_source_used,
@@ -308,22 +308,22 @@ async def get_elevation_line(
 @router.post("/path", response_model=PathResponse)
 @limiter.limit("20/minute")  # More restrictive for batch operations
 async def get_elevation_path(
-    request_http: Request,
-    request: PathRequest,
+    request: Request,
+    path_request: PathRequest,
     service: DEMService = Depends(get_dem_service)
 ) -> PathResponse:
     """Get elevations for a list of discrete points using unified elevation service."""
     try:
-        if not request.points:
+        if not path_request.points:
             raise HTTPException(status_code=400, detail="Points list cannot be empty")
         
         # Emergency protection: Limit path size to prevent API quota abuse  
-        if len(request.points) > 100:
+        if len(path_request.points) > 100:
             raise HTTPException(status_code=400, detail="Maximum 100 points per path request to prevent API quota abuse")
         
         # Convert request points to dict format for service
         points_data = []
-        for point in request.points:
+        for point in path_request.points:
             points_data.append({
                 "latitude": point.latitude,
                 "longitude": point.longitude,
@@ -333,7 +333,7 @@ async def get_elevation_path(
         # Use the new unified service for batch elevation
         elevations, dem_source_used, message = await service.get_elevations_for_path_unified(
             points_data,
-            request.dem_source_id
+            path_request.dem_source_id
         )
         
         # Convert to response model
@@ -779,22 +779,22 @@ async def debug_source_selection(
 @router.post("/points", response_model=StandardResponse, summary="Get elevations for multiple discrete coordinates")
 @limiter.limit("10/minute")  # Most restrictive for bulk operations
 async def get_elevation_points(
-    request_http: Request,
-    request: PointsRequest,
+    request: Request,
+    points_request: PointsRequest,
     service: DEMService = Depends(get_dem_service)
 ) -> StandardResponse:
     """Get elevations for multiple discrete coordinates (batch endpoint)."""
     try:
-        if not request.points:
+        if not points_request.points:
             raise HTTPException(status_code=400, detail="Points list cannot be empty")
         
         # Emergency protection: Limit batch size to prevent API quota abuse
-        if len(request.points) > 50:
+        if len(points_request.points) > 50:
             raise HTTPException(status_code=400, detail="Maximum 50 points per batch request to prevent API quota abuse")
         
         # Convert to format expected by existing service
         points_data = []
-        for i, point in enumerate(request.points):
+        for i, point in enumerate(points_request.points):
             points_data.append({
                 "latitude": point.lat,
                 "longitude": point.lon,
@@ -804,7 +804,7 @@ async def get_elevation_points(
         # Use unified elevation service for batch processing
         elevations, dem_source_used, message = await service.get_elevations_for_path_unified(
             points_data,
-            request.source
+            points_request.source
         )
         
         # Convert to standardized response format
