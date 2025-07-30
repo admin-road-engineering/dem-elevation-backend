@@ -143,6 +143,37 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+@app.get("/debug/settings-info")
+async def debug_settings_info():
+    """Debug endpoint to check Settings instance state in production"""
+    import os
+    from .dependencies import get_service_container
+    
+    # Get multiple Settings instances
+    direct_settings = get_settings()
+    container_settings = get_service_container().settings
+    
+    return {
+        "direct_settings": {
+            "source_count": len(direct_settings.DEM_SOURCES),
+            "first_3_sources": list(direct_settings.DEM_SOURCES.keys())[:3],
+            "instance_id": id(direct_settings)
+        },
+        "container_settings": {
+            "source_count": len(container_settings.DEM_SOURCES), 
+            "first_3_sources": list(container_settings.DEM_SOURCES.keys())[:3],
+            "instance_id": id(container_settings)
+        },
+        "same_instance": direct_settings is container_settings,
+        "environment": {
+            "RAILWAY_ENVIRONMENT": os.environ.get("RAILWAY_ENVIRONMENT"),
+            "SPATIAL_INDEX_SOURCE": os.environ.get("SPATIAL_INDEX_SOURCE"),
+            "DEM_SOURCES_in_env": "DEM_SOURCES" in os.environ,
+            "USE_S3_SOURCES": os.environ.get("USE_S3_SOURCES"),
+            "USE_API_SOURCES": os.environ.get("USE_API_SOURCES")
+        }
+    }
+
 # Add CORS middleware
 settings = get_settings()
 cors_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()] if settings.CORS_ORIGINS else ["*"]
