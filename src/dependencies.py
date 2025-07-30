@@ -14,6 +14,7 @@ from .dataset_manager import DatasetManager
 from .contour_service import ContourService
 from .unified_elevation_service import UnifiedElevationService
 from .dem_service import DEMService
+from .redis_state_manager import RedisStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,18 @@ class ServiceContainer:
         self._elevation_service: Optional[UnifiedElevationService] = None
         self._dem_service: Optional[DEMService] = None
         
-        logger.info("ServiceContainer initialized")
+        # Initialize Redis state manager for process-safe operations
+        self._redis_manager: Optional[RedisStateManager] = None
+        
+        logger.info("ServiceContainer initialized with Redis state management")
+    
+    @property
+    def redis_manager(self) -> RedisStateManager:
+        """Get or create the Redis state manager instance."""
+        if self._redis_manager is None:
+            self._redis_manager = RedisStateManager()
+            logger.info("RedisStateManager created for process-safe state")
+        return self._redis_manager
     
     @property
     def dataset_manager(self) -> DatasetManager:
@@ -55,11 +67,11 @@ class ServiceContainer:
     def elevation_service(self) -> UnifiedElevationService:
         """Get or create the UnifiedElevationService instance."""
         if self._elevation_service is None:
-            self._elevation_service = UnifiedElevationService(self.settings)
+            self._elevation_service = UnifiedElevationService(self.settings, redis_manager=self.redis_manager)
             # Inject dataset manager if the service supports it
             if hasattr(self._elevation_service, 'set_dataset_manager'):
                 self._elevation_service.set_dataset_manager(self.dataset_manager)
-            logger.info("UnifiedElevationService created with dependencies")
+            logger.info("UnifiedElevationService created with Redis state management")
         return self._elevation_service
     
     @property
@@ -83,6 +95,7 @@ class ServiceContainer:
             ("dem_service", self._dem_service),
             ("elevation_service", self._elevation_service),
             ("dataset_manager", self._dataset_manager),
+            ("redis_manager", self._redis_manager),
         ]
         
         for service_name, service in services_to_close:

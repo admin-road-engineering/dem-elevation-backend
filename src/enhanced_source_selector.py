@@ -15,6 +15,7 @@ from .error_handling import (
     CircuitBreaker, RetryableError, NonRetryableError, 
     create_unified_error_response, retry_with_backoff, SourceType
 )
+from .redis_state_manager import RedisStateManager, RedisS3CostManager, RedisCircuitBreaker
 
 logger = logging.getLogger(__name__)
 
@@ -160,49 +161,12 @@ class SpatialIndexLoader:
 
 logger = logging.getLogger(__name__)
 
-class S3CostManager:
-    """Track and limit S3 usage to control costs during development"""
-    
-    def __init__(self, daily_gb_limit: float = 1.0, cache_file: str = ".s3_usage.json"):
-        self.daily_gb_limit = daily_gb_limit
-        self.cache_file = Path(cache_file)
-        self.usage = self._load_usage()
-        
-    def _load_usage(self) -> Dict:
-        """Load usage data from cache"""
-        if self.cache_file.exists():
-            with open(self.cache_file, 'r') as f:
-                return json.load(f)
-        return {"date": str(datetime.now().date()), "gb_used": 0.0, "requests": 0}
-    
-    def _save_usage(self):
-        """Save usage data to cache"""
-        with open(self.cache_file, 'w') as f:
-            json.dump(self.usage, f)
-    
-    def can_access_s3(self, estimated_mb: float = 10) -> bool:
-        """Check if we're within daily limits"""
-        today = str(datetime.now().date())
-        
-        # Reset if new day
-        if self.usage["date"] != today:
-            self.usage = {"date": today, "gb_used": 0.0, "requests": 0}
-        
-        estimated_gb = estimated_mb / 1024
-        return self.usage["gb_used"] + estimated_gb <= self.daily_gb_limit
-    
-    def record_access(self, size_mb: float):
-        """Record S3 access"""
-        self.usage["gb_used"] += size_mb / 1024
-        self.usage["requests"] += 1
-        self._save_usage()
-        
-        logger.info(f"S3 Usage: {self.usage['gb_used']:.2f}GB / {self.daily_gb_limit}GB daily limit")
+# S3CostManager now replaced with RedisS3CostManager for process-safe state management
 
 class EnhancedSourceSelector:
     """Enhanced source selector with S3 → GPXZ → Google fallback chain"""
     
-    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None):
+    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None, redis_manager: Optional[RedisStateManager] = None):
         logger.info("=== EnhancedSourceSelector Initialization ===")
         logger.info(f"Parameters:")
         logger.info(f"  use_s3: {use_s3}")
@@ -211,15 +175,19 @@ class EnhancedSourceSelector:
         logger.info(f"  gpxz_config: {gpxz_config is not None}")
         logger.info(f"  google_api_key: {'set' if google_api_key else 'missing'}")
         logger.info(f"  aws_credentials: {'set' if aws_credentials else 'missing'}")
+        logger.info(f"  redis_manager: {'provided' if redis_manager else 'creating new'}")
         
         self.config = config
         self.use_s3 = use_s3
         self.use_apis = use_apis
-        self.cost_manager = S3CostManager() if use_s3 else None
-        self.spatial_index_loader = SpatialIndexLoader() if use_s3 else None
         self.aws_credentials = aws_credentials
         self.gpxz_client = None
         self.google_client = None
+        
+        # Initialize Redis state management
+        self.redis_manager = redis_manager if redis_manager else RedisStateManager()
+        self.cost_manager = RedisS3CostManager(self.redis_manager) if use_s3 else None
+        self.spatial_index_loader = SpatialIndexLoader() if use_s3 else None
         
         # Phase 3 Selector with S3 index support
         if use_s3:
@@ -239,11 +207,11 @@ class EnhancedSourceSelector:
             self.campaign_selector = None
             logger.info("Campaign selector not initialized (S3 disabled)")
         
-        # Check GPXZ client
+        # Initialize GPXZ client with Redis state management
         if use_apis and gpxz_config:
-            logger.info("Initializing GPXZ client...")
+            logger.info("Initializing GPXZ client with Redis state management...")
             try:
-                self.gpxz_client = GPXZClient(gpxz_config)
+                self.gpxz_client = GPXZClient(gpxz_config, redis_manager=self.redis_manager)
                 logger.info(f"GPXZ client initialized: {self.gpxz_client is not None}")
             except Exception as e:
                 logger.error(f"Failed to initialize GPXZ client: {e}")
@@ -252,11 +220,11 @@ class EnhancedSourceSelector:
             logger.warning(f"GPXZ client NOT initialized (use_apis={use_apis}, "
                           f"gpxz_config={gpxz_config is not None})")
         
-        # Check Google client
+        # Initialize Google client with Redis state management
         if use_apis and google_api_key:
-            logger.info("Initializing Google client...")
+            logger.info("Initializing Google client with Redis state management...")
             try:
-                self.google_client = GoogleElevationClient(google_api_key)
+                self.google_client = GoogleElevationClient(google_api_key, redis_manager=self.redis_manager)
                 logger.info(f"Google client initialized: {self.google_client is not None}")
             except Exception as e:
                 logger.error(f"Failed to initialize Google client: {e}")
@@ -265,12 +233,12 @@ class EnhancedSourceSelector:
             logger.warning(f"Google client NOT initialized (use_apis={use_apis}, "
                           f"google_api_key={'set' if google_api_key else 'missing'})")
         
-        # Circuit breakers for external services
+        # Redis-based circuit breakers for external services (process-safe)
         self.circuit_breakers = {
-            "gpxz_api": CircuitBreaker(failure_threshold=3, recovery_timeout=300),
-            "google_api": CircuitBreaker(failure_threshold=3, recovery_timeout=300),
-            "s3_nz": CircuitBreaker(failure_threshold=5, recovery_timeout=180),
-            "s3_au": CircuitBreaker(failure_threshold=5, recovery_timeout=180)
+            "gpxz_api": RedisCircuitBreaker(self.redis_manager, "gpxz_api", failure_threshold=3, recovery_timeout=300),
+            "google_api": RedisCircuitBreaker(self.redis_manager, "google_api", failure_threshold=3, recovery_timeout=300),
+            "s3_nz": RedisCircuitBreaker(self.redis_manager, "s3_nz", failure_threshold=5, recovery_timeout=180),
+            "s3_au": RedisCircuitBreaker(self.redis_manager, "s3_au", failure_threshold=5, recovery_timeout=180)
         }
         logger.info(f"Circuit breakers initialized: {list(self.circuit_breakers.keys())}")
         

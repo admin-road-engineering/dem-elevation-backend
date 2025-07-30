@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import logging
 from datetime import datetime, timedelta
 from .error_handling import RetryableError, NonRetryableError, SourceType
+from .redis_state_manager import RedisStateManager, RedisRateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +52,17 @@ class GPXZRateLimiter:
         self.daily_requests += 1
 
 class GPXZClient:
-    """Client for GPXZ.io elevation API"""
+    """Client for GPXZ.io elevation API with Redis-based rate limiting"""
     
-    def __init__(self, config: GPXZConfig):
+    def __init__(self, config: GPXZConfig, redis_manager: Optional[RedisStateManager] = None):
         self.config = config
-        self.rate_limiter = GPXZRateLimiter(config.rate_limit_per_second)
+        self.redis_manager = redis_manager if redis_manager else RedisStateManager()
+        self.rate_limiter = RedisRateLimiter(
+            self.redis_manager, 
+            service_name="gpxz",
+            requests_per_second=config.rate_limit_per_second,
+            daily_limit=config.daily_limit
+        )
         self._client = None
     
     @property
@@ -153,13 +160,8 @@ class GPXZClient:
             return [None] * len(points)
     
     async def get_usage_stats(self) -> Dict:
-        """Get current usage statistics"""
-        return {
-            "daily_requests_used": self.rate_limiter.daily_requests,
-            "daily_limit": 100,
-            "requests_remaining": 100 - self.rate_limiter.daily_requests,
-            "rate_limit_per_second": self.config.rate_limit_per_second
-        }
+        """Get current usage statistics from Redis"""
+        return self.rate_limiter.get_usage_stats()
     
     async def close(self):
         """Close the HTTP client"""

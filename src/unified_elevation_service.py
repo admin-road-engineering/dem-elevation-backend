@@ -15,6 +15,7 @@ from .dem_exceptions import (
     DEMCoordinateError, DEMConfigurationError
 )
 from .gpxz_client import GPXZConfig
+from .redis_state_manager import RedisStateManager
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,10 @@ class UnifiedElevationService:
     4. Supporting both legacy and enhanced source selectors
     """
     
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, redis_manager: Optional[RedisStateManager] = None):
         try:
             self.settings = settings
+            self.redis_manager = redis_manager
             
             # Initialize appropriate source selector based on configuration
             use_s3 = getattr(settings, 'USE_S3_SOURCES', False)
@@ -70,7 +72,8 @@ class UnifiedElevationService:
                     use_apis=True,
                     gpxz_config=gpxz_config,
                     google_api_key=google_api_key,
-                    aws_credentials=aws_creds
+                    aws_credentials=aws_creds,
+                    redis_manager=self.redis_manager
                 )
             elif use_s3 or use_apis:
                 logger.info("Initializing enhanced source selector with S3/API support")
@@ -90,7 +93,8 @@ class UnifiedElevationService:
                     use_apis=use_apis,
                     gpxz_config=gpxz_config,
                     google_api_key=google_api_key,
-                    aws_credentials=aws_creds
+                    aws_credentials=aws_creds,
+                    redis_manager=self.redis_manager
                 )
                 self.using_enhanced_selector = True
                 self.using_index_driven_selector = False
