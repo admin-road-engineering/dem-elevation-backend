@@ -1,0 +1,1 @@
+# Overlap Quantification Report\n\n**Generated:** 2025-07-20T23:29:03.593848\n**Test Coordinates:** 12 locations across Australia\n**Target:** 90%+ reduction in file overlap\n\n## Executive Summary\n\n- **Overall Success Rate:** 100.0% (12/12 locations meet 90%+ target)\n
