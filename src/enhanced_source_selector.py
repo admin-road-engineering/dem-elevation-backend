@@ -2,6 +2,7 @@ import time
 import json
 import asyncio
 import logging
+import os
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 from datetime import datetime
@@ -16,17 +17,19 @@ from .error_handling import (
     create_unified_error_response, retry_with_backoff, SourceType
 )
 from .redis_state_manager import RedisStateManager, RedisS3CostManager, RedisCircuitBreaker
+from .unified_index_loader import UnifiedIndexLoader
 
 logger = logging.getLogger(__name__)
 
 class SpatialIndexLoader:
     """Loads and manages spatial index files for S3 DEM sources with smart dataset selection"""
     
-    def __init__(self):
+    def __init__(self, unified_loader: Optional[UnifiedIndexLoader] = None):
         self.project_root = Path(__file__).parent.parent
         self.config_dir = self.project_root / "config"
         self.au_spatial_index = None
         self.nz_spatial_index = None
+        self.unified_loader = unified_loader
         # Initialize smart dataset selector for Phase 2 performance improvements
         # self.smart_selector = SmartDatasetSelector(self.config_dir)
         
@@ -43,15 +46,39 @@ class SpatialIndexLoader:
         return self.au_spatial_index
     
     def load_nz_index(self) -> Optional[Dict]:
-        """Load NZ spatial index"""
+        """Load NZ spatial index (S3 in production, filesystem in development)"""
         if self.nz_spatial_index is None:
+            # Try UnifiedIndexLoader first (production S3 loading)
+            if self.unified_loader:
+                try:
+                    import asyncio
+                    # Use UnifiedIndexLoader for S3 loading
+                    loop = None
+                    try:
+                        loop = asyncio.get_event_loop()
+                    except RuntimeError:
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                    
+                    self.nz_spatial_index = loop.run_until_complete(
+                        self.unified_loader.load_index("nz_spatial_index")
+                    )
+                    logger.info("Successfully loaded NZ spatial index from S3 via UnifiedIndexLoader")
+                    return self.nz_spatial_index
+                except Exception as e:
+                    logger.warning(f"Failed to load NZ spatial index from S3: {e}, falling back to filesystem")
+            
+            # Fallback to filesystem loading (development mode)
             nz_index_file = self.config_dir / "nz_spatial_index.json"
             if nz_index_file.exists():
                 try:
                     with open(nz_index_file, 'r') as f:
                         self.nz_spatial_index = json.load(f)
+                    logger.info("Successfully loaded NZ spatial index from filesystem")
                 except Exception as e:
-                    logger.error(f"Failed to load NZ spatial index: {e}")
+                    logger.error(f"Failed to load NZ spatial index from filesystem: {e}")
+            else:
+                logger.warning(f"NZ spatial index file not found: {nz_index_file}")
         return self.nz_spatial_index
     
     def find_au_file_for_coordinate(self, lat: float, lon: float) -> Optional[str]:
@@ -187,7 +214,17 @@ class EnhancedSourceSelector:
         # Initialize Redis state management
         self.redis_manager = redis_manager if redis_manager else RedisStateManager()
         self.cost_manager = RedisS3CostManager(self.redis_manager) if use_s3 else None
-        self.spatial_index_loader = SpatialIndexLoader() if use_s3 else None
+        
+        # Initialize UnifiedIndexLoader for Phase 3 NZ S3 integration
+        unified_loader = None
+        if use_s3:
+            try:
+                unified_loader = UnifiedIndexLoader()
+                logger.info("UnifiedIndexLoader initialized for NZ S3 index loading")
+            except Exception as e:
+                logger.warning(f"Failed to initialize UnifiedIndexLoader: {e}")
+        
+        self.spatial_index_loader = SpatialIndexLoader(unified_loader) if use_s3 else None
         
         # Phase 3 Selector with S3 index support
         if use_s3:
