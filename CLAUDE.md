@@ -27,7 +27,7 @@ DEM Backend - FastAPI elevation service for Road Engineering SaaS platform.
 
 ## Production Deployment
 
-**Railway Status**: `https://dem-elevation-backend-production.up.railway.app` ✅  
+**Railway Status**: `https://dem-elevation-backend-production-9c7a.up.railway.app` ✅  
 **Redis Status**: **REQUIRED** - Railway Redis addon for process-safe state management  
 **Plan**: Hobby ($5/month, 8GB RAM) + Redis ($5/month)
 
@@ -146,6 +146,47 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
 
 ## Troubleshooting
 
+### 🚨 CRITICAL: 500 Internal Server Error on Elevation Endpoints
+
+**Symptoms**: `/api/v1/elevation/point` returns `500 Internal Server Error`
+
+**Root Cause**: SlowAPI rate limiter expects first parameter to be `starlette.requests.Request`
+
+**Error**: `Exception: parameter 'request' must be an instance of starlette.requests.Request`
+
+**Fix**: Ensure correct parameter order in FastAPI endpoints:
+```python
+# ❌ WRONG - Causes 500 error
+@limiter.limit("60/minute")
+async def endpoint(
+    request_http: Request,    # SlowAPI gets confused
+    request: PydanticModel,   # Tries to use this as Request
+    service: Service = Depends(get_service)
+):
+
+# ✅ CORRECT - Works properly  
+@limiter.limit("60/minute")
+async def endpoint(
+    request: Request,         # SlowAPI uses this correctly
+    point_request: PydanticModel,  # Clear distinction
+    service: Service = Depends(get_service)
+):
+```
+
+### 🚨 CRITICAL: "RedisCircuitBreaker object has no attribute 'failure_count'"
+
+**Symptoms**: Elevation returns `"index_driven_error"` with circuit breaker error
+
+**Root Causes**:
+1. **Missing Redis Connection**: Service not connected to Railway Redis addon
+2. **Missing Property**: Debug endpoint accessing non-existent `failure_count` attribute
+
+**Fixes**:
+1. **Connect Redis Addon**: Via Railway dashboard → Service → Variables → Connect Redis
+2. **Add Property**: Added `failure_count` property to `RedisCircuitBreaker` class
+
+### Standard Issues
+
 **Service won't start**: 
 - Check `.env` exists with DEM_SOURCES
 - Reset: `python scripts/switch_environment.py local`
@@ -165,8 +206,8 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
 - Wait for circuit breaker recovery (60-300s)
 
 **Redis connection issues**:
-- Check Railway Redis addon is provisioned
-- Verify REDIS_URL environment variable is set
+- **CRITICAL**: Check Railway Redis addon is provisioned AND connected to service
+- Verify REDIS_URL environment variable is set (auto-added when Redis connected)
 - Service will fallback to in-memory state (dev only - not process-safe)
 
 **Diagnostic Commands**:
@@ -174,8 +215,22 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
 # Test config
 python -c "from src.config import Settings; print(Settings())"
 
-# Test production
-curl "https://dem-elevation-backend-production.up.railway.app/api/v1/health"
+# Test production health
+curl "https://dem-elevation-backend-production-9c7a.up.railway.app/api/v1/health"
+
+# Test elevation endpoints
+curl -X POST "https://dem-elevation-backend-production-9c7a.up.railway.app/api/v1/elevation/point" \
+  -H "Content-Type: application/json" \
+  -d '{"latitude": -27.4698, "longitude": 153.0251}'
+
+# Expected Brisbane result:
+# {"elevation":11.523284,"dem_source_used":"Brisbane2009LGA","message":"Index-driven S3 campaign: Brisbane2009LGA (resolution: 1m)"}
+
+# Check Railway logs for debugging
+railway logs --service dem-elevation-backend
+
+# Check environment variables (especially REDIS_URL)
+railway variables --service dem-elevation-backend
 ```
 
 ## Data Management
@@ -190,3 +245,43 @@ python scripts/manual_campaign_update.py --validate
 **Spatial Index Generation**:
 - Australian: `python scripts/generate_spatial_index.py generate`
 - New Zealand: `python scripts/generate_nz_spatial_index.py generate`
+
+## 🛠️ Debugging Protocol Reference
+
+When elevation endpoints fail, follow systematic debugging protocol:
+
+### Phase 1: Diagnosis & Hypothesis
+1. **Reproduce**: Test specific coordinates consistently
+2. **Gather Evidence**: Check Railway logs, error patterns, stack traces
+3. **Isolate Fault**: Create minimal test case
+4. **Formulate Hypothesis**: Based on evidence (e.g., SlowAPI parameter order)
+
+### Phase 2: Solution Design & Verification  
+5. **Research Solution**: Check FastAPI/SlowAPI documentation
+6. **Assess Impact**: Consider side effects, breaking changes
+
+### Phase 3: Implementation & Validation
+7. **Implement Fix**: Make targeted code changes
+8. **Validate**: Test endpoints, run regression tests
+9. **Deploy**: Push to GitHub → Railway auto-deploy → validate production
+
+### Common Fix Patterns
+- **SlowAPI Issues**: Parameter order in FastAPI endpoints
+- **Redis Issues**: Connection missing, circuit breaker properties
+- **S3 Issues**: Campaign loading, spatial indexing, credentials
+- **Deployment Issues**: Environment variables, service connections
+
+### Validation Checklist
+```bash
+# Brisbane (S3 campaign expected)
+curl -X POST "${BASE_URL}/api/v1/elevation/point" -d '{"latitude": -27.4698, "longitude": 153.0251}'
+# Expected: Brisbane2009LGA, ~11.5m elevation
+
+# Sydney (S3 campaign expected)  
+curl -X POST "${BASE_URL}/api/v1/elevation/point" -d '{"latitude": -33.8688, "longitude": 151.2093}'
+# Expected: Sydney201304, ~21.7m elevation
+
+# New Zealand (API fallback expected)
+curl -X POST "${BASE_URL}/api/v1/elevation/point" -d '{"latitude": -36.8485, "longitude": 174.7633}'
+# Expected: gpxz_api, Auckland elevation
+```
