@@ -236,6 +236,16 @@ class EnhancedSourceSelector:
         
         self.spatial_index_loader = SpatialIndexLoader(unified_loader) if use_s3 else None
         
+        # Load NZ spatial index if S3 is enabled and UnifiedIndexLoader is available
+        if self.spatial_index_loader and unified_loader:
+            try:
+                logger.info("Loading NZ spatial index during initialization...")
+                self.spatial_index_loader.load_nz_index()
+                nz_regions = len(self.spatial_index_loader.nz_spatial_index.get('regions', {})) if self.spatial_index_loader.nz_spatial_index else 0
+                logger.info(f"NZ spatial index loaded with {nz_regions} regions")
+            except Exception as e:
+                logger.warning(f"Failed to load NZ spatial index during initialization: {e}")
+        
         # Phase 3 Selector with S3 index support
         if use_s3:
             import os

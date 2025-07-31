@@ -74,7 +74,8 @@ class UnifiedIndexLoader:
                            f"secret_key_length={len(aws_secret_key)}, region={aws_region}")
                 
                 if not aws_access_key or not aws_secret_key:
-                    raise NoCredentialsError("AWS credentials not found in environment variables")
+                    logger.error("AWS credentials not found in environment variables")
+                    raise NoCredentialsError()
                 
                 # Configure timeouts for production
                 connect_timeout = int(os.getenv("S3_CONNECT_TIMEOUT", "10"))
