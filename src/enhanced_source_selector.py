@@ -829,32 +829,53 @@ class EnhancedSourceSelector:
                 from rasterio.errors import RasterioIOError
                 import psutil
                 
-                # S3 bucket is configured, not part of dem_file
-                bucket_name = "road-engineering-elevation-data"  # Or from config
-                logger.info(f"S3 bucket: {bucket_name}, key: {dem_file}")
+                # Parse bucket name and key from S3 URL or use default
+                if dem_file.startswith("s3://"):
+                    # Full S3 URL: s3://bucket-name/path/to/file
+                    parts = dem_file[5:].split("/", 1)  # Remove s3:// and split on first /
+                    bucket_name = parts[0]
+                    file_key = parts[1] if len(parts) > 1 else ""
+                    logger.info(f"Parsed S3 URL: bucket={bucket_name}, key={file_key}")
+                else:
+                    # Assume it's just a key for the default bucket
+                    bucket_name = "road-engineering-elevation-data"
+                    file_key = dem_file
+                    logger.info(f"Using default bucket: {bucket_name}, key={file_key}")
+                
+                # Use the parsed file_key for S3 operations
+                dem_file = file_key
                 
                 # Test S3 accessibility
-                if use_credentials:
+                if use_credentials and bucket_name != "nz-elevation":
+                    # Private bucket - requires AWS credentials
                     s3_client = boto3.client('s3', 
                         aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
                         aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
                         region_name=os.getenv('AWS_DEFAULT_REGION', 'ap-southeast-2')
                     )
-                    
-                    # Check if file exists
-                    try:
-                        response = s3_client.head_object(Bucket=bucket_name, Key=dem_file)
-                        logger.info(f"S3 file exists: size={response['ContentLength']} bytes, "
-                                   f"type={response.get('ContentType', 'unknown')}, "
-                                   f"modified={response['LastModified']}")
-                    except ClientError as e:
-                        error_code = e.response['Error']['Code']
-                        logger.error(f"S3 access error: {error_code} - {e}")
-                        if error_code == '404':
-                            logger.error(f"File not found in S3: {bucket_name}/{dem_file}")
-                        elif error_code == '403':
-                            logger.error(f"Access denied to S3 file (check IAM permissions)")
-                        return None
+                else:
+                    # NZ Open Data bucket or public access - no credentials required
+                    from botocore import UNSIGNED
+                    from botocore.config import Config
+                    s3_client = boto3.client('s3',
+                        region_name='ap-southeast-2',
+                        config=Config(signature_version=UNSIGNED)
+                    )
+                
+                # Check if file exists
+                try:
+                    response = s3_client.head_object(Bucket=bucket_name, Key=dem_file)
+                    logger.info(f"S3 file exists: size={response['ContentLength']} bytes, "
+                               f"type={response.get('ContentType', 'unknown')}, "
+                               f"modified={response['LastModified']}")
+                except ClientError as e:
+                    error_code = e.response['Error']['Code']
+                    logger.error(f"S3 access error: {error_code} - {e}")
+                    if error_code == '404':
+                        logger.error(f"File not found in S3: {bucket_name}/{dem_file}")
+                    elif error_code == '403':
+                        logger.error(f"Access denied to S3 file (check IAM permissions)")
+                    return None
                 
                 # Construct VSI path for GDAL
                 vsi_path = f"/vsis3/{bucket_name}/{dem_file}"
