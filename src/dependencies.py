@@ -15,6 +15,7 @@ from .contour_service import ContourService
 from .unified_elevation_service import UnifiedElevationService
 from .dem_service import DEMService
 from .redis_state_manager import RedisStateManager
+from .unified_index_loader import UnifiedIndexLoader
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ class ServiceContainer:
         
         # Initialize Redis state manager for process-safe operations
         self._redis_manager: Optional[RedisStateManager] = None
+        
+        # Initialize UnifiedIndexLoader for enhanced index management (Phase 1)
+        self._unified_index_loader: Optional[UnifiedIndexLoader] = None
         
         logger.info("ServiceContainer initialized with Redis state management")
     
@@ -88,6 +92,14 @@ class ServiceContainer:
             
             logger.info("DEMService created with injected dependencies")
         return self._dem_service
+    
+    @property
+    def unified_index_loader(self) -> UnifiedIndexLoader:
+        """Get UnifiedIndexLoader (Phase 1 - for enhanced index management)"""
+        if self._unified_index_loader is None:
+            self._unified_index_loader = UnifiedIndexLoader()
+            logger.info("UnifiedIndexLoader created with data-driven configuration")
+        return self._unified_index_loader
     
     async def close(self):
         """Close all managed services and clean up resources."""
