@@ -52,17 +52,16 @@ class SpatialIndexLoader:
             if self.unified_loader:
                 try:
                     import asyncio
-                    # Use UnifiedIndexLoader for S3 loading
-                    loop = None
-                    try:
-                        loop = asyncio.get_event_loop()
-                    except RuntimeError:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
+                    import concurrent.futures
                     
-                    self.nz_spatial_index = loop.run_until_complete(
-                        self.unified_loader.load_index("nz_spatial_index")
-                    )
+                    # Use asyncio.run in a thread pool to avoid "event loop already running" 
+                    def load_nz_index_sync():
+                        return asyncio.run(self.unified_loader.load_index("nz_spatial_index"))
+                    
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(load_nz_index_sync)
+                        self.nz_spatial_index = future.result(timeout=30)  # 30 second timeout
+                    
                     logger.info("Successfully loaded NZ spatial index from S3 via UnifiedIndexLoader")
                     return self.nz_spatial_index
                 except Exception as e:
