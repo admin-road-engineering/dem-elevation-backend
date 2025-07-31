@@ -821,7 +821,7 @@ class EnhancedSourceSelector:
         
         logger.info(f"Starting S3 extraction: key={dem_file} for ({lat}, {lon})")
         
-        def _sync_extract_elevation():
+        def _sync_extract_elevation(dem_file_param):
             """Synchronous elevation extraction with enhanced logging"""
             try:
                 import rasterio
@@ -829,20 +829,20 @@ class EnhancedSourceSelector:
                 import psutil
                 
                 # Parse bucket name and key from S3 URL or use default
-                if dem_file.startswith("s3://"):
+                if dem_file_param.startswith("s3://"):
                     # Full S3 URL: s3://bucket-name/path/to/file
-                    parts = dem_file[5:].split("/", 1)  # Remove s3:// and split on first /
+                    parts = dem_file_param[5:].split("/", 1)  # Remove s3:// and split on first /
                     bucket_name = parts[0]
                     file_key = parts[1] if len(parts) > 1 else ""
                     logger.info(f"Parsed S3 URL: bucket={bucket_name}, key={file_key}")
                 else:
                     # Assume it's just a key for the default bucket
                     bucket_name = "road-engineering-elevation-data"
-                    file_key = dem_file
+                    file_key = dem_file_param
                     logger.info(f"Using default bucket: {bucket_name}, key={file_key}")
                 
                 # Use the parsed file_key for S3 operations
-                dem_file = file_key
+                dem_file_local = file_key
                 
                 # Test S3 accessibility
                 if use_credentials and bucket_name != "nz-elevation":
@@ -863,7 +863,7 @@ class EnhancedSourceSelector:
                 
                 # Check if file exists
                 try:
-                    response = s3_client.head_object(Bucket=bucket_name, Key=dem_file)
+                    response = s3_client.head_object(Bucket=bucket_name, Key=dem_file_local)
                     logger.info(f"S3 file exists: size={response['ContentLength']} bytes, "
                                f"type={response.get('ContentType', 'unknown')}, "
                                f"modified={response['LastModified']}")
@@ -871,13 +871,13 @@ class EnhancedSourceSelector:
                     error_code = e.response['Error']['Code']
                     logger.error(f"S3 access error: {error_code} - {e}")
                     if error_code == '404':
-                        logger.error(f"File not found in S3: {bucket_name}/{dem_file}")
+                        logger.error(f"File not found in S3: {bucket_name}/{dem_file_local}")
                     elif error_code == '403':
                         logger.error(f"Access denied to S3 file (check IAM permissions)")
                     return None
                 
                 # Construct VSI path for GDAL
-                vsi_path = f"/vsis3/{bucket_name}/{dem_file}"
+                vsi_path = f"/vsis3/{bucket_name}/{dem_file_local}"
                 logger.info(f"Opening rasterio dataset from VSI path: {vsi_path}")
                 
                 # Monitor memory before opening large file
@@ -904,6 +904,15 @@ class EnhancedSourceSelector:
                 os.environ['CPL_VSIL_CURL_USE_HEAD'] = 'NO'  # Skip HEAD requests for faster startup
                 os.environ['GDAL_HTTP_MAX_RETRY'] = '1'  # Fast fail with single retry
                 os.environ['CPL_CURL_VERBOSE'] = 'NO'  # Reduce logging overhead
+                
+                # Configure GDAL for unsigned S3 access (NZ Open Data bucket)
+                if bucket_name == "nz-elevation":
+                    os.environ['AWS_NO_SIGN_REQUEST'] = 'YES'
+                    logger.info("Configured GDAL for unsigned S3 access (NZ bucket)")
+                else:
+                    # Remove unsigned access flag for private buckets
+                    if 'AWS_NO_SIGN_REQUEST' in os.environ:
+                        del os.environ['AWS_NO_SIGN_REQUEST']
                 
                 with rasterio.open(vsi_path) as dataset:
                     # Log dataset properties
@@ -984,7 +993,7 @@ class EnhancedSourceSelector:
         try:
             # Run the synchronous function in a thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            elevation = await loop.run_in_executor(None, _sync_extract_elevation)
+            elevation = await loop.run_in_executor(None, _sync_extract_elevation, dem_file)
             return elevation
         except Exception as e:
             logger.error(f"Error in async elevation extraction: {e}")
