@@ -462,6 +462,21 @@ class EnhancedSourceSelector:
     async def _try_campaign_selection(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
         """Use Phase 3 campaign-based selection for maximum performance and intelligence"""
         try:
+            # Check if coordinates are in New Zealand first
+            if self._is_new_zealand_coordinate(lat, lon):
+                logger.info(f"Coordinate ({lat}, {lon}) detected as New Zealand - trying NZ S3 sources")
+                nz_elevation = await self._try_nz_source(lat, lon)
+                if nz_elevation is not None:
+                    return {
+                        "elevation_m": nz_elevation,
+                        "campaign_id": "nz_s3_source",
+                        "campaign_info": {
+                            "selection_method": "nz_geographic_routing",
+                            "resolution_m": "1m",
+                            "source": "nz-elevation S3 bucket"
+                        }
+                    }
+            
             # Get the best campaigns for this coordinate using multi-factor scoring
             campaign_matches = self.campaign_selector.select_campaigns_for_coordinate(lat, lon)
             
@@ -587,6 +602,12 @@ class EnhancedSourceSelector:
                 raise RetryableError(f"GPXZ server error: {e}", SourceType.API)
             else:
                 raise NonRetryableError(f"GPXZ client error: {e}", SourceType.API)
+    
+    def _is_new_zealand_coordinate(self, lat: float, lon: float) -> bool:
+        """Check if coordinates are within New Zealand geographic bounds"""
+        # New Zealand bounds: approximately -47.3 to -34.4 latitude, 166.4 to 178.6 longitude
+        # Include some buffer for offshore islands
+        return (-47.5 <= lat <= -34.0) and (166.0 <= lon <= 179.0)
     
     async def _try_s3_au_source_with_fallback(self, lat: float, lon: float) -> Optional[float]:
         """
