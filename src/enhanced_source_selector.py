@@ -177,13 +177,24 @@ class SpatialIndexLoader:
         if not index:
             return None
             
-        # Search through all regions
+        # Search through all regions and surveys (NZ index structure: regions -> surveys -> files)
         for region_name, region_data in index.get("regions", {}).items():
-            for file_info in region_data.get("files", []):
-                bounds = file_info.get("bounds", {})
-                if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
-                    bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
-                    return file_info.get("file")
+            # Check if region has surveys (new structure) or files directly (old structure)
+            if "surveys" in region_data:
+                # New structure: regions -> surveys -> files
+                for survey_name, survey_data in region_data.get("surveys", {}).items():
+                    for file_info in survey_data.get("files", []):
+                        bounds = file_info.get("bounds", {})
+                        if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
+                            bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
+                            return file_info.get("file")
+            else:
+                # Old structure: regions -> files (fallback)
+                for file_info in region_data.get("files", []):
+                    bounds = file_info.get("bounds", {})
+                    if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
+                        bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
+                        return file_info.get("file")
         return None
 
 logger = logging.getLogger(__name__)
