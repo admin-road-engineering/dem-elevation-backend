@@ -955,17 +955,26 @@ class EnhancedSourceSelector:
                     logger.info(f"  Data types: {dataset.dtypes}")
                     logger.info(f"  Nodata value: {dataset.nodata}")
                     
-                    # Check if coordinate is within bounds
-                    if not (dataset.bounds.left <= lon <= dataset.bounds.right and 
-                            dataset.bounds.bottom <= lat <= dataset.bounds.top):
-                        logger.warning(f"Coordinate ({lat}, {lon}) outside dataset bounds")
+                    # Transform coordinates to dataset CRS before bounds checking
+                    from pyproj import Transformer
+                    
+                    # Create transformer from WGS84 to dataset CRS
+                    transformer = Transformer.from_crs("EPSG:4326", dataset.crs, always_xy=True)
+                    transformed_x, transformed_y = transformer.transform(lon, lat)
+                    
+                    logger.info(f"Transformed coordinates: x={transformed_x}, y={transformed_y} in {dataset.crs}")
+                    
+                    # Check if transformed coordinate is within bounds
+                    if not (dataset.bounds.left <= transformed_x <= dataset.bounds.right and 
+                            dataset.bounds.bottom <= transformed_y <= dataset.bounds.top):
+                        logger.warning(f"Transformed coordinate ({transformed_x}, {transformed_y}) outside dataset bounds")
                         logger.warning(f"  Bounds: left={dataset.bounds.left}, right={dataset.bounds.right}, "
                                       f"bottom={dataset.bounds.bottom}, top={dataset.bounds.top}")
                         return None
                     
-                    # Transform coordinate to pixel indices
+                    # Transform coordinate to pixel indices using transformed coordinates
                     try:
-                        row, col = dataset.index(lon, lat)
+                        row, col = dataset.index(transformed_x, transformed_y)
                         logger.info(f"Pixel coordinates: row={row}, col={col}")
                         
                         # Validate pixel indices
