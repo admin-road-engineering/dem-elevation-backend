@@ -212,8 +212,55 @@ async def lifespan(app: FastAPI):
         s3_factory = create_s3_client_factory()
         app.state.s3_factory = s3_factory
         
-        # Initialize service container with loaded data
-        service_container = init_service_container(settings, source_provider=provider)
+        # Pre-initialize EnhancedSourceSelector during startup to avoid async event loop conflicts
+        logger.info("Pre-initializing EnhancedSourceSelector during lifespan startup...")
+        try:
+            from .enhanced_source_selector import EnhancedSourceSelector
+            from .gpxz_service import GPXZConfig
+            
+            # Prepare configurations for external services
+            gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
+            google_api_key = settings.GOOGLE_ELEVATION_API_KEY
+            aws_creds = {
+                "access_key_id": settings.AWS_ACCESS_KEY_ID,
+                "secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                "region": settings.AWS_DEFAULT_REGION
+            } if settings.AWS_ACCESS_KEY_ID else None
+            
+            # Create and fully initialize EnhancedSourceSelector here (with event loop available)
+            enhanced_selector = EnhancedSourceSelector(
+                config=dem_sources,
+                use_s3=getattr(settings, 'USE_S3_SOURCES', False),
+                use_apis=getattr(settings, 'USE_API_SOURCES', False),
+                gpxz_config=gpxz_config,
+                google_api_key=google_api_key,
+                aws_credentials=aws_creds,
+                redis_manager=None,  # Will be created lazily
+                enable_nz=getattr(settings, 'ENABLE_NZ_SOURCES', False)
+            )
+            
+            # Trigger NZ index loading if enabled (now we have a running event loop)
+            if getattr(settings, 'ENABLE_NZ_SOURCES', False):
+                logger.info("Loading NZ spatial index during lifespan startup...")
+                try:
+                    await enhanced_selector._load_nz_index_async()
+                    logger.info("NZ spatial index loaded successfully during startup")
+                except Exception as nz_error:
+                    logger.warning(f"Failed to load NZ index during startup: {nz_error}")
+            
+            # Store on app.state for dependency injection
+            app.state.enhanced_selector = enhanced_selector
+            logger.info("EnhancedSourceSelector pre-initialized and stored on app.state")
+        except Exception as e:
+            logger.warning(f"Failed to pre-initialize EnhancedSourceSelector (will fall back to lazy loading): {e}")
+            app.state.enhanced_selector = None
+
+        # Initialize service container with loaded data and pre-initialized enhanced selector
+        service_container = init_service_container(
+            settings, 
+            source_provider=provider,
+            enhanced_selector=getattr(app.state, 'enhanced_selector', None)
+        )
         
         logger.info(
             "DEM Elevation Service started successfully with SourceProvider pattern",

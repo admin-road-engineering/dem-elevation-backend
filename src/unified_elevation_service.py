@@ -46,17 +46,21 @@ class UnifiedElevationService:
     """
     
     def __init__(self, settings: Settings, redis_manager: Optional[RedisStateManager] = None, 
-                 source_provider: Optional[SourceProvider] = None):
+                 source_provider: Optional[SourceProvider] = None,
+                 enhanced_selector: Optional[EnhancedSourceSelector] = None):
         """
-        Initialize UnifiedElevationService with optional SourceProvider.
+        Initialize UnifiedElevationService with optional SourceProvider and pre-initialized EnhancedSourceSelector.
         
         Phase 3A-Fix: Added SourceProvider parameter to decouple from Settings.DEM_SOURCES.
+        Phase 3B.5: Added enhanced_selector parameter for lifespan-initialized selector (avoids async conflicts).
         When source_provider is provided, use its dynamically loaded data instead of Settings.
+        When enhanced_selector is provided, use it instead of creating a new one (preventing event loop issues).
         """
         try:
             self.settings = settings
             self.redis_manager = redis_manager
             self.source_provider = source_provider
+            self.pre_initialized_enhanced_selector = enhanced_selector
             
             # Get DEM sources from provider or fallback to settings
             if source_provider and source_provider.is_loading_complete():
@@ -80,12 +84,23 @@ class UnifiedElevationService:
                 self.using_enhanced_selector = True
                 self.using_index_driven_selector = True
                 
-                # Also initialize enhanced selector for actual data extraction
-                self._enhanced_selector = self._create_enhanced_selector(dem_sources, use_s3=True, use_apis=True)
+                # Use pre-initialized enhanced selector or create new one
+                if self.pre_initialized_enhanced_selector:
+                    logger.info("Using pre-initialized EnhancedSourceSelector from lifespan startup")
+                    self._enhanced_selector = self.pre_initialized_enhanced_selector
+                else:
+                    logger.warning("No pre-initialized selector available, creating new one (may cause event loop issues)")
+                    self._enhanced_selector = self._create_enhanced_selector(dem_sources, use_s3=True, use_apis=True)
             elif use_s3 or use_apis:
                 logger.info("Initializing enhanced source selector with S3/API support")
                 
-                self.source_selector = self._create_enhanced_selector(dem_sources, use_s3=use_s3, use_apis=use_apis)
+                # Use pre-initialized enhanced selector or create new one
+                if self.pre_initialized_enhanced_selector:
+                    logger.info("Using pre-initialized EnhancedSourceSelector from lifespan startup")
+                    self.source_selector = self.pre_initialized_enhanced_selector
+                else:
+                    logger.warning("No pre-initialized selector available, creating new one (may cause event loop issues)")
+                    self.source_selector = self._create_enhanced_selector(dem_sources, use_s3=use_s3, use_apis=use_apis)
                 self.using_enhanced_selector = True
                 self.using_index_driven_selector = False
             else:

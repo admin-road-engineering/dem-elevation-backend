@@ -9,6 +9,7 @@ import logging
 from typing import Optional
 from functools import lru_cache
 
+from fastapi import Request
 from .config import Settings, get_settings
 from .dataset_manager import DatasetManager
 from .contour_service import ContourService
@@ -29,14 +30,16 @@ class ServiceContainer:
     dependency graph at startup and providing clean interfaces for testing.
     """
     
-    def __init__(self, settings: Settings, source_provider: Optional[SourceProvider] = None):
+    def __init__(self, settings: Settings, source_provider: Optional[SourceProvider] = None, enhanced_selector=None):
         """
-        Initialize ServiceContainer with optional SourceProvider.
+        Initialize ServiceContainer with optional SourceProvider and EnhancedSourceSelector.
         
         Phase 3A-Fix: Added SourceProvider parameter for dependency injection.
+        Phase 3B.5: Added enhanced_selector parameter for lifespan-initialized selector.
         """
         self.settings = settings
         self.source_provider = source_provider
+        self.enhanced_selector = enhanced_selector
         self._dataset_manager: Optional[DatasetManager] = None
         self._contour_service: Optional[ContourService] = None
         self._elevation_service: Optional[UnifiedElevationService] = None
@@ -89,7 +92,8 @@ class ServiceContainer:
             self._elevation_service = UnifiedElevationService(
                 self.settings, 
                 redis_manager=self.redis_manager,
-                source_provider=self.source_provider
+                source_provider=self.source_provider,
+                enhanced_selector=self.enhanced_selector
             )
             # Inject dataset manager if the service supports it
             if hasattr(self._elevation_service, 'set_dataset_manager'):
@@ -154,16 +158,17 @@ def get_service_container() -> ServiceContainer:
     return _service_container
 
 
-def init_service_container(settings: Settings, source_provider: Optional[SourceProvider] = None) -> ServiceContainer:
+def init_service_container(settings: Settings, source_provider: Optional[SourceProvider] = None, enhanced_selector=None) -> ServiceContainer:
     """
     Initialize the global service container with settings and optional SourceProvider.
     
     Phase 3A-Fix: Added SourceProvider parameter for dependency injection.
+    Phase 3B.5: Added enhanced_selector parameter for lifespan-initialized selector.
     """
     global _service_container
     try:
-        _service_container = ServiceContainer(settings, source_provider=source_provider)
-        logger.info("Service container initialized successfully with SourceProvider support")
+        _service_container = ServiceContainer(settings, source_provider=source_provider, enhanced_selector=enhanced_selector)
+        logger.info("Service container initialized successfully with SourceProvider and EnhancedSourceSelector support")
         return _service_container
     except Exception as e:
         logger.error(f"Failed to initialize service container: {e}")
@@ -207,3 +212,10 @@ def get_elevation_service() -> UnifiedElevationService:
 def get_dem_service() -> DEMService:
     """FastAPI dependency to get DEMService instance."""
     return get_service_container().dem_service
+
+
+def get_enhanced_selector_from_app_state(request: Request):
+    """FastAPI dependency to get pre-initialized EnhancedSourceSelector from app.state."""
+    if hasattr(request.app.state, 'enhanced_selector'):
+        return request.app.state.enhanced_selector
+    return None
