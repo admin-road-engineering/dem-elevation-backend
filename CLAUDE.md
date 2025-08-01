@@ -73,8 +73,24 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 - ✅ **InMemoryCircuitBreaker**: Testing/development implementation without external dependencies
 - ✅ **Enhanced Monitoring**: Detailed status tracking, admin reset, multi-service support
 
-### Phase 3B.3.2: Advanced Pattern Refinements (Next)
-**Gemini Roadmap**: *"Strategic refinements to build upon this outstanding foundation for ultimate A+ composability"*
+### Phase 3B.4: New Zealand S3 Integration (COMPLETED ✅)
+**Achievement**: *"Complete bi-national elevation coverage with unified S3 performance architecture"*
+
+#### ✅ NZ S3 Sources Implementation (COMPLETED)
+- ✅ **NZ Spatial Index Generated**: 16 regions, 1.08MB comprehensive index covering Auckland, Wellington, Canterbury
+- ✅ **S3 Integration**: Uploaded to `s3://road-engineering-elevation-data/indexes/nz_spatial_index.json`
+- ✅ **Two-Bucket Architecture**: Main bucket (indexes) + `nz-elevation` bucket (public DEM data)
+- ✅ **Environment Configuration**: `ENABLE_NZ_SOURCES=true` set in Railway production
+- ✅ **Auckland Coverage**: 79 files with 53 covering Auckland CBD coordinates (-36.8485, 174.7633)
+
+#### 🌏 Production Coverage Enhancement
+- **Australia**: 1,153 S3 campaigns maintaining 54,000x Brisbane speedup
+- **New Zealand**: 16 regions with 1m resolution LiDAR data via public S3 bucket  
+- **Global Fallback**: GPXZ → Google API chain for worldwide coverage
+- **Response Times**: Sub-second for AU/NZ coordinates, <2s for global API fallback
+
+### Phase 3B.5: Future Advanced Pattern Refinements
+**Gemini Roadmap**: *"Strategic refinements to build upon this outstanding bi-national foundation"*
 
 **Priority 1: Advanced Architectural Patterns**
 - **Composite Pattern**: FallbackDataSource treating fallback chain as first-class citizen
@@ -141,5 +157,84 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 - **Redis-First**: All shared state managed through Redis for multi-worker safety
 - **Circuit Breakers**: API resilience through intelligent failure detection
 - **Atomic Operations**: Race condition prevention through proper state management
+
+## 🚀 Deployment & Infrastructure Management
+
+### Railway Platform Integration
+**Production Platform**: Railway (https://re-dem-elevation-backend.up.railway.app)  
+**Authentication**: Logged in as `admin@road.engineering`  
+**Project**: `road-engineering-DEM-Backend`  
+
+#### Railway CLI Connection Process
+```bash
+# Check authentication status
+railway whoami
+# Output: Logged in as admin@road.engineering 👋
+
+# Check project status  
+railway status
+# Output: Project: road-engineering-DEM-Backend
+#         Environment: production
+#         Service: dem-elevation-backend
+
+# Manage environment variables
+railway variables                           # List all variables
+railway variables --set "KEY=value"        # Set new variable
+railway variables --set "ENABLE_NZ_SOURCES=true"  # Example: Enable NZ sources
+```
+
+#### Critical Environment Variables
+- `ENABLE_NZ_SOURCES=true` - Enables New Zealand S3 elevation sources
+- `USE_S3_SOURCES=true` - Enables Australian S3 campaign sources  
+- `SPATIAL_INDEX_SOURCE=s3` - Use S3-hosted spatial indexes
+- `APP_ENV=production` - Production safety behaviors
+- `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` - S3 access credentials
+
+### AWS S3 Integration Architecture
+**Main Bucket**: `road-engineering-elevation-data` (Private, contains indexes)  
+**NZ Data Bucket**: `nz-elevation` (Public, contains NZ DEM files)  
+**Region**: `ap-southeast-2` (Sydney)  
+
+#### S3 Bucket Structure
+```
+road-engineering-elevation-data/
+├── indexes/
+│   ├── spatial_index.json           # 1,153 Australian campaigns
+│   └── nz_spatial_index.json        # 16 NZ regions (1.08MB)
+└── [campaign data files...]
+
+nz-elevation/                         # Public bucket
+├── auckland/
+│   ├── auckland-north_2016-2018/
+│   └── auckland-part-2_2024/
+├── wellington/
+├── canterbury/
+└── [other NZ regions...]
+```
+
+#### AWS Connection Process
+```bash
+# Using environment variables from .env or Railway
+AWS_ACCESS_KEY_ID=AKIA5SIDYET7N3U4JQ5H
+AWS_SECRET_ACCESS_KEY=[credential]
+AWS_DEFAULT_REGION=ap-southeast-2
+
+# Upload spatial indexes (when needed)
+python upload_nz_index.py              # Uploads NZ index to S3
+python scripts/upload_indexes_to_s3.py # Uploads AU indexes to S3
+```
+
+#### S3 Access Patterns
+- **Australian Data**: Private bucket access with AWS credentials
+- **NZ Data**: Public bucket with unsigned access (`AWS_NO_SIGN_REQUEST=YES`)
+- **Index Loading**: SourceProvider loads indexes from main bucket during startup
+- **File Access**: Direct S3 access via GDAL VSI (`/vsis3/bucket/path`)
+
+### Deployment Workflow
+1. **Code Changes**: Commit and push to GitHub main branch
+2. **Automatic Deploy**: Railway detects changes and redeploys  
+3. **Environment Updates**: Use Railway CLI to set variables
+4. **Health Verification**: Check `/api/v1/health` endpoint
+5. **Performance Testing**: Validate response times for AU/NZ coordinates
 
 This service achieves "Excellent" architecture status through systematic application of safety-first engineering, performance optimization, and operational excellence while maintaining clear separation between production requirements and development convenience.

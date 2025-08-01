@@ -29,10 +29,12 @@ APP_ENV=production
 
 # S3 Configuration (Required)
 USE_S3_SOURCES=true
+ENABLE_NZ_SOURCES=true
 AWS_ACCESS_KEY_ID=your_key_here
 AWS_SECRET_ACCESS_KEY=your_secret_here
 AWS_S3_BUCKET_NAME=road-engineering-elevation-data
 AWS_DEFAULT_REGION=ap-southeast-2
+SPATIAL_INDEX_SOURCE=s3
 
 # API Configuration
 USE_API_SOURCES=true
@@ -68,7 +70,7 @@ curl https://re-dem-elevation-backend.up.railway.app/api/v1/health
   "status": "healthy",
   "service": "DEM Backend API",
   "s3_indexes": "loaded",
-  "sources_available": 1153
+  "sources_available": 1169  # 1,153 AU + 16 NZ regions
 }
 ```
 
@@ -81,13 +83,70 @@ curl -X POST "https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/p
 
 # Expected: Brisbane2009LGA campaign, ~11.5m elevation
 
-# Auckland (API fallback)
+# Auckland (NZ S3 sources - with ENABLE_NZ_SOURCES=true)
 curl -X POST "https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/point" \
   -H "Content-Type: application/json" \
   -d '{"latitude": -36.8485, "longitude": 174.7633}'
 
-# Expected: gpxz_api fallback, Auckland elevation
+# Expected: nz_auckland S3 source, 1m resolution LiDAR data
+
+# Wellington (NZ S3 sources)
+curl -X POST "https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/point" \
+  -H "Content-Type: application/json" \
+  -d '{"latitude": -41.2924, "longitude": 174.7787}'
+
+# Expected: nz_wellington S3 source, sub-second response
 ```
+
+## 🇳🇿 New Zealand S3 Integration
+
+### Overview
+- **Status**: ✅ Production Ready (Phase 3B.4)
+- **Coverage**: 16 NZ regions with 1m resolution LiDAR data
+- **Architecture**: Two-bucket system (indexes + public NZ data)
+- **Performance**: Sub-second response times for major NZ cities
+
+### S3 Bucket Architecture
+```
+road-engineering-elevation-data/     # Private bucket (indexes)
+├── indexes/
+│   ├── spatial_index.json          # 1,153 Australian campaigns  
+│   └── nz_spatial_index.json       # 16 NZ regions (1.08MB)
+
+nz-elevation/                        # Public bucket (NZ DEM data)
+├── auckland/
+│   ├── auckland-north_2016-2018/   # 40 files covering Auckland
+│   └── auckland-part-2_2024/       # 39 files with 2024 data
+├── wellington/
+├── canterbury/
+└── [13 other regions...]
+```
+
+### NZ Sources Configuration
+The system automatically loads NZ sources when `ENABLE_NZ_SOURCES=true` is set:
+
+```bash
+# Set via Railway CLI
+railway variables --set "ENABLE_NZ_SOURCES=true"
+
+# Verify deployment logs show:
+# "Loading NZ index: s3://road-engineering-elevation-data/indexes/nz_spatial_index.json"
+# "NZ index loaded: 16 regions"
+# "Data loading completed: 1,169 sources available"
+```
+
+### NZ Coverage Areas
+- **Auckland**: 79 files, 53 covering Auckland CBD
+- **Wellington**: Regional coverage with 1m resolution
+- **Canterbury**: Including Christchurch metropolitan area  
+- **Otago**: Including Dunedin region
+- **Bay of Plenty**: Including Tauranga area
+- **13 Additional Regions**: Comprehensive national coverage
+
+### Fallback Behavior
+- **With NZ Sources**: Auckland/Wellington use S3 (sub-second)
+- **Without NZ Sources**: All NZ coordinates use GPXZ API (2-3 seconds)
+- **Global Coverage**: API fallback for areas outside AU/NZ S3 coverage
 
 ## 🛠️ Local Development (Docker)
 
