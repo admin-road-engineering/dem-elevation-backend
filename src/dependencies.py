@@ -16,6 +16,7 @@ from .unified_elevation_service import UnifiedElevationService
 from .dem_service import DEMService
 from .redis_state_manager import RedisStateManager
 from .unified_index_loader import UnifiedIndexLoader
+from .source_provider import SourceProvider
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,14 @@ class ServiceContainer:
     dependency graph at startup and providing clean interfaces for testing.
     """
     
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, source_provider: Optional[SourceProvider] = None):
+        """
+        Initialize ServiceContainer with optional SourceProvider.
+        
+        Phase 3A-Fix: Added SourceProvider parameter for dependency injection.
+        """
         self.settings = settings
+        self.source_provider = source_provider
         self._dataset_manager: Optional[DatasetManager] = None
         self._contour_service: Optional[ContourService] = None
         self._elevation_service: Optional[UnifiedElevationService] = None
@@ -41,14 +48,18 @@ class ServiceContainer:
         # Initialize UnifiedIndexLoader for enhanced index management (Phase 1)
         self._unified_index_loader: Optional[UnifiedIndexLoader] = None
         
-        logger.info("ServiceContainer initialized with Redis state management")
+        logger.info("ServiceContainer initialized with Redis state management and SourceProvider support")
     
     @property
     def redis_manager(self) -> RedisStateManager:
-        """Get or create the Redis state manager instance."""
+        """
+        Get or create the Redis state manager instance.
+        
+        Phase 3B.1: Pass app_env for production safety checks.
+        """
         if self._redis_manager is None:
-            self._redis_manager = RedisStateManager()
-            logger.info("RedisStateManager created for process-safe state")
+            self._redis_manager = RedisStateManager(app_env=self.settings.APP_ENV)
+            logger.info(f"RedisStateManager created for process-safe state (env: {self.settings.APP_ENV})")
         return self._redis_manager
     
     @property
@@ -69,13 +80,21 @@ class ServiceContainer:
     
     @property
     def elevation_service(self) -> UnifiedElevationService:
-        """Get or create the UnifiedElevationService instance."""
+        """
+        Get or create the UnifiedElevationService instance.
+        
+        Phase 3A-Fix: Injects SourceProvider if available.
+        """
         if self._elevation_service is None:
-            self._elevation_service = UnifiedElevationService(self.settings, redis_manager=self.redis_manager)
+            self._elevation_service = UnifiedElevationService(
+                self.settings, 
+                redis_manager=self.redis_manager,
+                source_provider=self.source_provider
+            )
             # Inject dataset manager if the service supports it
             if hasattr(self._elevation_service, 'set_dataset_manager'):
                 self._elevation_service.set_dataset_manager(self.dataset_manager)
-            logger.info("UnifiedElevationService created with Redis state management")
+            logger.info("UnifiedElevationService created with Redis state management and SourceProvider")
         return self._elevation_service
     
     @property
@@ -135,12 +154,16 @@ def get_service_container() -> ServiceContainer:
     return _service_container
 
 
-def init_service_container(settings: Settings) -> ServiceContainer:
-    """Initialize the global service container with settings."""
+def init_service_container(settings: Settings, source_provider: Optional[SourceProvider] = None) -> ServiceContainer:
+    """
+    Initialize the global service container with settings and optional SourceProvider.
+    
+    Phase 3A-Fix: Added SourceProvider parameter for dependency injection.
+    """
     global _service_container
     try:
-        _service_container = ServiceContainer(settings)
-        logger.info("Service container initialized successfully")
+        _service_container = ServiceContainer(settings, source_provider=source_provider)
+        logger.info("Service container initialized successfully with SourceProvider support")
         return _service_container
     except Exception as e:
         logger.error(f"Failed to initialize service container: {e}")

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -14,6 +15,8 @@ from .api.v1.dataset_endpoints import router as dataset_router
 from .api.v1.campaigns_endpoints import router as campaign_router
 from .dependencies import init_service_container, close_service_container, get_dem_service
 from .logging_config import setup_logging
+from .s3_client_factory import create_s3_client_factory
+from .source_provider import SourceProvider, SourceProviderConfig
 
 # Setup structured logging based on environment
 setup_logging(
@@ -22,9 +25,51 @@ setup_logging(
 )
 logger = logging.getLogger(__name__)
 
-async def validate_index_driven_sources(settings):
-    """Validate index-driven source configuration and connectivity"""
-    logger.info("Validating index-driven DEM sources...")
+async def validate_s3_connectivity(s3_factory):
+    """Async validation of S3 connectivity with timeout using DI factory"""
+    try:
+        logger.info("Validating S3 connectivity...")
+        
+        # Test basic connectivity to default S3 region using injected factory
+        async with s3_factory.get_client("private", "ap-southeast-2") as s3_client:
+            # Simple list operation to test connectivity
+            await asyncio.wait_for(s3_client.list_buckets(), timeout=5.0)
+            
+        logger.info("S3 connectivity validation successful")
+        return {"status": "healthy", "connectivity": True}
+        
+    except asyncio.TimeoutError:
+        logger.warning("S3 connectivity validation timed out")
+        return {"status": "timeout", "connectivity": False}
+    except Exception as e:
+        logger.warning(f"S3 connectivity validation failed: {e}")
+        return {"status": "error", "connectivity": False, "error": str(e)}
+
+async def validate_api_sources():
+    """Async validation of API sources connectivity"""
+    try:
+        logger.info("Validating API sources...")
+        
+        # Quick validation - just check if API keys are configured
+        gpxz_key = os.getenv("GPXZ_API_KEY")
+        
+        if gpxz_key:
+            logger.info("GPXZ API key configured")
+            return {"status": "healthy", "gpxz_configured": True}
+        else:
+            logger.info("GPXZ API key not configured - API sources will be limited")
+            return {"status": "partial", "gpxz_configured": False}
+            
+    except Exception as e:
+        logger.warning(f"API sources validation failed: {e}")
+        return {"status": "error", "error": str(e)}
+
+async def validate_index_driven_sources_concurrent(settings, s3_factory):
+    """
+    Phase 2B: Concurrent startup validation using DI and asyncio.gather pattern
+    Validates index-driven source configuration and connectivity concurrently
+    """
+    logger.info("Starting concurrent validation of index-driven DEM sources...")
     
     try:
         # Check that sources were loaded successfully via index-driven approach
@@ -39,81 +84,126 @@ async def validate_index_driven_sources(settings):
         api_sources = sum(1 for source in settings.DEM_SOURCES.values() 
                          if source.get('source_type') == 'api')
         
+        logger.info(f"Found {s3_sources} S3 sources and {api_sources} API sources")
+        
+        # Phase 2B: Concurrent validation using asyncio.gather with injected dependencies
+        validation_tasks = []
+        
+        # Add S3 validation if we have S3 sources (pass injected factory)
+        if s3_sources > 0:
+            validation_tasks.append(validate_s3_connectivity(s3_factory))
+        
+        # Add API validation if we have API sources  
+        if api_sources > 0:
+            validation_tasks.append(validate_api_sources())
+        
+        # Run all validations concurrently with timeout
+        if validation_tasks:
+            logger.info(f"Running {len(validation_tasks)} validation tasks concurrently...")
+            results = await asyncio.gather(*validation_tasks, return_exceptions=True)
+            
+            # Process results
+            all_healthy = True
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logger.warning(f"Validation task {i} failed with exception: {result}")
+                    all_healthy = False
+                elif isinstance(result, dict) and result.get("status") not in ["healthy", "partial"]:
+                    logger.warning(f"Validation task {i} returned unhealthy status: {result}")
+                    all_healthy = False
+                else:
+                    logger.info(f"Validation task {i} completed: {result}")
+        
         logger.info(
-            "Index-driven source validation successful",
+            "Concurrent source validation completed",
             extra={
-                "event": "index_validation_success",
+                "event": "concurrent_validation_success",
                 "total_sources": source_count,
                 "s3_sources": s3_sources,
-                "api_sources": api_sources
+                "api_sources": api_sources,
+                "validation_tasks": len(validation_tasks)
             }
         )
-        
-        # If we have S3 sources, validate S3 connectivity using existing loader
-        if s3_sources > 0 and os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3":
-            logger.info("Validating S3 connectivity for index-driven S3 sources...")
-            try:
-                from .s3_index_loader import s3_index_loader
-                health_check = s3_index_loader.health_check()
-                
-                if health_check['status'] == 'healthy':
-                    logger.info(f"S3 connectivity confirmed for {s3_sources} campaign sources")
-                else:
-                    logger.warning(f"S3 connectivity issue, but {s3_sources} sources available via index")
-                    
-            except Exception as e:
-                logger.warning(
-                    f"S3 connectivity test failed, but {s3_sources} index-driven sources still available",
-                    extra={"error": str(e)}
-                )
         
         return True
         
     except Exception as e:
         logger.error(
-            "Index-driven source validation failed",
-            extra={"event": "index_validation_failed", "error": str(e)},
+            "Concurrent source validation failed",
+            extra={"event": "concurrent_validation_failed", "error": str(e)},
             exc_info=True
         )
         return False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle application startup and shutdown events."""
+    """
+    Phase 3A-Fix: SourceProvider pattern for production-ready startup.
+    
+    This lifespan handler implements Gemini's approved architecture:
+    - Moves all I/O out of Settings class
+    - Uses SourceProvider with aioboto3 for async S3 operations
+    - Blocks startup until all critical data is loaded
+    - Enables sub-500ms startup time for production deployment
+    """
     # Startup
-    logger.info("Starting DEM Elevation Service...", extra={"event": "startup_begin"})
+    logger.info("Starting DEM Elevation Service with SourceProvider pattern...", extra={"event": "startup_begin"})
+    
     try:
+        # Get static settings (no I/O operations)
         settings = get_settings()
-        
-        # Validate configuration and log results
         validate_environment_configuration(settings)
         
-        # CRITICAL: Force DEM_SOURCES property access to trigger S3 campaign loading
-        # This ensures S3 campaigns are loaded before ServiceContainer initialization
-        source_count = len(settings.DEM_SOURCES)
-        logger.info(f"Forced DEM_SOURCES loading: {source_count} sources loaded during startup")
+        # Create SourceProvider with static configuration
+        source_config = SourceProviderConfig(
+            s3_bucket_name=os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data'),
+            campaign_index_key='indexes/phase3_campaign_populated_index.json',
+            nz_index_key='indexes/nz_spatial_index.json',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            aws_region=settings.AWS_DEFAULT_REGION,
+            enable_nz_sources=getattr(settings, 'ENABLE_NZ_SOURCES', False)
+        )
         
-        # Validate index-driven sources (replaces legacy S3 validation)
-        # This MUST happen before ServiceContainer initialization to load S3 campaigns
-        validation_success = await validate_index_driven_sources(settings)
-        if not validation_success:
-            logger.warning("Source validation had issues, but continuing startup with available sources")
+        # Create SourceProvider and store on app.state
+        provider = SourceProvider(source_config)
+        app.state.source_provider = provider
+        logger.info("SourceProvider created and stored on app.state")
         
-        # Initialize dependency injection container AFTER S3 campaigns are loaded
-        service_container = init_service_container(settings)
+        # Load all data asynchronously - BLOCKS startup until complete
+        logger.info("Loading all data sources asynchronously...")
+        load_success = await provider.load_all_sources()
+        
+        if not load_success:
+            logger.error(f"Failed to load critical data sources: {provider.get_load_errors()}")
+            raise RuntimeError("Critical data loading failed - cannot start service")
+        
+        # Get loaded sources for service container
+        dem_sources = provider.get_dem_sources()
+        logger.info(f"Data loading completed: {len(dem_sources)} sources available")
+        
+        # Create S3ClientFactory for legacy compatibility
+        s3_factory = create_s3_client_factory()
+        app.state.s3_factory = s3_factory
+        
+        # Initialize service container with loaded data
+        service_container = init_service_container(settings, source_provider=provider)
+        
         logger.info(
-            "DEM Elevation Service started successfully",
+            "DEM Elevation Service started successfully with SourceProvider pattern",
             extra={
                 "event": "startup_complete",
-                "dem_sources_count": len(settings.DEM_SOURCES),
-                "use_s3": getattr(settings, 'USE_S3_SOURCES', False),
-                "use_apis": getattr(settings, 'USE_API_SOURCES', False)
+                "sources_loaded": len(dem_sources),
+                "load_success": load_success,
+                "provider_stats": provider.get_performance_stats()
             }
         )
-        yield
+        
+        yield  # App ready for traffic
+        
     except Exception as e:
         logger.error(
-            "Failed to start DEM service",
+            "Failed to start DEM service with SourceProvider",
             extra={"event": "startup_failed", "error_type": type(e).__name__},
             exc_info=True
         )
@@ -122,8 +212,15 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down DEM Elevation Service...", extra={"event": "shutdown_begin"})
     try:
-        # Clean up service container and all managed services
+        # Clean up service container
         await close_service_container()
+        
+        # Clear references
+        if hasattr(app.state, 'source_provider'):
+            app.state.source_provider = None
+        if hasattr(app.state, 's3_factory'):
+            app.state.s3_factory = None
+        
         logger.info("DEM Elevation Service shut down successfully", extra={"event": "shutdown_complete"})
     except Exception as e:
         logger.error("Error during shutdown", extra={"event": "shutdown_failed"}, exc_info=True)

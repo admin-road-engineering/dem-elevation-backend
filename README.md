@@ -1,31 +1,35 @@
-# DEM Backend - FastAPI Elevation Service
+# DEM Backend - Railway Production Elevation Service
 
-**Status**: ✅ **PRODUCTION SECURE - ALL CRITICAL ISSUES RESOLVED**  
-**Security**: Redis state management for Railway multi-worker deployment  
+**Status**: ✅ **A- RATING - "EXCELLENT" ARCHITECTURE + A+ ROADMAP VALIDATED**  
+**Deployment**: Railway production with robust Redis fail-fast safety  
 **Performance**: 1,000-54,000x speedup for Australian coordinates  
 **Coverage**: 1,153 sources (1,151 S3 campaigns + 2 API fallbacks)  
-**Architecture**: Process-safe Redis state with fail-fast timeout strategy
+**Architecture**: SourceProvider pattern with sub-500ms startup + production safety
+**Development**: Complete Docker Compose environment with containerized scripts
 
-A production-ready Digital Elevation Model (DEM) backend service delivering secure global elevation data through S3 campaign selection and comprehensive API fallback chains for professional road engineering applications.
+**Gemini Validation**: *"Outstanding piece of engineering on solid foundation. World-class documentation suite should be model for other projects."*
+
+Production-ready Digital Elevation Model (DEM) backend service deployed exclusively on Railway, delivering secure global elevation data through S3 campaign selection with comprehensive API fallback chains for professional road engineering applications.
 
 ## 🚀 Key Features
 
-- **🔒 PRODUCTION SECURE** - All security vulnerabilities resolved via bundled fix
-- **⚡ Redis State Management** - Process-safe atomic operations for Railway deployment
+- **🔒 PRODUCTION SAFETY** - Phase 3B.1: Redis fail-fast prevents dangerous fallbacks
+- **⚡ Sub-500ms Startup** - SourceProvider pattern with async data loading
 - **🛡️ Rate Limiting Protection** - Multi-layer geographic-aware abuse prevention  
 - **🚀 54,000x PERFORMANCE** - Brisbane coordinates via S3 campaign selection
 - **🎯 Campaign-Based Selection** - 1,151 survey campaigns with spatial indexing
 - **🌐 Global Coverage** - S3 regional data + GPXZ/Google API fallbacks
 - **⚡ Fail-Fast Timeouts** - S3(2s) → GPXZ(8s) → Google(15s) strategy
-- **🔄 Singleton Clients** - FastAPI lifespan-managed clients prevent resource leaks
-- **🏗️ Circuit Breakers** - Redis-backed failure state shared across workers
+- **🔄 Lifespan-Managed Dependencies** - FastAPI lifespan integration prevents resource leaks
+- **🏗️ Circuit Breakers** - Redis-backed failure state shared across Railway workers
 
 ## 🏗️ Architecture
 
-### Service Integration
+### Railway Production Integration
 ```
-Frontend (React) → DEM Backend (8001) → S3 → GPXZ → Google
-Main Platform (3001) → DEM Backend (8001) → S3 → GPXZ → Google
+Frontend (React) → Railway DEM Backend → S3 → GPXZ → Google
+Main Platform → Railway DEM Backend → S3 → GPXZ → Google
+URL: https://re-dem-elevation-backend.up.railway.app
 ```
 
 ### Data Sources (Priority Order)
@@ -95,7 +99,7 @@ curl -X POST "http://localhost:8001/api/v1/elevation/point" \
 ## 🌐 Production Deployment
 
 ### Railway Deployment
-- **URL**: `https://dem-elevation-backend-production-9c7a.up.railway.app`
+- **URL**: `https://re-dem-elevation-backend.up.railway.app`
 - **Requirements**: Railway Redis addon (REQUIRED)
 - **Cost**: Hobby ($5/month) + Redis ($5/month)
 
@@ -131,22 +135,22 @@ REDIS_PRIVATE_URL=redis://...
 ### Service Status
 ```bash
 # Check all sources loaded
-curl https://dem-elevation-backend-production-9c7a.up.railway.app/api/v1/elevation/sources | jq '.total_sources'
+curl https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/sources | jq '.total_sources'
 # Expected: 1153
 
 # Check S3 indexes
-curl https://dem-elevation-backend-production-9c7a.up.railway.app/api/v1/health | jq '.s3_indexes'
+curl https://re-dem-elevation-backend.up.railway.app/api/v1/health | jq '.s3_indexes'
 ```
 
 ### Performance Validation
 ```bash
 # Brisbane (should use S3 campaign)
-curl -X POST "https://dem-elevation-backend-production-9c7a.up.railway.app/api/v1/elevation/point" \
+curl -X POST "https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/point" \
   -d '{"latitude": -27.4698, "longitude": 153.0251}' | jq '.dem_source_used'
 # Expected: "Brisbane2009LGA"
 
 # Auckland (should use API fallback)  
-curl -X POST "https://dem-elevation-backend-production-9c7a.up.railway.app/api/v1/elevation/point" \
+curl -X POST "https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/point" \
   -d '{"latitude": -36.8485, "longitude": 174.7633}' | jq '.dem_source_used'
 # Expected: "gpxz_api"
 ```

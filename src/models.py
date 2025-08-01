@@ -80,6 +80,19 @@ class PointResponse(BaseModel):
     dem_source_used: str
     message: Optional[str] = None
 
+# Enhanced response models with structured resolution fields
+class EnhancedPointResponse(BaseModel):
+    """Enhanced point response with structured resolution metadata."""
+    elevation: Optional[float] = Field(description="Elevation value in meters")
+    latitude: float = Field(description="Input latitude coordinate")
+    longitude: float = Field(description="Input longitude coordinate")
+    dem_source_used: str = Field(description="DEM source identifier that provided the elevation")
+    resolution: Optional[float] = Field(None, description="Data resolution in meters")
+    grid_resolution_m: Optional[float] = Field(None, description="Grid resolution in meters")
+    data_type: Optional[str] = Field(None, description="Type of elevation data (LiDAR, SRTM, etc.)")
+    accuracy: Optional[str] = Field(None, description="Estimated accuracy range")
+    message: Optional[str] = Field(None, description="Additional information about the result")
+
 class LinePointResponse(BaseModel):
     latitude: float
     longitude: float
@@ -106,6 +119,48 @@ class PathResponse(BaseModel):
     crs: str = "EPSG:4326"
     dem_source_used: str
     message: Optional[str] = None
+
+# Enhanced response models for line and path endpoints
+class EnhancedLinePointResponse(BaseModel):
+    """Enhanced line point response with structured resolution metadata."""
+    elevation: Optional[float] = Field(description="Elevation value in meters")
+    latitude: float = Field(description="Latitude coordinate")
+    longitude: float = Field(description="Longitude coordinate")
+    sequence: int = Field(description="Point sequence number in the line")
+    dem_source_used: str = Field(description="DEM source identifier that provided the elevation")
+    resolution: Optional[float] = Field(None, description="Data resolution in meters")
+    grid_resolution_m: Optional[float] = Field(None, description="Grid resolution in meters")
+    data_type: Optional[str] = Field(None, description="Type of elevation data (LiDAR, SRTM, etc.)")
+    accuracy: Optional[str] = Field(None, description="Estimated accuracy range")
+    message: Optional[str] = Field(None, description="Additional information about the result")
+
+class EnhancedLineResponse(BaseModel):
+    """Enhanced line response with structured resolution metadata."""
+    points: List[EnhancedLinePointResponse]
+    crs: str = "EPSG:4326"
+    total_distance_m: Optional[float] = Field(None, description="Total line distance in meters")
+    message: Optional[str] = Field(None, description="Additional information about the result")
+
+class EnhancedPathElevationResponse(BaseModel):
+    """Enhanced path elevation response with structured resolution metadata."""
+    elevation: Optional[float] = Field(description="Elevation value in meters")
+    input_latitude: float = Field(description="Input latitude coordinate")
+    input_longitude: float = Field(description="Input longitude coordinate")
+    input_id: Optional[Any] = Field(None, description="Input point identifier")
+    sequence: int = Field(description="Point sequence number in the path")
+    dem_source_used: str = Field(description="DEM source identifier that provided the elevation")
+    resolution: Optional[float] = Field(None, description="Data resolution in meters")
+    grid_resolution_m: Optional[float] = Field(None, description="Grid resolution in meters")
+    data_type: Optional[str] = Field(None, description="Type of elevation data (LiDAR, SRTM, etc.)")
+    accuracy: Optional[str] = Field(None, description="Estimated accuracy range")
+    message: Optional[str] = Field(None, description="Additional information about the result")
+
+class EnhancedPathResponse(BaseModel):
+    """Enhanced path response with structured resolution metadata."""
+    path_elevations: List[EnhancedPathElevationResponse]
+    crs: str = "EPSG:4326"
+    total_points: int = Field(description="Total number of points in the path")
+    message: Optional[str] = Field(None, description="Additional information about the result")
 
 # New standardized response models
 class StandardElevationResult(BaseModel):

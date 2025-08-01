@@ -16,14 +16,24 @@ logger = logging.getLogger(__name__)
 class RedisStateManager:
     """Process-safe state management using Redis atomic operations"""
     
-    def __init__(self, redis_url: Optional[str] = None):
-        """Initialize Redis connection with Railway or fallback configuration"""
+    def __init__(self, redis_url: Optional[str] = None, app_env: Optional[str] = None):
+        """
+        Initialize Redis connection with Railway or fallback configuration.
+        
+        Phase 3B.1: Added app_env parameter for production safety checks.
+        """
         self.redis_url = redis_url or os.getenv('REDIS_URL') or os.getenv('REDIS_PRIVATE_URL') or 'redis://localhost:6379'
+        self.app_env = app_env or os.getenv('APP_ENV', 'local')
         self._redis_client = None
         self._connection_tested = False
         
     def _get_redis_client(self) -> redis.Redis:
-        """Get Redis client with lazy initialization and connection testing"""
+        """
+        Get Redis client with lazy initialization and connection testing.
+        
+        Phase 3B.1: Fail-fast in production if Redis unavailable to prevent
+        inconsistent state across multiple Railway workers.
+        """
         if self._redis_client is None:
             try:
                 self._redis_client = redis.from_url(
@@ -42,8 +52,14 @@ class RedisStateManager:
                     
             except Exception as e:
                 logger.error(f"Redis connection failed: {e}")
-                logger.warning("Falling back to in-memory state (NOT process-safe)")
-                # Fallback to dict-based storage for development
+                
+                # Phase 3B.1: Fail-fast in production for safety
+                if self.app_env == 'production':
+                    logger.critical("FATAL: Redis connection failed in production environment. Service cannot start safely.")
+                    raise RuntimeError(f"Redis connection failed in production: {e}") from e
+                
+                # Only allow fallback in local development
+                logger.warning("Falling back to in-memory state (NOT process-safe) - LOCAL DEVELOPMENT ONLY")
                 if not hasattr(self, '_fallback_storage'):
                     self._fallback_storage = {}
                 return None
@@ -171,11 +187,23 @@ class RedisCircuitBreaker:
         self.last_failure_key = f"circuit_breaker:{service_name}:last_failure"
     
     def is_available(self) -> bool:
-        """Check if service is available (circuit closed)"""
+        """
+        Check if service is available (circuit closed).
+        
+        Phase 3B.1: Fail-fast in production if Redis unavailable.
+        """
         try:
             redis_client = self.redis_manager._get_redis_client()
             if redis_client is None:
-                return True  # Fail open when Redis unavailable
+                # Phase 3B.1: In production, Redis failure should have already raised an exception
+                # If we somehow reach here in production, it's a critical error
+                if self.redis_manager.app_env == 'production':
+                    logger.critical(f"FATAL: Circuit breaker for {self.service_name} cannot function without Redis in production")
+                    raise RuntimeError(f"Circuit breaker unavailable in production: Redis connection failed")
+                
+                # Only allow fail-open in local development
+                logger.warning(f"Circuit breaker for {self.service_name} failing open - Redis unavailable (LOCAL DEV ONLY)")
+                return True
             
             failure_count = int(redis_client.get(self.failure_key) or "0")
             

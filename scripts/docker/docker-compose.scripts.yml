@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # DEM Backend Scripts Container
+  dem-scripts:
+    build:
+      context: ../..
+      dockerfile: scripts/docker/Dockerfile.scripts
+    container_name: dem-backend-scripts
+    environment:
+      - APP_ENV=development
+      - PYTHONPATH=/app
+    volumes:
+      - ../../config:/app/config:rw
+      - ../../logs:/app/logs:rw
+      - ../../.env.development:/app/.env:ro
+    working_dir: /app
+    profiles:
+      - scripts
+
+  # Redis service for scripts that need state management
+  redis-scripts:
+    image: redis:7-alpine
+    container_name: dem-backend-scripts-redis
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_scripts_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - scripts
+
+volumes:
+  redis_scripts_data:
+    driver: local
+
+networks:
+  default:
+    name: dem-backend-scripts-network

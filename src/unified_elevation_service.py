@@ -10,6 +10,7 @@ from .enhanced_source_selector import EnhancedSourceSelector
 from .source_selector import DEMSourceSelector
 from .index_driven_source_selector import IndexDrivenSourceSelector
 from .config import Settings
+from .source_provider import SourceProvider
 from .dem_exceptions import (
     DEMServiceError, DEMSourceError, DEMAPIError, DEMS3Error,
     DEMCoordinateError, DEMConfigurationError
@@ -26,6 +27,12 @@ class ElevationResult:
     dem_source_used: str
     message: Optional[str]
     metadata: Optional[Dict[str, Any]] = None
+    
+    # Enhanced structured fields for Phase 2C
+    resolution: Optional[float] = None
+    grid_resolution_m: Optional[float] = None  
+    data_type: Optional[str] = None
+    accuracy: Optional[str] = None
 
 class UnifiedElevationService:
     """
@@ -38,69 +45,52 @@ class UnifiedElevationService:
     4. Supporting both legacy and enhanced source selectors
     """
     
-    def __init__(self, settings: Settings, redis_manager: Optional[RedisStateManager] = None):
+    def __init__(self, settings: Settings, redis_manager: Optional[RedisStateManager] = None, 
+                 source_provider: Optional[SourceProvider] = None):
+        """
+        Initialize UnifiedElevationService with optional SourceProvider.
+        
+        Phase 3A-Fix: Added SourceProvider parameter to decouple from Settings.DEM_SOURCES.
+        When source_provider is provided, use its dynamically loaded data instead of Settings.
+        """
         try:
             self.settings = settings
             self.redis_manager = redis_manager
+            self.source_provider = source_provider
+            
+            # Get DEM sources from provider or fallback to settings
+            if source_provider and source_provider.is_loading_complete():
+                dem_sources = source_provider.get_dem_sources()
+                logger.info(f"Using SourceProvider with {len(dem_sources)} sources")
+            else:
+                dem_sources = settings.DEM_SOURCES
+                logger.info(f"Using Settings.DEM_SOURCES with {len(dem_sources)} sources")
             
             # Initialize appropriate source selector based on configuration
             use_s3 = getattr(settings, 'USE_S3_SOURCES', False)
             use_apis = getattr(settings, 'USE_API_SOURCES', False)
             
             # Check if we have index-driven sources (detect S3 campaigns)
-            s3_sources = sum(1 for source in settings.DEM_SOURCES.values() 
+            s3_sources = sum(1 for source in dem_sources.values() 
                            if source.get('source_type') == 's3')
             
             if s3_sources > 0:
                 logger.info(f"Initializing index-driven source selector with {s3_sources} S3 campaigns")
-                self.source_selector = IndexDrivenSourceSelector(settings.DEM_SOURCES)
+                self.source_selector = IndexDrivenSourceSelector(dem_sources)
                 self.using_enhanced_selector = True
                 self.using_index_driven_selector = True
                 
                 # Also initialize enhanced selector for actual data extraction
-                gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
-                google_api_key = settings.GOOGLE_ELEVATION_API_KEY
-                aws_creds = {
-                    "access_key_id": settings.AWS_ACCESS_KEY_ID,
-                    "secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                    "region": settings.AWS_DEFAULT_REGION
-                } if settings.AWS_ACCESS_KEY_ID else None
-
-                self._enhanced_selector = EnhancedSourceSelector(
-                    config=settings.DEM_SOURCES,
-                    use_s3=True,
-                    use_apis=True,
-                    gpxz_config=gpxz_config,
-                    google_api_key=google_api_key,
-                    aws_credentials=aws_creds,
-                    redis_manager=self.redis_manager
-                )
+                self._enhanced_selector = self._create_enhanced_selector(dem_sources, use_s3=True, use_apis=True)
             elif use_s3 or use_apis:
                 logger.info("Initializing enhanced source selector with S3/API support")
                 
-                # Prepare configurations for external services
-                gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
-                google_api_key = settings.GOOGLE_ELEVATION_API_KEY
-                aws_creds = {
-                    "access_key_id": settings.AWS_ACCESS_KEY_ID,
-                    "secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                    "region": settings.AWS_DEFAULT_REGION
-                } if settings.AWS_ACCESS_KEY_ID else None
-
-                self.source_selector = EnhancedSourceSelector(
-                    config=settings.DEM_SOURCES,
-                    use_s3=use_s3,
-                    use_apis=use_apis,
-                    gpxz_config=gpxz_config,
-                    google_api_key=google_api_key,
-                    aws_credentials=aws_creds,
-                    redis_manager=self.redis_manager
-                )
+                self.source_selector = self._create_enhanced_selector(dem_sources, use_s3=use_s3, use_apis=use_apis)
                 self.using_enhanced_selector = True
                 self.using_index_driven_selector = False
             else:
                 logger.info("Initializing legacy source selector")
-                self.source_selector = DEMSourceSelector(settings.DEM_SOURCES)
+                self.source_selector = DEMSourceSelector(dem_sources)
                 self.using_enhanced_selector = False
                 self.using_index_driven_selector = False
                 
@@ -110,6 +100,33 @@ class UnifiedElevationService:
         except Exception as e:
             logger.error(f"Unexpected error initializing elevation service: {e}")
             raise DEMServiceError(f"Failed to initialize elevation service: {e}") from e
+    
+    def _create_enhanced_selector(self, dem_sources: Dict[str, Any], use_s3: bool, use_apis: bool) -> EnhancedSourceSelector:
+        """
+        Factory method for creating EnhancedSourceSelector instances.
+        Eliminates DRY violation by centralizing the 8+ parameter configuration logic.
+        
+        Phase 3A-Fix: Updated to accept dem_sources parameter instead of using Settings.DEM_SOURCES.
+        """
+        # Prepare configurations for external services
+        gpxz_config = GPXZConfig(api_key=self.settings.GPXZ_API_KEY) if self.settings.GPXZ_API_KEY else None
+        google_api_key = self.settings.GOOGLE_ELEVATION_API_KEY
+        aws_creds = {
+            "access_key_id": self.settings.AWS_ACCESS_KEY_ID,
+            "secret_access_key": self.settings.AWS_SECRET_ACCESS_KEY,
+            "region": self.settings.AWS_DEFAULT_REGION
+        } if self.settings.AWS_ACCESS_KEY_ID else None
+        
+        return EnhancedSourceSelector(
+            config=dem_sources,
+            use_s3=use_s3,
+            use_apis=use_apis,
+            gpxz_config=gpxz_config,
+            google_api_key=google_api_key,
+            aws_credentials=aws_creds,
+            redis_manager=self.redis_manager,
+            enable_nz=getattr(self.settings, 'ENABLE_NZ_SOURCES', False)
+        )
     
     async def get_elevation(self, latitude: float, longitude: float, 
                           dem_source_id: Optional[str] = None) -> ElevationResult:
@@ -186,21 +203,33 @@ class UnifiedElevationService:
             source_used = result.get('source', 'unknown')
             campaign_info = result.get('campaign_info', {})
             
+            # Extract structured metadata fields
+            resolution = campaign_info.get('resolution_m')
+            data_type = campaign_info.get('data_type', 'DEM')
+            accuracy = campaign_info.get('accuracy', '±1m')
+            
             # Create detailed message with campaign intelligence
             attempted_sources = result.get('attempted_sources', [])
             if campaign_info and source_used != 'gpxz_api' and source_used != 'google_api':
                 # Campaign-based message with performance info
                 speedup_factor = campaign_info.get('speedup_factor', 'unknown')
                 provider = campaign_info.get('provider', 'unknown')
-                resolution = campaign_info.get('resolution_m', 'unknown')
                 year = campaign_info.get('campaign_year', 'unknown')
                 
                 message = (f"Campaign: {source_used} | Provider: {provider} | "
                           f"Resolution: {resolution}m | Year: {year} | "
                           f"Performance: {speedup_factor}")
             else:
-                # Standard fallback message
+                # Standard fallback message for API sources
                 message = f"Attempted sources: {attempted_sources}"
+                if source_used == 'gpxz_api':
+                    resolution = 30.0  # GPXZ API resolution
+                    data_type = 'SRTM'
+                    accuracy = '±16m'
+                elif source_used == 'google_api':
+                    resolution = 30.0  # Google API resolution  
+                    data_type = 'Mixed'
+                    accuracy = '±10m'
             
             return ElevationResult(
                 elevation_m=result.get('elevation_m'),
@@ -210,7 +239,11 @@ class UnifiedElevationService:
                     **(result.get('metadata', {})),
                     'campaign_info': campaign_info,
                     'attempted_sources': attempted_sources
-                }
+                },
+                resolution=resolution,
+                grid_resolution_m=resolution,
+                data_type=data_type,
+                accuracy=accuracy
             )
             
         except Exception as e:
@@ -250,6 +283,8 @@ class UnifiedElevationService:
                 # S3 campaign source - this is where the 54,000x speedup happens
                 campaign_id = selected_source_id
                 resolution_m = source_info.get('resolution_m', 1.0)
+                data_type = source_info.get('data_type', 'DEM')
+                accuracy = source_info.get('accuracy', '±1m')
                 
                 # Delegate to enhanced source selector for actual S3 data extraction
                 if hasattr(self, '_enhanced_selector'):
@@ -265,7 +300,11 @@ class UnifiedElevationService:
                             'selection_method': 'spatial_index',
                             'performance_note': '54,000x speedup via campaign selection',
                             **(enhanced_result.get('metadata', {}))
-                        }
+                        },
+                        resolution=resolution_m,
+                        grid_resolution_m=resolution_m,
+                        data_type=data_type,
+                        accuracy=accuracy
                     )
                 else:
                     # Fallback: Return info that we selected the right campaign but can't extract yet

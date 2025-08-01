@@ -203,11 +203,12 @@ logger = logging.getLogger(__name__)
 class EnhancedSourceSelector:
     """Enhanced source selector with S3 → GPXZ → Google fallback chain"""
     
-    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None, redis_manager: Optional[RedisStateManager] = None):
+    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None, redis_manager: Optional[RedisStateManager] = None, enable_nz: bool = False):
         logger.info("=== EnhancedSourceSelector Initialization ===")
         logger.info(f"Parameters:")
         logger.info(f"  use_s3: {use_s3}")
         logger.info(f"  use_apis: {use_apis}")
+        logger.info(f"  enable_nz: {enable_nz}")
         logger.info(f"  config sources: {list(config.keys())}")
         logger.info(f"  gpxz_config: {gpxz_config is not None}")
         logger.info(f"  google_api_key: {'set' if google_api_key else 'missing'}")
@@ -217,6 +218,7 @@ class EnhancedSourceSelector:
         self.config = config
         self.use_s3 = use_s3
         self.use_apis = use_apis
+        self.enable_nz = enable_nz
         self.aws_credentials = aws_credentials
         self.gpxz_client = None
         self.google_client = None
@@ -236,15 +238,14 @@ class EnhancedSourceSelector:
         
         self.spatial_index_loader = SpatialIndexLoader(unified_loader) if use_s3 else None
         
-        # Load NZ spatial index if S3 is enabled and UnifiedIndexLoader is available
-        if self.spatial_index_loader and unified_loader:
-            try:
-                logger.info("Loading NZ spatial index during initialization...")
-                self.spatial_index_loader.load_nz_index()
-                nz_regions = len(self.spatial_index_loader.nz_spatial_index.get('regions', {})) if self.spatial_index_loader.nz_spatial_index else 0
-                logger.info(f"NZ spatial index loaded with {nz_regions} regions")
-            except Exception as e:
-                logger.warning(f"Failed to load NZ spatial index during initialization: {e}")
+        # Schedule async NZ spatial index loading if S3 is enabled, NZ is enabled, and UnifiedIndexLoader is available
+        if self.spatial_index_loader and unified_loader and enable_nz:
+            logger.info("Scheduling async NZ spatial index loading (NZ sources enabled)...")
+            # Don't block initialization - load asynchronously in background
+            import asyncio
+            asyncio.create_task(self._load_nz_index_async())
+        elif not enable_nz:
+            logger.info("NZ spatial index loading skipped (NZ sources disabled)")
         
         # Phase 3 Selector with S3 index support
         if use_s3:
@@ -320,6 +321,24 @@ class EnhancedSourceSelector:
             logger.error(f"Rasterio not available: {e}")
         
         logger.info("=== Initialization Complete ===")
+    
+    async def _load_nz_index_async(self):
+        """Asynchronously load NZ spatial index without blocking initialization"""
+        try:
+            logger.info("Starting async NZ spatial index loading...")
+            
+            # Use asyncio.to_thread to run the synchronous load_nz_index in a thread pool
+            import asyncio
+            nz_index = await asyncio.to_thread(self.spatial_index_loader.load_nz_index)
+            
+            if nz_index:
+                nz_regions = len(nz_index.get('regions', {}))
+                logger.info(f"NZ spatial index loaded asynchronously with {nz_regions} regions")
+            else:
+                logger.warning("NZ spatial index async loading returned None")
+                
+        except Exception as e:
+            logger.warning(f"Failed to load NZ spatial index asynchronously (non-critical): {e}")
     
     def _log_circuit_breaker_status(self):
         """Log status of all circuit breakers"""
@@ -600,11 +619,13 @@ class EnhancedSourceSelector:
     async def _try_s3_sources_legacy(self, lat: float, lon: float) -> Optional[float]:
         """Legacy S3 sources approach (both NZ and AU) - fallback when campaigns fail"""
         try:
-            # Try NZ sources first (free)
-            if self.spatial_index_loader:
+            # Try NZ sources first (free) if enabled
+            if self.spatial_index_loader and self.enable_nz:
                 nz_elevation = await self._try_nz_source(lat, lon)
                 if nz_elevation is not None:
                     return nz_elevation
+            elif not self.enable_nz:
+                logger.debug("NZ sources disabled, skipping NZ lookup")
             
             # Try AU sources with the robust fallback logic
             if self.spatial_index_loader:
@@ -618,7 +639,7 @@ class EnhancedSourceSelector:
     
     async def _try_nz_source(self, lat: float, lon: float) -> Optional[float]:
         """Try NZ Open Data source using industry best practices"""
-        if not self.use_s3 or not self.spatial_index_loader:
+        if not self.use_s3 or not self.spatial_index_loader or not self.enable_nz:
             return None
             
         try:

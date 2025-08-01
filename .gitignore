@@ -127,24 +127,32 @@ test_*.py
 # Debug Scripts (Temporary)
 debug_*.py
 
-# Analysis Scripts (Temporary)
-analyze_*.py
-test_*.py
-comprehensive_*.py
-incremental_*.py
-metadata_*.py
-overlap_*.py
-validate_*.py
-ground_truth_*.py
-phase1_*.py
-quick_*.py
-smart_*.py
-fix_*.py
-add_*.py
-create_*.py
-generate_*.py
-populate_*.py
-direct_*.py
+# Analysis Scripts (Temporary) - Root Level Only
+/analyze_*.py
+/test_*.py
+/comprehensive_*.py
+/incremental_*.py
+/metadata_*.py
+/overlap_*.py
+/validate_*.py
+/ground_truth_*.py
+/phase1_*.py
+/quick_*.py
+/smart_*.py
+/fix_*.py
+/add_*.py
+/create_*.py
+/generate_*.py
+/populate_*.py
+/direct_*.py
+/debug_*.py
+/run_*.py
+/simple_*.py
+/start_*.py
+
+# Root Level Process Scripts
+/*.ps1
+/check_processes.ps1
 
 # Large Index Files (Too big for git)
 config/phase3_*_index.json

@@ -55,6 +55,30 @@ class PathResponse(BaseModel):
     total_points: int
     message: Optional[str] = None
 
+# Enhanced response models with structured resolution fields (Phase 2C)
+class EnhancedPointResponse(BaseModel):
+    elevation: Optional[float]
+    latitude: float
+    longitude: float
+    dem_source_used: Optional[str]
+    message: Optional[str] = None
+    # Enhanced structured fields
+    resolution: Optional[float] = None
+    grid_resolution_m: Optional[float] = None
+    data_type: Optional[str] = None
+    accuracy: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+class EnhancedLineResponse(BaseModel):
+    points: List[EnhancedPointResponse]
+    total_points: int
+    message: Optional[str] = None
+
+class EnhancedPathResponse(BaseModel):
+    points: List[EnhancedPointResponse]
+    total_points: int
+    message: Optional[str] = None
+
 class ContourDataResponse(BaseModel):
     contours: List[List[List[float]]]
     bounds: Dict[str, float]

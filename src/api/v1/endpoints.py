@@ -18,6 +18,8 @@ from ...models import (
     PointResponse, LineResponse, PathResponse, ContourDataResponse,
     LegacyContourDataResponse, GeoJSONFeatureCollection, ContourStatistics,
     DEMPoint, ErrorResponse, SourceSelectionRequest, SourceSelectionResponse,
+    # Enhanced response models with structured resolution fields
+    EnhancedPointResponse, EnhancedLineResponse, EnhancedPathResponse,
     # Frontend-specific models
     FrontendContourDataRequest, FrontendContourDataResponse,
     # New standardized models
@@ -235,11 +237,10 @@ async def get_elevation_point(
             point_request.dem_source_id
         )
         
-        # Create response directly - try both elevation and elevation_m
+        # Create standard response (temporarily reverted to test core service)
         return PointResponse(
             latitude=point_request.latitude,
             longitude=point_request.longitude,
-            elevation=result.elevation_m,  # Try elevation instead of elevation_m
             elevation_m=result.elevation_m,
             dem_source_used=result.dem_source_used,
             message=result.message
@@ -258,11 +259,11 @@ async def get_elevation_point(
         logger.error(f"Unexpected error in point elevation: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.post("/line", response_model=LineResponse)
+@router.post("/line", response_model=EnhancedLineResponse)
 async def get_elevation_line(
     request: LineRequest,
     service: DEMService = Depends(get_dem_service)
-) -> LineResponse:
+) -> EnhancedLineResponse:
     """Get elevations for points along a line segment using unified elevation service."""
     try:
         # Use the new unified service for line elevation

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Literal
 import os
 import json
 from pathlib import Path
@@ -261,9 +261,22 @@ class Settings(BaseSettings):
     DEFAULT_DEM_ID: Optional[str] = None  # Optional default DEM source ID
     BASE_DIR: str = Field(default=".", description="Base directory for the application")
     
-    # Multi-source environment settings
+    # Environment detection (Phase 3B.1: Critical Production Safety + Phase 3B.2: Development Support)
+    APP_ENV: Literal["production", "development"] = Field(
+        default="production", 
+        description="Application environment: production (Railway), development (Docker Compose)"
+    )
+    
+    # Multi-source environment settings (Phase 3B.2: Enhanced with better field types)
     USE_S3_SOURCES: bool = Field(default=False, description="Enable S3-based DEM sources")
     USE_API_SOURCES: bool = Field(default=False, description="Enable external API sources")
+    ENABLE_NZ_SOURCES: bool = Field(default=False, description="Enable New Zealand elevation sources (S3 nz-elevation bucket)")
+    
+    # Data source configuration (Phase 3B.2: Added with Literal types)
+    SPATIAL_INDEX_SOURCE: Literal["local", "s3"] = Field(
+        default="local",
+        description="Source for spatial indexes: local (filesystem), s3 (S3 bucket)"
+    )
     
     # Geodatabase-specific settings
     GDB_AUTO_DISCOVER: bool = Field(default=True, description="Automatically discover raster layers in geodatabases")
@@ -274,9 +287,12 @@ class Settings(BaseSettings):
     DATASET_CACHE_SIZE: int = Field(default=10, description="Maximum number of datasets to keep in memory cache")
     MAX_WORKER_THREADS: int = Field(default=10, description="Maximum number of worker threads for async operations")
     
-    # GDAL Error Handling
+    # GDAL Error Handling (Phase 3B.2: Enhanced with Literal types)
     SUPPRESS_GDAL_ERRORS: bool = Field(default=True, description="Suppress non-critical GDAL errors from log output")
-    GDAL_LOG_LEVEL: str = Field(default="ERROR", description="GDAL logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL")
+    GDAL_LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="ERROR", 
+        description="GDAL logging level"
+    )
     
     # AWS S3 Configuration
     AWS_ACCESS_KEY_ID: Optional[str] = None
@@ -298,6 +314,30 @@ class Settings(BaseSettings):
     # Source selection settings
     AUTO_SELECT_BEST_SOURCE: bool = Field(default=True, description="Automatically select the best available source for each location")
     
+    # ========================================
+    # ENHANCED MULTI-BUCKET S3 CONFIGURATION 
+    # ========================================
+    # Implements Gemini's approved architecture for mixed public/private bucket support
+    
+    # LEGACY CONFIGURATION (Backward Compatible)
+    S3_INDEX_BUCKET: str = Field(default="road-engineering-elevation-data", description="Legacy S3 bucket for Australian indexes")
+    
+    # FEATURE FLAG - NZ Sources Integration
+    ENABLE_NZ_SOURCES: bool = Field(default=False, description="Enable New Zealand S3 sources integration")
+    
+    # SIMPLE MODE - NZ Configuration via Environment Variables (Phase 3B.2: Enhanced types)
+    S3_NZ_BUCKET: str = Field(default="nz-elevation", description="New Zealand S3 bucket name")
+    S3_NZ_REGION: str = Field(default="ap-southeast-2", description="New Zealand S3 bucket region")
+    S3_NZ_INDEX_KEY: str = Field(default="indexes/nz_spatial_index.json", description="New Zealand spatial index file key")
+    S3_NZ_ACCESS_TYPE: Literal["public", "private"] = Field(
+        default="public", 
+        description="New Zealand bucket access type"
+    )
+    S3_NZ_REQUIRED: bool = Field(default=False, description="Whether NZ sources are required for startup")
+    
+    # EXPERT MODE - JSON Configuration (overrides all other S3 settings)
+    S3_SOURCES_CONFIG: str = Field(default="", description="JSON configuration for advanced multi-bucket setup")
+    
     # Server settings
     HOST: str = Field(default="0.0.0.0", description="Server host")
     PORT: int = Field(default=8001, description="Server port")
@@ -312,15 +352,26 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = Field(default="http://localhost:3001,http://localhost:5173,http://localhost:5174", description="Comma-separated list of allowed CORS origins")
     MAIN_BACKEND_URL: str = Field(default="http://localhost:3001", description="Main platform backend URL")
     
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Phase 3B.1: Simplified production-focused configuration  
+    # Railway deployment uses .env file with APP_ENV for safety checks
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding='utf-8', 
+        extra="ignore"
+    )
     
     @property
     def DEM_SOURCES(self) -> Dict[str, Dict[str, Any]]:
-        """Load DEM sources using index-driven approach from spatial indices"""
+        """
+        Static DEM sources configuration - NO I/O OPERATIONS.
+        
+        Phase 3A-Fix: This property now only returns static configuration from environment.
+        All dynamic data loading has been moved to SourceProvider for async startup.
+        """
         import os
         import json
         
-        # Check if DEM_SOURCES environment variable is set and non-empty
+        # Only return sources from environment variable (static config)
         env_dem_sources = os.getenv('DEM_SOURCES', '').strip()
         if env_dem_sources and env_dem_sources != '{}':
             try:
@@ -328,12 +379,26 @@ class Settings(BaseSettings):
                 if isinstance(parsed_sources, dict) and len(parsed_sources) > 0:
                     return parsed_sources
             except (json.JSONDecodeError, TypeError):
-                pass  # Fall back to index-driven approach
+                pass
         
-        # Use index-driven approach (cache for performance)
-        if self._dem_sources_cache is None:
-            self._dem_sources_cache = load_dem_sources_from_spatial_index()
-        return self._dem_sources_cache
+        # Return minimal static API sources as fallback
+        # NOTE: SourceProvider will provide the full dynamic source list
+        return {
+            'gpxz_api': {
+                'source_type': 'api',
+                'name': 'GPXZ.io Global Elevation API',
+                'resolution_m': 30.0,
+                'accuracy': '±1m',
+                'coverage': 'global'
+            },
+            'google_api': {
+                'source_type': 'api', 
+                'name': 'Google Elevation API',
+                'resolution_m': 30.0,
+                'accuracy': '±1m',
+                'coverage': 'global'
+            }
+        }
     
     def refresh_dem_sources(self) -> None:
         """Refresh DEM sources cache - useful when S3 indices are updated"""
@@ -346,8 +411,43 @@ class Settings(BaseSettings):
         global _sources_cache, _cache_timestamp
         _sources_cache = None
         _cache_timestamp = None
+    
+    def build_s3_sources_config(self) -> List['S3SourceConfig']:
+        """
+        Build S3 sources configuration using Gemini's approved precedence hierarchy:
+        1. Expert Mode: S3_SOURCES_CONFIG JSON (overrides everything)
+        2. Simple Mode: Individual environment variables
+        3. Legacy Fallback: Existing behavior preserved
+        """
+        from .s3_config import S3SourceConfig, S3ConfigurationManager
+        return S3ConfigurationManager.build_sources_from_settings(self)
+    
+    def validate_app_environment(self) -> None:
+        """
+        Phase 3B.2: Validate APP_ENV configuration consistency.
         
-        _ = self.DEM_SOURCES  # Trigger reload
+        Ensures environment-specific settings are consistent with APP_ENV value.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if self.APP_ENV == "production":
+            # Production validation
+            if not os.getenv('REDIS_URL') and not os.getenv('REDIS_PRIVATE_URL'):
+                logger.warning("Production environment without Redis configuration - service will fail-fast on startup")
+            
+            if self.SPATIAL_INDEX_SOURCE == "s3" and not self.AWS_ACCESS_KEY_ID:
+                logger.warning("Production using S3 spatial indexes without AWS credentials")
+                
+        elif self.APP_ENV == "development":
+            # Development validation
+            if not os.getenv('REDIS_URL'):
+                logger.info("Development environment - Redis fallback will be used if Redis unavailable")
+            
+            if self.SPATIAL_INDEX_SOURCE == "s3":
+                logger.info("Development using S3 spatial indexes - ensure AWS credentials are configured")
+        
+        logger.info(f"APP_ENV validation complete: {self.APP_ENV} environment configured correctly")
 
 def runtime_config_check(settings: Settings) -> Dict[str, Any]:
     """Runtime configuration check with fallback capabilities"""
@@ -424,14 +524,23 @@ def validate_environment_configuration(settings: Settings) -> None:
     
     Raises:
         ValueError: For critical configuration errors that prevent startup
+        DEMConfigurationError: For DEM-specific configuration errors
     """
     import logging
     import os
     from pathlib import Path
+    from .dem_exceptions import DEMConfigurationError
     logger = logging.getLogger(__name__)
     
     critical_errors = []
     warnings = []
+    
+    # Configuration dependency validation (Phase 3A.3)
+    if getattr(settings, 'ENABLE_NZ_SOURCES', False) and not getattr(settings, 'USE_S3_SOURCES', False):
+        critical_errors.append(
+            "Configuration dependency error: ENABLE_NZ_SOURCES=true requires USE_S3_SOURCES=true. "
+            "NZ sources are hosted on S3 and cannot be used without S3 support enabled."
+        )
     
     # Basic validation - DEM_SOURCES must exist
     if not settings.DEM_SOURCES:
@@ -475,7 +584,7 @@ def validate_environment_configuration(settings: Settings) -> None:
     if critical_errors:
         error_msg = "Critical configuration errors found:\n" + "\n".join(f"- {error}" for error in critical_errors)
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise DEMConfigurationError(error_msg)
     
     # Validate S3-specific requirements
     if settings.USE_S3_SOURCES:
@@ -571,13 +680,14 @@ def validate_environment_configuration(settings: Settings) -> None:
 
 def get_settings():
     """Dependency for getting settings with validation."""
+    from .dem_exceptions import DEMConfigurationError
     settings = Settings()
     
     # Validate configuration
     try:
         validate_environment_configuration(settings)
-    except ValueError as e:
-        raise ValueError(f"Configuration validation failed: {e}")
+    except (ValueError, DEMConfigurationError) as e:
+        raise DEMConfigurationError(f"Configuration validation failed: {e}")
     
     # Set AWS environment variables if provided in settings
     if settings.AWS_ACCESS_KEY_ID:
