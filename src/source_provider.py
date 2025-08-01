@@ -116,14 +116,19 @@ class SourceProvider:
             # Build unified DEM_SOURCES from loaded data
             self._build_dem_sources()
             
-            # Determine overall success
-            self._load_success = campaign_success and nz_success
+            # Determine overall success - we need at least some sources (API fallback is acceptable)
+            source_count = len(self.dem_sources) if self.dem_sources else 0
+            has_sources = source_count >= 2  # At least API sources (gpxz_api, google_api)
+            
+            # Success if we have sources available, even if S3 indexes failed to load
+            self._load_success = has_sources and nz_success
             
             if self._load_success:
-                source_count = len(self.dem_sources) if self.dem_sources else 0
                 logger.info(f"SourceProvider loading completed successfully: {source_count} sources available")
+                if not campaign_success:
+                    logger.warning("S3 campaign index failed to load, but API fallback sources are available")
             else:
-                logger.error(f"SourceProvider loading had failures: {self._load_errors}")
+                logger.error(f"SourceProvider loading failed: {source_count} sources, errors: {self._load_errors}")
             
         except Exception as e:
             logger.error(f"Critical error in load_all_sources: {e}", exc_info=True)
