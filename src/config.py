@@ -348,9 +348,12 @@ class Settings(BaseSettings):
     # EXPERT MODE - JSON Configuration (overrides all other S3 settings)
     S3_SOURCES_CONFIG: str = Field(default="", description="JSON configuration for advanced multi-bucket setup")
     
-    # Server settings
+    # Server settings (Phase 3B.3.2: Enhanced with Railway PORT support)
     HOST: str = Field(default="0.0.0.0", description="Server host")
-    PORT: int = Field(default=8001, description="Server port")
+    PORT: int = Field(
+        default=8001, 
+        description="Port for the Uvicorn server. Injected by Railway's $PORT in production."
+    )
     
     # Authentication settings
     SUPABASE_JWT_SECRET: Optional[str] = None

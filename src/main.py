@@ -631,4 +631,6 @@ setattr(health_check, '_start_time', time.time())
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001) # Force Railway rebuild Sat, Jul 26, 2025 11:29:16 PM
+    # Phase 3B.3.2: Use settings for host/port configuration
+    settings = get_settings()
+    uvicorn.run(app, host=settings.HOST, port=settings.PORT)
