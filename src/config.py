@@ -553,7 +553,9 @@ def validate_environment_configuration(settings: Settings) -> None:
                 critical_errors.append(f"DEM source '{source_id}' must be a dictionary")
                 continue
             
-            if 'path' not in source_config:
+            # Only require 'path' field for non-API sources
+            source_type = source_config.get('source_type', 'file')
+            if source_type != 'api' and 'path' not in source_config:
                 critical_errors.append(f"DEM source '{source_id}' missing required 'path' field")
             
             # Validate local file paths exist
