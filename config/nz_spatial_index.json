@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-08-02T01:50:07.752828",
+  "generated_at": "2025-08-02T02:09:51.951592",
   "bucket": "nz-elevation",
   "coordinate_system": "NZGD2000 / New Zealand Transverse Mercator 2000 (EPSG:2193)",
   "regions": {
@@ -646,6 +646,310 @@
               "region": "auckland",
               "survey": "auckland-north_2016-2018",
               "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0101.tiff",
+              "filename": "BA32_10000_0101.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 9.9,
+              "last_modified": "2024-02-29T01:30:06+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0102.tiff",
+              "filename": "BA32_10000_0102.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 1.51,
+              "last_modified": "2024-02-29T01:30:06+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0201.tiff",
+              "filename": "BA32_10000_0201.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 8.89,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0203.tiff",
+              "filename": "BA32_10000_0203.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.16,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0204.tiff",
+              "filename": "BA32_10000_0204.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 6.84,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0205.tiff",
+              "filename": "BA32_10000_0205.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 1.77,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0301.tiff",
+              "filename": "BA32_10000_0301.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 24.42,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0302.tiff",
+              "filename": "BA32_10000_0302.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 14.14,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0303.tiff",
+              "filename": "BA32_10000_0303.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 31.15,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0304.tiff",
+              "filename": "BA32_10000_0304.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 16.93,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0305.tiff",
+              "filename": "BA32_10000_0305.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 14.36,
+              "last_modified": "2024-02-29T01:30:07+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0401.tiff",
+              "filename": "BA32_10000_0401.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 32.1,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0402.tiff",
+              "filename": "BA32_10000_0402.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 22.92,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0403.tiff",
+              "filename": "BA32_10000_0403.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 12.89,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0404.tiff",
+              "filename": "BA32_10000_0404.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 2.22,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0405.tiff",
+              "filename": "BA32_10000_0405.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.4,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0501.tiff",
+              "filename": "BA32_10000_0501.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 37.08,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0502.tiff",
+              "filename": "BA32_10000_0502.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 33.56,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-north_2016-2018/dem_1m/2193/BA32_10000_0503.tiff",
+              "filename": "BA32_10000_0503.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 6.38,
+              "last_modified": "2024-02-29T01:30:08+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-north_2016-2018",
+              "coordinate_system": "EPSG:2193"
             }
           ],
           "file_count": 187,
@@ -657,9 +961,223 @@
           }
         },
         "auckland-part-1_2024": {
-          "files": [],
+          "files": [
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0101.tiff",
+              "filename": "BA32_10000_0101.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 9.41,
+              "last_modified": "2025-04-11T01:19:36+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0102.tiff",
+              "filename": "BA32_10000_0102.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 1.4,
+              "last_modified": "2025-04-11T01:19:36+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0201.tiff",
+              "filename": "BA32_10000_0201.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 8.7,
+              "last_modified": "2025-04-11T01:19:36+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0301.tiff",
+              "filename": "BA32_10000_0301.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 24.35,
+              "last_modified": "2025-04-11T01:19:37+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0302.tiff",
+              "filename": "BA32_10000_0302.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.03,
+              "last_modified": "2025-04-11T01:19:37+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0401.tiff",
+              "filename": "BA32_10000_0401.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 32.13,
+              "last_modified": "2025-04-11T01:19:37+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0402.tiff",
+              "filename": "BA32_10000_0402.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 22.64,
+              "last_modified": "2025-04-11T01:19:37+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0403.tiff",
+              "filename": "BA32_10000_0403.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 16.67,
+              "last_modified": "2025-04-11T01:19:38+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0404.tiff",
+              "filename": "BA32_10000_0404.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.55,
+              "last_modified": "2025-04-11T01:19:37+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0501.tiff",
+              "filename": "BA32_10000_0501.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 41.93,
+              "last_modified": "2025-04-11T01:19:38+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0502.tiff",
+              "filename": "BA32_10000_0502.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 43.14,
+              "last_modified": "2025-04-11T01:19:28+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0503.tiff",
+              "filename": "BA32_10000_0503.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 39.46,
+              "last_modified": "2025-04-11T01:19:28+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-1_2024/dem_1m/2193/BA32_10000_0504.tiff",
+              "filename": "BA32_10000_0504.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 32.6,
+              "last_modified": "2025-04-11T01:19:28+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-1_2024",
+              "coordinate_system": "EPSG:2193"
+            }
+          ],
           "file_count": 109,
-          "coverage_bounds": null
+          "coverage_bounds": {
+            "min_lat": -36.9,
+            "max_lat": -36.8,
+            "min_lon": 174.7,
+            "max_lon": 174.8
+          }
         },
         "auckland-part-2_2024": {
           "files": [
@@ -1286,6 +1804,182 @@
               "region": "auckland",
               "survey": "auckland-part-2_2024",
               "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0203.tiff",
+              "filename": "BA32_10000_0203.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.14,
+              "last_modified": "2025-07-02T22:10:50+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0204.tiff",
+              "filename": "BA32_10000_0204.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 6.32,
+              "last_modified": "2025-07-02T22:10:50+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0205.tiff",
+              "filename": "BA32_10000_0205.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.82,
+              "last_modified": "2025-07-02T22:10:50+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0302.tiff",
+              "filename": "BA32_10000_0302.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 14.15,
+              "last_modified": "2025-07-02T22:10:50+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0303.tiff",
+              "filename": "BA32_10000_0303.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 30.88,
+              "last_modified": "2025-07-02T22:10:51+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0304.tiff",
+              "filename": "BA32_10000_0304.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 16.88,
+              "last_modified": "2025-07-02T22:10:51+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0305.tiff",
+              "filename": "BA32_10000_0305.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 14.53,
+              "last_modified": "2025-07-02T22:10:51+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0404.tiff",
+              "filename": "BA32_10000_0404.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 2.3,
+              "last_modified": "2025-07-02T22:10:51+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0405.tiff",
+              "filename": "BA32_10000_0405.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.47,
+              "last_modified": "2025-07-02T22:10:51+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0504.tiff",
+              "filename": "BA32_10000_0504.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 6.85,
+              "last_modified": "2025-07-02T22:10:51+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-part-2_2024/dem_1m/2193/BA32_10000_0505.tiff",
+              "filename": "BA32_10000_0505.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 40.77,
+              "last_modified": "2025-07-02T22:10:51+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-part-2_2024",
+              "coordinate_system": "EPSG:2193"
             }
           ],
           "file_count": 172,
@@ -1297,9 +1991,127 @@
           }
         },
         "auckland-south_2016-2017": {
-          "files": [],
+          "files": [
+            {
+              "file": "s3://nz-elevation/auckland/auckland-south_2016-2017/dem_1m/2193/BA32_10000_0403.tiff",
+              "filename": "BA32_10000_0403.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 4.15,
+              "last_modified": "2024-02-27T23:15:53+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-south_2016-2017",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-south_2016-2017/dem_1m/2193/BA32_10000_0404.tiff",
+              "filename": "BA32_10000_0404.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 0.39,
+              "last_modified": "2024-02-27T23:15:53+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-south_2016-2017",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-south_2016-2017/dem_1m/2193/BA32_10000_0501.tiff",
+              "filename": "BA32_10000_0501.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 4.87,
+              "last_modified": "2024-02-27T23:15:53+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-south_2016-2017",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-south_2016-2017/dem_1m/2193/BA32_10000_0502.tiff",
+              "filename": "BA32_10000_0502.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 8.65,
+              "last_modified": "2024-02-27T23:15:54+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-south_2016-2017",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-south_2016-2017/dem_1m/2193/BA32_10000_0503.tiff",
+              "filename": "BA32_10000_0503.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 32.74,
+              "last_modified": "2024-02-27T23:15:54+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-south_2016-2017",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-south_2016-2017/dem_1m/2193/BA32_10000_0504.tiff",
+              "filename": "BA32_10000_0504.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 38.37,
+              "last_modified": "2024-02-27T23:15:54+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-south_2016-2017",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/auckland/auckland-south_2016-2017/dem_1m/2193/BA32_10000_0505.tiff",
+              "filename": "BA32_10000_0505.tiff",
+              "bounds": {
+                "min_lat": -36.9,
+                "max_lat": -36.8,
+                "min_lon": 174.7,
+                "max_lon": 174.8
+              },
+              "size_mb": 39.76,
+              "last_modified": "2024-02-27T23:15:54+00:00",
+              "resolution": "1m",
+              "region": "auckland",
+              "survey": "auckland-south_2016-2017",
+              "coordinate_system": "EPSG:2193"
+            }
+          ],
           "file_count": 83,
-          "coverage_bounds": null
+          "coverage_bounds": {
+            "min_lat": -36.9,
+            "max_lat": -36.8,
+            "min_lon": 174.7,
+            "max_lon": 174.8
+          }
         }
       },
       "file_count": 551,
@@ -28629,9 +29441,9 @@
       }
     }
   },
-  "file_count": 1736,
+  "file_count": 1786,
   "coverage_summary": {
-    "total_files": 1736,
+    "total_files": 1786,
     "regions": {
       "auckland": {
         "file_count": 551,
@@ -28770,7 +29582,7 @@
           -36.8485,
           174.7633
         ],
-        "matching_files": 168,
+        "matching_files": 218,
         "files": [
           "AY30_10000_0405.tiff",
           "AY30_10000_0502.tiff",

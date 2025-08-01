@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""
+Instructions for enabling NZ sources in Railway production
+"""
+
+def show_railway_instructions():
+    print("[DEPLOY] Railway NZ Sources Deployment Instructions")
+    print("=" * 60)
+    print()
+    print("STEP 1: Set Environment Variable in Railway")
+    print("----------------------------------------")
+    print("1. Go to Railway dashboard: https://railway.app/")
+    print("2. Select the DEM Backend project")
+    print("3. Go to Variables tab")
+    print("4. Add new environment variable:")
+    print("   - Name: ENABLE_NZ_SOURCES")
+    print("   - Value: true")
+    print("5. Save the variable")
+    print()
+    print("STEP 2: Verify Deployment")
+    print("------------------------")
+    print("Railway will automatically redeploy after adding the variable.")
+    print("Check deployment logs for:")
+    print("- 'Loading NZ index: s3://road-engineering-elevation-data/indexes/nz_spatial_index.json'")
+    print("- 'NZ index loaded: X regions'")  
+    print("- 'Data loading completed: 1,XXX+ sources available'")
+    print()
+    print("STEP 3: Test NZ Coordinates")
+    print("---------------------------")
+    print("Test Auckland after deployment:")
+    print()
+    print("curl 'https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/point' \\")
+    print("     -X POST -H 'Content-Type: application/json' \\")
+    print("     -d '{\"latitude\": -36.8485, \"longitude\": 174.7633}'")
+    print()
+    print("Expected result: Should use NZ S3 sources instead of API fallback")
+    print()
+    print("STEP 4: Verify Health Check")
+    print("---------------------------")
+    print("curl 'https://re-dem-elevation-backend.up.railway.app/api/v1/health'")
+    print()
+    print("Expected: 'sources_available' should be >1,153 (AU + NZ)")
+    print()
+    print("[SUCCESS] NZ spatial index uploaded to S3: COMPLETE")
+    print("[READY] NZ sources ready for activation: SET RAILWAY VARIABLE")
+
+if __name__ == "__main__":
+    show_railway_instructions()

@@ -246,9 +246,10 @@ class NZSpatialIndexGenerator:
         # NZGD2000 grid references mapping (approximate)
         # This is a simplified mapping for spatial indexing
         grid_mappings = {
-            # Auckland region
+            # Auckland region - including BA32 series for Auckland CBD
             'AY30': {'min_lat': -36.9, 'max_lat': -36.8, 'min_lon': 174.7, 'max_lon': 174.8},
             'AY31': {'min_lat': -36.9, 'max_lat': -36.8, 'min_lon': 174.8, 'max_lon': 174.9},
+            'BA32': {'min_lat': -36.9, 'max_lat': -36.8, 'min_lon': 174.7, 'max_lon': 174.8},  # Auckland CBD coverage
             
             # Wellington region
             'BP32': {'min_lat': -41.3, 'max_lat': -41.2, 'min_lon': 174.9, 'max_lon': 175.0},

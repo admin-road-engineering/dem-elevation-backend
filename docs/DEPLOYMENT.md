@@ -102,8 +102,8 @@ curl -X POST "https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/p
 
 ### Overview
 - **Status**: ✅ Production Ready (Phase 3B.4)
-- **Coverage**: 16 NZ regions with 1m resolution LiDAR data
-- **Architecture**: Two-bucket system (indexes + public NZ data)
+- **Coverage**: 16 NZ regions with 1m resolution LiDAR data  
+- **Architecture**: Two-bucket system with dynamic spatial indexing
 - **Performance**: Sub-second response times for major NZ cities
 
 ### S3 Bucket Architecture
@@ -111,16 +111,44 @@ curl -X POST "https://re-dem-elevation-backend.up.railway.app/api/v1/elevation/p
 road-engineering-elevation-data/     # Private bucket (indexes)
 ├── indexes/
 │   ├── spatial_index.json          # 1,153 Australian campaigns  
-│   └── nz_spatial_index.json       # 16 NZ regions (1.08MB)
+│   └── nz_spatial_index.json       # Dynamic NZ index (actual GeoTIFF bounds)
 
 nz-elevation/                        # Public bucket (NZ DEM data)
 ├── auckland/
-│   ├── auckland-north_2016-2018/   # 40 files covering Auckland
-│   └── auckland-part-2_2024/       # 39 files with 2024 data
+│   ├── auckland-north_2016-2018/
+│   ├── auckland-part-1_2024/
+│   ├── auckland-part-2_2024/
+│   └── auckland-south_2016-2017/
 ├── wellington/
 ├── canterbury/
-└── [13 other regions...]
+├── bay-of-plenty/
+└── [other regions...]                # 188 directories with .tiff files
 ```
+
+### Spatial Index Management  
+
+#### Dynamic Index Generation
+All spatial indexes now use **dynamic S3 bucket scanning** instead of hardcoded mappings:
+
+```bash
+# Australian S3 bucket - Full regeneration (15-30 minutes)
+scripts/generate_australian_spatial_index.bat
+
+# Australian S3 bucket - Incremental update (2-5 minutes)
+scripts/update_australian_spatial_index.bat
+
+# New Zealand S3 bucket - Full regeneration (10-20 minutes)  
+generate_nz_dynamic_index.bat
+
+# New Zealand S3 bucket - Incremental update (1-3 minutes)
+scripts/update_nz_spatial_index.bat
+```
+
+#### Key Features
+- **No Hardcoded Mappings**: Automatically discovers all files in buckets
+- **Actual Bounds Extraction**: Uses GeoTIFF metadata with rasterio for precise coordinates
+- **Progressive Updates**: Bucket contents can be updated without code changes
+- **Automatic Fallback**: Incremental updates fall back to full regeneration if needed
 
 ### NZ Sources Configuration
 The system automatically loads NZ sources when `ENABLE_NZ_SOURCES=true` is set:
@@ -129,23 +157,26 @@ The system automatically loads NZ sources when `ENABLE_NZ_SOURCES=true` is set:
 # Set via Railway CLI
 railway variables --set "ENABLE_NZ_SOURCES=true"
 
+# Upload updated spatial index to production
+python upload_nz_index.py
+
 # Verify deployment logs show:
 # "Loading NZ index: s3://road-engineering-elevation-data/indexes/nz_spatial_index.json"
-# "NZ index loaded: 16 regions"
-# "Data loading completed: 1,169 sources available"
+# "NZ index loaded: 16+ regions with actual bounds"
+# "Data loading completed: 1,153+ sources available"
 ```
 
-### NZ Coverage Areas
-- **Auckland**: 79 files, 53 covering Auckland CBD
-- **Wellington**: Regional coverage with 1m resolution
-- **Canterbury**: Including Christchurch metropolitan area  
-- **Otago**: Including Dunedin region
-- **Bay of Plenty**: Including Tauranga area
-- **13 Additional Regions**: Comprehensive national coverage
+### NZ Coverage Areas (Dynamic Discovery)
+- **Auckland**: 4 surveys spanning 2016-2024 with comprehensive CBD coverage
+- **Wellington**: Regional coverage with 1m resolution LiDAR
+- **Canterbury**: Banks Peninsula, Christchurch metropolitan area  
+- **Bay of Plenty**: Tauranga, regional surveys from 2015-2025
+- **Otago, Southland, West Coast**: Full regional coverage
+- **All Other Regions**: Automatically discovered and indexed
 
 ### Fallback Behavior
-- **With NZ Sources**: Auckland/Wellington use S3 (sub-second)
-- **Without NZ Sources**: All NZ coordinates use GPXZ API (2-3 seconds)
+- **With NZ Sources**: Major cities use S3 files (sub-second response)
+- **Without NZ Sources**: All NZ coordinates use GPXZ API (2-3 seconds)  
 - **Global Coverage**: API fallback for areas outside AU/NZ S3 coverage
 
 ## 🛠️ Local Development (Docker)

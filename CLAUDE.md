@@ -120,6 +120,7 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 **CLAUDE.md** (this file): Architectural principles, mission, and high-level guidance  
 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Technical architecture, patterns, and design decisions  
 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**: Railway production and Docker development deployment  
+**[docs/SPATIAL_INDEX_MANAGEMENT.md](docs/SPATIAL_INDEX_MANAGEMENT.md)**: Dynamic spatial index generation and maintenance  
 **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**: Systematic debugging and issue resolution  
 **[docs/DOCKER_DEVELOPMENT.md](docs/DOCKER_DEVELOPMENT.md)**: Local development environment setup  
 **[docs/CONTAINERIZED_SCRIPTS.md](docs/CONTAINERIZED_SCRIPTS.md)**: Operational script execution  
@@ -189,6 +190,35 @@ railway variables --set "ENABLE_NZ_SOURCES=true"  # Example: Enable NZ sources
 - `SPATIAL_INDEX_SOURCE=s3` - Use S3-hosted spatial indexes
 - `APP_ENV=production` - Production safety behaviors
 - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` - S3 access credentials
+
+### Spatial Index Management
+**Automated Batch Files**: Complete spatial index generation and maintenance workflows  
+**Dynamic Discovery**: All systems use dynamic S3 bucket scanning to detect new files automatically  
+**Incremental Updates**: Fast detection of only new files added since last update  
+
+#### Australian S3 Bucket Management
+```bash
+# Full regeneration (15-30 minutes)
+scripts/generate_australian_spatial_index.bat
+
+# Incremental update (2-5 minutes) 
+scripts/update_australian_spatial_index.bat
+```
+
+#### New Zealand S3 Bucket Management  
+```bash
+# Full regeneration with dynamic scanning (10-20 minutes)
+generate_nz_dynamic_index.bat
+
+# Incremental update (1-3 minutes)
+scripts/update_nz_spatial_index.bat
+```
+
+**Key Features:**
+- **Dynamic Discovery**: No hardcoded mappings - automatically finds new files
+- **Actual Bounds Extraction**: Uses GeoTIFF metadata instead of approximations  
+- **Automatic Fallback**: Incremental updates fall back to full generation if needed
+- **Production Integration**: Compatible with existing `upload_nz_index.py` for Railway deployment
 
 ### AWS S3 Integration Architecture
 **Main Bucket**: `road-engineering-elevation-data` (Private, contains indexes)  
