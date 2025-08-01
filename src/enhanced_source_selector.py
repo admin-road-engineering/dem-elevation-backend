@@ -171,11 +171,18 @@ class SpatialIndexLoader:
         return zone
     
     def find_nz_file_for_coordinate(self, lat: float, lon: float) -> Optional[str]:
-        """Find NZ DEM file for given coordinates"""
+        """Find NZ DEM file for given coordinates - returns first candidate"""
+        candidates = self.find_nz_files_for_coordinate(lat, lon)
+        return candidates[0] if candidates else None
+    
+    def find_nz_files_for_coordinate(self, lat: float, lon: float) -> List[str]:
+        """Find all potential NZ DEM files for given coordinates (multiple candidates for fallback)"""
         index = self.load_nz_index()
         if not index:
-            return None
+            return []
             
+        candidates = []
+        
         # Search through all regions and surveys (NZ index structure: regions -> surveys -> files)
         for region_name, region_data in index.get("regions", {}).items():
             # Check if region has surveys (new structure) or files directly (old structure)
@@ -186,15 +193,17 @@ class SpatialIndexLoader:
                         bounds = file_info.get("bounds", {})
                         if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
                             bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
-                            return file_info.get("file")
+                            candidates.append(file_info.get("file"))
             else:
                 # Old structure: regions -> files (fallback)
                 for file_info in region_data.get("files", []):
                     bounds = file_info.get("bounds", {})
                     if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
                         bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
-                        return file_info.get("file")
-        return None
+                        candidates.append(file_info.get("file"))
+        
+        logger.info(f"Found {len(candidates)} NZ DEM file candidates for ({lat}, {lon})")
+        return candidates
 
 logger = logging.getLogger(__name__)
 
@@ -636,24 +645,34 @@ class EnhancedSourceSelector:
             raise RetryableError(f"Legacy S3 source error: {e}", SourceType.S3)
     
     async def _try_nz_source(self, lat: float, lon: float) -> Optional[float]:
-        """Try NZ Open Data source using industry best practices"""
+        """Try NZ Open Data source using industry best practices with multiple file fallback"""
         if not self.use_s3 or not self.spatial_index_loader or not self.enable_nz:
             return None
             
         try:
-            dem_file = self.spatial_index_loader.find_nz_file_for_coordinate(lat, lon)
-            if dem_file:
-                logger.info(f"Found NZ DEM file: {dem_file}")
+            # Get all candidate files (handles inaccurate spatial index bounds)
+            candidate_files = self.spatial_index_loader.find_nz_files_for_coordinate(lat, lon)
+            
+            if not candidate_files:
+                logger.info(f"No NZ DEM file candidates found for ({lat}, {lon})")
+                return None
+            
+            # Try each candidate file until we find one that covers the coordinates
+            for i, dem_file in enumerate(candidate_files):
+                logger.info(f"Trying NZ DEM file {i+1}/{len(candidate_files)}: {dem_file}")
                 
                 # Apply industry best practices for public S3 access
                 elevation = await self._extract_elevation_from_s3_file(dem_file, lat, lon, use_credentials=False)
                 if elevation is not None:
+                    logger.info(f"Successfully extracted elevation {elevation}m from NZ file {i+1}/{len(candidate_files)}")
                     return elevation
                 else:
-                    # No mock elevation - let the fallback chain handle it
-                    logger.info(f"NZ DEM file does not cover coordinates ({lat}, {lon}) - returning None for fallback")
-                    return None
+                    logger.info(f"NZ DEM file {i+1}/{len(candidate_files)} does not cover coordinates ({lat}, {lon}) - trying next candidate")
+            
+            # All candidates failed
+            logger.info(f"All {len(candidate_files)} NZ DEM file candidates failed to cover coordinates ({lat}, {lon}) - returning None for fallback")
             return None
+            
         except Exception as e:
             raise RetryableError(f"NZ S3 source error: {e}", SourceType.S3)
     
