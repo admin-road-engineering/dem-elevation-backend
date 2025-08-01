@@ -116,6 +116,12 @@ class UnifiedElevationService:
             logger.error(f"Unexpected error initializing elevation service: {e}")
             raise DEMServiceError(f"Failed to initialize elevation service: {e}") from e
     
+    def _is_new_zealand_coordinate(self, lat: float, lon: float) -> bool:
+        """Check if coordinates are within New Zealand geographic bounds"""
+        # New Zealand bounds: approximately -47.3 to -34.4 latitude, 166.4 to 178.6 longitude
+        # Include some buffer for offshore islands
+        return (-47.5 <= lat <= -34.0) and (166.0 <= lon <= 179.0)
+    
     def _create_enhanced_selector(self, dem_sources: Dict[str, Any], use_s3: bool, use_apis: bool) -> EnhancedSourceSelector:
         """
         Factory method for creating EnhancedSourceSelector instances.
@@ -273,6 +279,11 @@ class UnifiedElevationService:
                                         source_id: Optional[str]) -> ElevationResult:
         """Handle elevation queries using index-driven source selector with spatial indexing"""
         try:
+            # Check if coordinates are in New Zealand - delegate to EnhancedSourceSelector for NZ queries
+            if not source_id and self._is_new_zealand_coordinate(lat, lon) and hasattr(self, '_enhanced_selector'):
+                logger.info(f"NZ coordinates detected ({lat}, {lon}) - delegating to EnhancedSourceSelector")
+                return await self._get_elevation_enhanced(lat, lon, source_id)
+            
             # Use spatial indexing for fast source selection
             if source_id:
                 # Specific source requested
