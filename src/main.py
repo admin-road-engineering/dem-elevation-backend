@@ -157,7 +157,7 @@ async def lifespan(app: FastAPI):
         # Create SourceProvider with static configuration
         source_config = SourceProviderConfig(
             s3_bucket_name=os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data'),
-            campaign_index_key='indexes/phase3_campaign_populated_index.json',
+            campaign_index_key='indexes/grouped_spatial_index.json',
             nz_index_key='indexes/nz_spatial_index.json',
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
