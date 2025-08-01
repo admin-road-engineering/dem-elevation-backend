@@ -212,7 +212,7 @@ async def lifespan(app: FastAPI):
         logger.info("Pre-initializing EnhancedSourceSelector during lifespan startup...")
         try:
             from .enhanced_source_selector import EnhancedSourceSelector
-            from .gpxz_service import GPXZConfig
+            from .gpxz_client import GPXZConfig
             
             # Prepare configurations for external services
             gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
