@@ -416,16 +416,31 @@ class UnifiedElevationService:
     
     def get_available_sources(self) -> List[Dict[str, Any]]:
         """Get list of available DEM sources"""
-        # Always use the source selector's sources (which includes SourceProvider data)
-        return list(self.source_selector.dem_sources.values())
+        # Use the appropriate attribute based on selector type
+        if hasattr(self.source_selector, 'dem_sources'):
+            return list(self.source_selector.dem_sources.values())
+        elif hasattr(self.source_selector, 'index_sources'):
+            return list(self.source_selector.index_sources.values())
+        else:
+            return []
     
     def get_source_keys(self) -> List[str]:
         """Get list of available DEM source keys"""
-        return list(self.source_selector.dem_sources.keys())
+        if hasattr(self.source_selector, 'dem_sources'):
+            return list(self.source_selector.dem_sources.keys())
+        elif hasattr(self.source_selector, 'index_sources'):
+            return list(self.source_selector.index_sources.keys())
+        else:
+            return []
     
     def get_source_count(self) -> int:
         """Get count of available DEM sources"""
-        return len(self.source_selector.dem_sources)
+        if hasattr(self.source_selector, 'dem_sources'):
+            return len(self.source_selector.dem_sources)
+        elif hasattr(self.source_selector, 'index_sources'):
+            return len(self.source_selector.index_sources)
+        else:
+            return 0
     
     def get_coverage_summary(self) -> Dict[str, Any]:
         """Get coverage summary for all sources""" 
