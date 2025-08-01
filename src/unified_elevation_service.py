@@ -416,10 +416,16 @@ class UnifiedElevationService:
     
     def get_available_sources(self) -> List[Dict[str, Any]]:
         """Get list of available DEM sources"""
-        if self.using_enhanced_selector:
-            return list(self.settings.DEM_SOURCES.values())
-        else:
-            return list(self.source_selector.dem_sources.values())
+        # Always use the source selector's sources (which includes SourceProvider data)
+        return list(self.source_selector.dem_sources.values())
+    
+    def get_source_keys(self) -> List[str]:
+        """Get list of available DEM source keys"""
+        return list(self.source_selector.dem_sources.keys())
+    
+    def get_source_count(self) -> int:
+        """Get count of available DEM sources"""
+        return len(self.source_selector.dem_sources)
     
     def get_coverage_summary(self) -> Dict[str, Any]:
         """Get coverage summary for all sources""" 

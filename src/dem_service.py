@@ -376,10 +376,11 @@ class DEMService:
 
     def get_coverage_summary(self) -> Dict[str, Any]:
         """Get coverage summary for configured DEM sources."""
+        # Use elevation service sources (includes SourceProvider data) instead of settings
         return {
-            "total_sources": len(self.settings.DEM_SOURCES),
+            "total_sources": self.elevation_service.get_source_count(),
             "default_source": self.default_dem_id,
-            "configured_sources": list(self.settings.DEM_SOURCES.keys()),
+            "configured_sources": self.elevation_service.get_source_keys(),
             "selector_type": "unified_elevation_service"
         }
 
