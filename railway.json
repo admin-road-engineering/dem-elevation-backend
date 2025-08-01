@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python start_railway.py",
+    "startCommand": "uvicorn src.main:app --host 0.0.0.0 --port 8001",
     "healthcheckPath": "/api/v1/health",
     "healthcheckTimeout": 240,
     "healthcheckInterval": 45,
