@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "uvicorn src.main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "sh -c 'uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8001}'",
     "healthcheckPath": "/api/v1/health",
     "healthcheckTimeout": 240,
     "healthcheckInterval": 45,
@@ -24,7 +24,8 @@
         "CPL_VSIL_CURL_CACHE_SIZE": "300000000",
         "AWS_DEFAULT_REGION": "ap-southeast-2",
         "USE_S3_SOURCES": "true",
-        "USE_API_SOURCES": "true"
+        "USE_API_SOURCES": "true",
+        "PORT": "8001"
       }
     }
   }
