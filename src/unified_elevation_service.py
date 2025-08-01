@@ -282,7 +282,24 @@ class UnifiedElevationService:
             # Check if coordinates are in New Zealand - delegate to EnhancedSourceSelector for NZ queries
             if not source_id and self._is_new_zealand_coordinate(lat, lon) and hasattr(self, '_enhanced_selector'):
                 logger.info(f"NZ coordinates detected ({lat}, {lon}) - delegating to EnhancedSourceSelector")
-                return await self._get_elevation_enhanced(lat, lon, source_id)
+                # Call EnhancedSourceSelector directly for NZ coordinates
+                result = await self._enhanced_selector.get_elevation_with_resilience(lat, lon)
+                
+                # Convert to ElevationResult format
+                return ElevationResult(
+                    elevation_m=result.get('elevation_m'),
+                    dem_source_used=result.get('source', 'nz_s3'),
+                    message=f"NZ delegation: {result.get('source', 'nz_s3')} - {result.get('message', '')}",
+                    metadata={
+                        'selection_method': 'nz_coordinate_delegation',
+                        'delegated_to': 'enhanced_selector',
+                        **(result.get('metadata', {}))
+                    },
+                    resolution=result.get('resolution'),
+                    grid_resolution_m=result.get('grid_resolution_m'),
+                    data_type=result.get('data_type'),
+                    accuracy=result.get('accuracy')
+                )
             
             # Use spatial indexing for fast source selection
             if source_id:
