@@ -222,6 +222,7 @@ class EnhancedSourceSelector:
         self.aws_credentials = aws_credentials
         self.gpxz_client = None
         self.google_client = None
+        self._nz_loading_pending = False
         
         # Initialize Redis state management
         self.redis_manager = redis_manager if redis_manager else RedisStateManager()
@@ -241,9 +242,16 @@ class EnhancedSourceSelector:
         # Schedule async NZ spatial index loading if S3 is enabled, NZ is enabled, and UnifiedIndexLoader is available
         if self.spatial_index_loader and unified_loader and enable_nz:
             logger.info("Scheduling async NZ spatial index loading (NZ sources enabled)...")
-            # Don't block initialization - load asynchronously in background
+            # Don't block initialization - schedule for later execution when event loop is available
             import asyncio
-            asyncio.create_task(self._load_nz_index_async())
+            try:
+                # Check if there's a running event loop
+                loop = asyncio.get_running_loop()
+                asyncio.create_task(self._load_nz_index_async())
+            except RuntimeError:
+                # No event loop running - store the task to run later
+                logger.info("No event loop available during init - NZ index will be loaded when first accessed")
+                self._nz_loading_pending = True
         elif not enable_nz:
             logger.info("NZ spatial index loading skipped (NZ sources disabled)")
         
@@ -400,6 +408,16 @@ class EnhancedSourceSelector:
     async def get_elevation_with_resilience(self, lat: float, lon: float) -> Dict[str, Any]:
         """Get elevation with comprehensive error handling and campaign intelligence"""
         logger.info(f"=== Starting elevation query for ({lat}, {lon}) ===")
+        
+        # Handle deferred NZ index loading if pending
+        if self._nz_loading_pending:
+            logger.info("Loading NZ spatial index (deferred from initialization)...")
+            try:
+                await self._load_nz_index_async()
+                self._nz_loading_pending = False
+            except Exception as e:
+                logger.warning(f"Failed to load NZ index on first access: {e}")
+        
         self.attempted_sources = []
         last_error = None
         
