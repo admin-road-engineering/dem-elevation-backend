@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-07-18T23:38:40.470923",
+  "generated_at": "2025-08-02T00:15:56.429803",
   "bucket": "nz-elevation",
   "coordinate_system": "NZGD2000 / New Zealand Transverse Mercator 2000 (EPSG:2193)",
   "regions": {
@@ -26283,8 +26283,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 53.84,
-              "last_modified": "2024-12-17T01:07:42+00:00",
+              "size_mb": 54.27,
+              "last_modified": "2025-07-31T10:37:49+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26299,8 +26299,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 33.6,
-              "last_modified": "2024-12-17T01:07:43+00:00",
+              "size_mb": 54.33,
+              "last_modified": "2025-07-31T10:37:49+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26571,8 +26571,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 53.16,
-              "last_modified": "2024-12-17T01:07:52+00:00",
+              "size_mb": 58.02,
+              "last_modified": "2025-07-31T10:37:51+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26587,8 +26587,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 37.43,
-              "last_modified": "2025-02-25T02:38:48+00:00",
+              "size_mb": 63.59,
+              "last_modified": "2025-07-31T10:37:51+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26603,8 +26603,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 35.53,
-              "last_modified": "2025-02-25T02:38:48+00:00",
+              "size_mb": 61.07,
+              "last_modified": "2025-07-31T10:37:52+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26619,8 +26619,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 39.5,
-              "last_modified": "2025-02-25T02:38:48+00:00",
+              "size_mb": 65.56,
+              "last_modified": "2025-07-31T10:37:51+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26635,8 +26635,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 9.33,
-              "last_modified": "2024-12-17T01:07:52+00:00",
+              "size_mb": 62.24,
+              "last_modified": "2025-07-31T10:37:52+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26651,8 +26651,56 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 2.58,
-              "last_modified": "2024-12-17T01:07:52+00:00",
+              "size_mb": 65.12,
+              "last_modified": "2025-07-31T10:37:52+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BV18_10000_0503.tiff",
+              "filename": "BV18_10000_0503.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.0,
+                "max_lon": 173.0
+              },
+              "size_mb": 65.6,
+              "last_modified": "2025-07-31T10:37:52+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BV18_10000_0504.tiff",
+              "filename": "BV18_10000_0504.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.0,
+                "max_lon": 173.0
+              },
+              "size_mb": 64.62,
+              "last_modified": "2025-07-31T10:37:54+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BV18_10000_0505.tiff",
+              "filename": "BV18_10000_0505.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.0,
+                "max_lon": 173.0
+              },
+              "size_mb": 62.85,
+              "last_modified": "2025-07-31T10:37:55+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26907,8 +26955,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 38.93,
-              "last_modified": "2025-02-25T02:38:53+00:00",
+              "size_mb": 64.89,
+              "last_modified": "2025-07-31T10:37:57+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26923,8 +26971,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 38.99,
-              "last_modified": "2025-02-25T02:38:54+00:00",
+              "size_mb": 64.71,
+              "last_modified": "2025-07-31T10:37:57+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26939,8 +26987,8 @@
                 "min_lon": 172.0,
                 "max_lon": 173.0
               },
-              "size_mb": 33.72,
-              "last_modified": "2025-02-25T02:38:54+00:00",
+              "size_mb": 51.8,
+              "last_modified": "2025-07-31T10:37:57+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -26957,6 +27005,54 @@
               },
               "size_mb": 2.64,
               "last_modified": "2025-02-25T02:38:54+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BV19_10000_0501.tiff",
+              "filename": "BV19_10000_0501.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.0,
+                "max_lon": 173.0
+              },
+              "size_mb": 57.7,
+              "last_modified": "2025-07-31T10:37:58+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BV19_10000_0502.tiff",
+              "filename": "BV19_10000_0502.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.0,
+                "max_lon": 173.0
+              },
+              "size_mb": 41.61,
+              "last_modified": "2025-07-31T10:37:58+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BV19_10000_0503.tiff",
+              "filename": "BV19_10000_0503.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.0,
+                "max_lon": 173.0
+              },
+              "size_mb": 13.11,
+              "last_modified": "2025-07-31T10:37:58+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27483,8 +27579,8 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 33.13,
-              "last_modified": "2024-12-17T01:07:59+00:00",
+              "size_mb": 46.62,
+              "last_modified": "2025-07-31T10:37:49+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27707,8 +27803,8 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 30.28,
-              "last_modified": "2024-12-17T01:08:07+00:00",
+              "size_mb": 41.54,
+              "last_modified": "2025-07-31T10:37:50+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27723,8 +27819,8 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 12.24,
-              "last_modified": "2024-12-17T01:08:08+00:00",
+              "size_mb": 60.48,
+              "last_modified": "2025-07-31T10:37:50+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27755,8 +27851,8 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 46.96,
-              "last_modified": "2024-12-17T01:08:09+00:00",
+              "size_mb": 59.15,
+              "last_modified": "2025-07-31T10:37:50+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27771,8 +27867,40 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 13.84,
-              "last_modified": "2024-12-17T01:08:09+00:00",
+              "size_mb": 61.15,
+              "last_modified": "2025-07-31T10:37:50+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW16_10000_0404.tiff",
+              "filename": "BW16_10000_0404.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 61.45,
+              "last_modified": "2025-07-31T10:37:51+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW16_10000_0405.tiff",
+              "filename": "BW16_10000_0405.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 61.69,
+              "last_modified": "2025-07-31T10:37:51+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27787,8 +27915,72 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 13.55,
-              "last_modified": "2024-12-17T01:08:10+00:00",
+              "size_mb": 59.41,
+              "last_modified": "2025-07-31T10:37:54+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW16_10000_0502.tiff",
+              "filename": "BW16_10000_0502.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 66.17,
+              "last_modified": "2025-07-31T10:37:52+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW16_10000_0503.tiff",
+              "filename": "BW16_10000_0503.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 65.29,
+              "last_modified": "2025-07-31T10:37:53+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW16_10000_0504.tiff",
+              "filename": "BW16_10000_0504.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.55,
+              "last_modified": "2025-07-31T10:37:54+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW16_10000_0505.tiff",
+              "filename": "BW16_10000_0505.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 62.07,
+              "last_modified": "2025-07-31T10:37:55+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27835,8 +28027,8 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 34.04,
-              "last_modified": "2024-12-17T01:08:10+00:00",
+              "size_mb": 50.87,
+              "last_modified": "2025-07-31T10:37:56+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27851,8 +28043,24 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 11.83,
-              "last_modified": "2024-12-17T01:07:29+00:00",
+              "size_mb": 63.18,
+              "last_modified": "2025-07-31T10:37:57+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0105.tiff",
+              "filename": "BW17_10000_0105.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 63.02,
+              "last_modified": "2025-07-31T10:37:57+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27867,8 +28075,8 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 36.68,
-              "last_modified": "2024-12-17T01:07:29+00:00",
+              "size_mb": 52.37,
+              "last_modified": "2025-07-31T10:37:58+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
@@ -27883,15 +28091,527 @@
                 "min_lon": 172.5,
                 "max_lon": 173.5
               },
-              "size_mb": 12.0,
-              "last_modified": "2024-12-17T01:07:29+00:00",
+              "size_mb": 63.56,
+              "last_modified": "2025-07-31T10:37:58+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0203.tiff",
+              "filename": "BW17_10000_0203.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 60.65,
+              "last_modified": "2025-07-31T10:37:58+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0204.tiff",
+              "filename": "BW17_10000_0204.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 63.94,
+              "last_modified": "2025-07-31T10:37:59+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0205.tiff",
+              "filename": "BW17_10000_0205.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.1,
+              "last_modified": "2025-07-31T10:37:59+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0301.tiff",
+              "filename": "BW17_10000_0301.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 65.92,
+              "last_modified": "2025-07-31T10:38:00+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0302.tiff",
+              "filename": "BW17_10000_0302.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 65.12,
+              "last_modified": "2025-07-31T10:38:01+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0303.tiff",
+              "filename": "BW17_10000_0303.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 65.65,
+              "last_modified": "2025-07-31T10:38:02+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0304.tiff",
+              "filename": "BW17_10000_0304.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.58,
+              "last_modified": "2025-07-31T10:38:02+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0305.tiff",
+              "filename": "BW17_10000_0305.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.02,
+              "last_modified": "2025-07-31T10:38:03+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0401.tiff",
+              "filename": "BW17_10000_0401.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 63.61,
+              "last_modified": "2025-07-31T10:38:03+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0402.tiff",
+              "filename": "BW17_10000_0402.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.84,
+              "last_modified": "2025-07-31T10:38:04+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0403.tiff",
+              "filename": "BW17_10000_0403.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 63.84,
+              "last_modified": "2025-07-31T10:38:05+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0404.tiff",
+              "filename": "BW17_10000_0404.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 58.02,
+              "last_modified": "2025-07-31T10:38:05+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0405.tiff",
+              "filename": "BW17_10000_0405.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 26.51,
+              "last_modified": "2025-07-31T10:38:06+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0501.tiff",
+              "filename": "BW17_10000_0501.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 63.98,
+              "last_modified": "2025-07-31T10:38:06+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0502.tiff",
+              "filename": "BW17_10000_0502.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.87,
+              "last_modified": "2025-07-31T10:38:07+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0503.tiff",
+              "filename": "BW17_10000_0503.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 54.17,
+              "last_modified": "2025-07-31T10:38:08+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW17_10000_0504.tiff",
+              "filename": "BW17_10000_0504.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 2.01,
+              "last_modified": "2025-07-31T10:38:08+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0101.tiff",
+              "filename": "BW18_10000_0101.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 65.2,
+              "last_modified": "2025-07-31T10:38:08+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0102.tiff",
+              "filename": "BW18_10000_0102.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.38,
+              "last_modified": "2025-07-31T10:38:09+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0103.tiff",
+              "filename": "BW18_10000_0103.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 65.18,
+              "last_modified": "2025-07-31T10:38:09+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0104.tiff",
+              "filename": "BW18_10000_0104.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 63.68,
+              "last_modified": "2025-07-31T10:38:09+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0105.tiff",
+              "filename": "BW18_10000_0105.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 42.1,
+              "last_modified": "2025-07-31T10:38:10+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0201.tiff",
+              "filename": "BW18_10000_0201.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.93,
+              "last_modified": "2025-07-31T10:38:10+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0202.tiff",
+              "filename": "BW18_10000_0202.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 64.31,
+              "last_modified": "2025-07-31T10:38:11+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0203.tiff",
+              "filename": "BW18_10000_0203.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 55.81,
+              "last_modified": "2025-07-31T10:38:12+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0204.tiff",
+              "filename": "BW18_10000_0204.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 48.04,
+              "last_modified": "2025-07-31T10:38:12+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0205.tiff",
+              "filename": "BW18_10000_0205.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 3.39,
+              "last_modified": "2025-07-31T10:38:13+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0301.tiff",
+              "filename": "BW18_10000_0301.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 63.34,
+              "last_modified": "2025-07-31T10:38:14+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0302.tiff",
+              "filename": "BW18_10000_0302.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 37.77,
+              "last_modified": "2025-07-31T10:38:14+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0303.tiff",
+              "filename": "BW18_10000_0303.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 0.75,
+              "last_modified": "2025-07-31T10:38:14+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW18_10000_0401.tiff",
+              "filename": "BW18_10000_0401.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 10.47,
+              "last_modified": "2025-07-31T10:38:14+00:00",
+              "resolution": "1m",
+              "region": "west-coast",
+              "survey": "west-coast_2020-2022",
+              "coordinate_system": "EPSG:2193"
+            },
+            {
+              "file": "s3://nz-elevation/west-coast/west-coast_2020-2022/dem_1m/2193/BW19_10000_0101.tiff",
+              "filename": "BW19_10000_0101.tiff",
+              "bounds": {
+                "min_lat": -43.5,
+                "max_lat": -43.0,
+                "min_lon": 172.5,
+                "max_lon": 173.5
+              },
+              "size_mb": 3.4,
+              "last_modified": "2025-07-31T10:38:14+00:00",
               "resolution": "1m",
               "region": "west-coast",
               "survey": "west-coast_2020-2022",
               "coordinate_system": "EPSG:2193"
             }
           ],
-          "file_count": 746,
+          "file_count": 843,
           "coverage_bounds": {
             "min_lat": -43.5,
             "max_lat": -41.0,
@@ -27900,7 +28620,7 @@
           }
         }
       },
-      "file_count": 746,
+      "file_count": 843,
       "coverage_bounds": {
         "min_lat": -43.5,
         "max_lat": -41.0,
@@ -27909,9 +28629,9 @@
       }
     }
   },
-  "file_count": 1691,
+  "file_count": 1736,
   "coverage_summary": {
-    "total_files": 1691,
+    "total_files": 1736,
     "regions": {
       "auckland": {
         "file_count": 551,
@@ -28034,7 +28754,7 @@
         }
       },
       "west-coast": {
-        "file_count": 746,
+        "file_count": 843,
         "survey_count": 1,
         "coverage_bounds": {
           "min_lat": -43.5,

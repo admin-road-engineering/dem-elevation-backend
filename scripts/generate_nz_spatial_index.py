@@ -35,7 +35,7 @@ class NZSpatialIndexGenerator:
     def generate_complete_index(self) -> Dict:
         """Generate complete spatial index from NZ elevation S3 bucket"""
         
-        logger.info("🗺️ Generating NZ elevation spatial index...")
+        logger.info("[NZ] Generating NZ elevation spatial index...")
         
         try:
             # Create S3 client for public bucket access
@@ -408,7 +408,7 @@ def main():
         else:
             print("Unknown command. Use: generate or show")
     else:
-        print("🗺️ NZ Elevation Spatial Index Generator")
+        print("[NZ] NZ Elevation Spatial Index Generator")
         print("Commands:")
         print("  generate - Generate spatial index from NZ elevation S3 bucket")
         print("  show     - Show coverage summary")
