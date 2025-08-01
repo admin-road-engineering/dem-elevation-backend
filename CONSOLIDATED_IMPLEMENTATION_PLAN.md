@@ -82,28 +82,60 @@ After comprehensive 3-round collaborative review, Gemini provided **B+ rating (G
 - **✅ Documentation Restructuring**: Focused guides (ARCHITECTURE.md, DEPLOYMENT.md, TROUBLESHOOTING.md)
 - **✅ A+ Roadmap Validated**: Comprehensive Gemini architectural review completed
 
-### **🎯 PHASE 3B.3: PATH TO "EXCEPTIONAL" (A+ RATING)** 
-*Based on Gemini's comprehensive architectural review and A+ roadmap*
+### **✅ PHASE 3B.3.1 COMPLETE: CORE ARCHITECTURAL DECOUPLING**
+*Gemini A+ Foundation Validation - "Well-Architected" Status Achieved*
 
-**Gemini Assessment**: *"Outstanding piece of engineering built on solid, production-ready foundation. Focus on hardening system for long term through decoupling, abstraction, proactive observability, and rigorous automated testing."*
+**Gemini Assessment**: *"Top-tier refactoring demonstrating deep understanding of modern software architecture principles. Project is no longer just 'well-written'—it is **well-architected**."*
 
-#### 🏗️ 3B.3.1: Core Architectural Decoupling (HIGHEST PRIORITY)
-- **DataSource Strategy Pattern**: Abstract S3Source, GPXZSource, GoogleSource with common interface
-- **Dependency Injection**: FastAPI DI with AbstractCircuitBreaker, AbstractHealthReporter protocols
-- **Configuration Objects**: Replace APP_ENV conditionals with ProdSettings/DevSettings injection
-- **Platform Abstraction**: Remove Railway-specific logic for universal portability
+#### ✅ 3B.3.1: Core Architectural Decoupling (COMPLETED)
+- **✅ DataSource Strategy Pattern**: S3Source, GPXZSource, GoogleSource with clean protocol interface
+- **✅ UnifiedElevationProvider**: Chain of Responsibility orchestration with usage statistics tracking
+- **✅ CircuitBreaker Dependency Injection**: Abstract protocol with Redis + InMemory implementations
+- **✅ Enhanced Testability**: Core logic now testable with simple mocks, no external dependencies
+- **✅ Gemini Validation**: "Strongly Approve - Perfect trajectory toward A+ Exceptional rating"
 
-#### 📊 3B.3.2: Operational Excellence (HIGH PRIORITY)  
-- **Structured Logging**: JSON output with correlation IDs for request tracing through fallback chain
-- **Metrics-Based Monitoring**: Prometheus metrics for proactive system monitoring and alerting
-- **Comprehensive Testing**: Multi-layered strategy with Testcontainers for integration tests
-- **Modern Python Tooling**: Poetry dependency management, pre-commit hooks, automated quality checks
+### **🎯 PHASE 3B.3.2: ADVANCED PATTERN REFINEMENTS**
+*Gemini Collaborative Review Validated - A+ Architecture Implementation Plan*
 
-#### 🔍 3B.3.3: Enterprise-Grade Observability (MEDIUM PRIORITY)
-- **Request Tracing**: End-to-end correlation IDs through S3→GPXZ→Google fallback chain
-- **Performance Monitoring**: Automated performance tests validating 54,000x speedup claims
-- **Circuit Breaker Metrics**: Real-time dashboards for API health and failure patterns
-- **Spatial Index Analytics**: Cache hit/miss ratios and geographic performance patterns
+**Gemini Assessment**: *"Strategic refinements to build upon this outstanding foundation. These changes will create a world-class microservice that is truly composable and maintainable."*
+
+**Status**: ✅ **GEMINI VALIDATED** - Comprehensive 3-round architectural review completed
+**Timeline**: **25-30 hours** (increased from 15h based on architectural complexity assessment)
+**Approach**: Pragmatic implementation prioritizing immediate value over pattern purity
+
+#### 🏗️ 3B.3.2: Task Group 1 - Foundation: Custom Exception Hierarchy (6 hours)
+**Priority**: HIGHEST - Foundation for all other patterns
+- **DataSourceError Hierarchy**: Base class with TimeoutError, NotFoundError, ServiceUnavailableError, ConfigurationError
+- **Error Context Enhancement**: Coordinates, source_name, correlation_id for precise telemetry
+- **FastAPI Integration**: Exception handlers for structured API error responses
+- **Comprehensive Testing**: Unit tests for all exception types and error flow validation
+
+#### 🏗️ 3B.3.2: Task Group 2 - Core Patterns: Composite + Decorator (10 hours)  
+**Priority**: HIGH - Core structural improvements (implemented together)
+- **Composite Pattern**: FallbackDataSource treating fallback chain as first-class DataSource citizen
+- **Decorator Pattern**: CircuitBreakerWrappedDataSource for ultimate decoupling of resilience policies
+- **Pattern Integration**: Design composite + decorator assembly for maximum flexibility
+- **Performance Preservation**: Maintain 54,000x Brisbane speedup through all changes
+
+#### 🏗️ 3B.3.2: Task Group 3 - Lifecycle & Configuration (6 hours)
+**Priority**: MEDIUM - Infrastructure modernization  
+- **FastAPI Lifespan Management**: Replace AsyncSingleton with idiomatic app.state pattern
+- **Environment-Specific Settings**: BaseAppSettings → ProdAppSettings/DevAppSettings factory pattern
+- **DI Strategy Decision**: Evaluate factory-based approach vs full container (pragmatic choice)
+- **Resource Migration**: Move all AsyncSingleton resources to lifespan context managers
+
+#### 🏗️ 3B.3.2: Task Group 4 - Integration & Testing (6 hours)
+**Priority**: CRITICAL - Validation and documentation
+- **UnifiedElevationProvider Refactor**: Use FallbackDataSource as primary implementation
+- **Comprehensive Testing**: Unit, integration, and performance validation tests
+- **Documentation Updates**: Architecture patterns explanation in docs/ARCHITECTURE.md
+- **Performance Benchmarks**: Automated validation of 54,000x speedup preservation
+
+#### 📊 3B.3.3: Operational Excellence (FUTURE PHASE)
+**Status**: Deferred pending 3B.3.2 completion
+- **Comprehensive Testing**: Unit → Integration (Testcontainers) → E2E testing pyramid
+- **Metrics-Based Monitoring**: Prometheus metrics leveraging new architecture for detailed observability
+- **Modern Python Tooling**: Poetry dependency management, pre-commit hooks, automated quality
 
 ### **✅ PHASE 2B: CRITICAL ASYNC FIXES COMPLETE** 
 *Production-blocking async issues resolved with Gemini approval*

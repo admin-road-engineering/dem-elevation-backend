@@ -154,11 +154,12 @@ async def lifespan(app: FastAPI):
         settings = get_settings()
         validate_environment_configuration(settings)
         
-        # Create SourceProvider with static configuration
+        # Create SourceProvider with dependency-injected configuration
+        # Phase 3B.3.2: S3 index paths injected from settings
         source_config = SourceProviderConfig(
             s3_bucket_name=os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data'),
-            campaign_index_key='indexes/grouped_spatial_index.json',
-            nz_index_key='indexes/nz_spatial_index.json',
+            campaign_index_key=getattr(settings, 'S3_CAMPAIGN_INDEX_PATH', 'indexes/spatial_index.json'),
+            nz_index_key=getattr(settings, 'S3_NZ_INDEX_PATH', 'indexes/nz_spatial_index.json'),
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             aws_region=settings.AWS_DEFAULT_REGION,
@@ -172,11 +173,36 @@ async def lifespan(app: FastAPI):
         
         # Load all data asynchronously - BLOCKS startup until complete
         logger.info("Loading all data sources asynchronously...")
-        load_success = await provider.load_all_sources()
+        try:
+            load_success = await provider.load_all_sources()
+        except Exception as e:
+            # Phase 3B.3.2: Implement fail-fast production behavior
+            from .exceptions import S3IndexNotFoundError, S3AccessError
+            
+            if isinstance(e, S3IndexNotFoundError):
+                critical_msg = (
+                    f"CRITICAL: S3 DataSource failed to initialize: "
+                    f"Index '{e.index_path}' not found in bucket '{e.bucket}'. "
+                    f"Service degrading to API-only mode."
+                )
+                logger.critical(critical_msg)
+                
+                # Fail-fast in production for configuration errors
+                if settings.APP_ENV == "production":
+                    logger.critical("Production environment cannot start with missing S3 index. Exiting.")
+                    raise SystemExit(1)
+                else:
+                    logger.warning("Development environment - continuing with API fallback")
+                    load_success = False
+            else:
+                # Re-raise other exceptions
+                raise e
         
-        if not load_success:
-            logger.error(f"Failed to load critical data sources: {provider.get_load_errors()}")
-            raise RuntimeError("Critical data loading failed - cannot start service")
+        if not load_success and settings.APP_ENV == "production":
+            logger.critical(f"Production service cannot start without critical data sources: {provider.get_load_errors()}")
+            raise SystemExit(1)
+        elif not load_success:
+            logger.warning(f"Development service starting in degraded mode: {provider.get_load_errors()}")
         
         # Get loaded sources for service container
         dem_sources = provider.get_dem_sources()

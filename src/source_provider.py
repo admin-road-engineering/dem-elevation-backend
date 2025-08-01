@@ -6,6 +6,11 @@ Implements Gemini's approved SourceProvider pattern to resolve critical startup 
 - Uses aioboto3 for true async S3 operations  
 - Provides coordinated loading with asyncio.Event
 - Enables production-ready non-blocking startup (<500ms target)
+
+Phase 3B.3.2: Enhanced with dependency injection and custom exception hierarchy
+- S3 index paths injected via configuration (not hardcoded)
+- Structured exception handling with S3IndexNotFoundError
+- Fail-fast production behavior for configuration errors
 """
 
 import asyncio
@@ -17,11 +22,17 @@ from dataclasses import dataclass
 import aioboto3
 import aiofiles
 
+from .exceptions import S3IndexNotFoundError, S3AccessError, DataSourceError
+
 logger = logging.getLogger(__name__)
 
 @dataclass
 class SourceProviderConfig:
-    """Configuration for SourceProvider - static config only, no I/O"""
+    """Configuration for SourceProvider - static config only, no I/O
+    
+    Phase 3B.3.2: Enhanced with dependency injection support.
+    Index paths are injected from settings rather than hardcoded.
+    """
     s3_bucket_name: str
     campaign_index_key: str
     nz_index_key: str
@@ -100,15 +111,30 @@ class SourceProvider:
             # Execute all loading tasks concurrently
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
-            # Process results
+            # Process results with structured exception handling
             campaign_success = False
             nz_success = True  # Default true if not needed
             
             for i, result in enumerate(results):
-                if isinstance(result, Exception):
+                if isinstance(result, S3IndexNotFoundError):
+                    # Phase 3B.3.2: Handle specific S3 index errors
+                    self._load_errors.append(f"S3 Index not found: {result.index_path} in bucket {result.bucket}")
+                    logger.error(f"S3 Index missing: {result.index_path} in bucket {result.bucket}")
+                    if i == 0:  # Campaign index failure
+                        campaign_success = False
+                elif isinstance(result, (S3AccessError, DataSourceError)):
+                    # Handle other structured exceptions
+                    self._load_errors.append(f"Task {i} failed: {result.message}")
+                    logger.error(f"Loading task {i} failed: {result.message}")
+                    if i == 0:  # Campaign index failure
+                        campaign_success = False
+                elif isinstance(result, Exception):
+                    # Handle unexpected exceptions
                     self._load_errors.append(f"Task {i} failed: {result}")
                     logger.error(f"Loading task {i} failed: {result}")
-                elif i == 0:  # Campaign index
+                    if i == 0:  # Campaign index failure
+                        campaign_success = False
+                elif i == 0:  # Campaign index success
                     campaign_success = result
                 elif i == 1:  # NZ index (optional)
                     nz_success = result
@@ -142,7 +168,10 @@ class SourceProvider:
         return self._load_success
     
     async def _load_campaign_index(self, session: aioboto3.Session) -> bool:
-        """Load campaign spatial index from S3 using aioboto3"""
+        """Load campaign spatial index from S3 using aioboto3
+        
+        Phase 3B.3.2: Enhanced with structured exception handling
+        """
         try:
             logger.info(f"Loading campaign index: s3://{self.config.s3_bucket_name}/{self.config.campaign_index_key}")
             
@@ -162,9 +191,28 @@ class SourceProvider:
                 return True
         
         except Exception as e:
-            logger.error(f"Failed to load campaign index: {e}")
-            self.campaign_index = {}
-            return False
+            # Phase 3B.3.2: Use structured exception hierarchy
+            if 'NoSuchKey' in str(e):
+                # Raise specific exception for missing S3 index
+                raise S3IndexNotFoundError(
+                    index_path=self.config.campaign_index_key,
+                    bucket=self.config.s3_bucket_name,
+                    source_id="campaign_index"
+                )
+            elif 'AccessDenied' in str(e) or 'Forbidden' in str(e):
+                # Raise specific exception for access issues
+                raise S3AccessError(
+                    bucket=self.config.s3_bucket_name,
+                    operation="get_object",
+                    source_id="campaign_index"
+                )
+            else:
+                # Wrap other errors in generic DataSourceError
+                raise DataSourceError(
+                    message=f"Failed to load campaign index: {e}",
+                    source_type="s3",
+                    source_id="campaign_index"
+                )
     
     async def _load_nz_index(self, session: aioboto3.Session) -> bool:
         """Load NZ spatial index from S3 using aioboto3"""
@@ -195,9 +243,10 @@ class SourceProvider:
         """Build unified DEM_SOURCES dict from loaded indexes"""
         self.dem_sources = {}
         
-        # Add campaign sources
+        # Add campaign sources - handle both 'campaigns' and 'datasets' keys
         if self.campaign_index:
-            campaigns = self.campaign_index.get('campaigns', {})
+            # Phase 3B.3.2: Support multiple index formats
+            campaigns = self.campaign_index.get('campaigns', self.campaign_index.get('datasets', {}))
             for campaign_id, campaign_data in campaigns.items():
                 self.dem_sources[campaign_id] = {
                     'source_type': 's3',

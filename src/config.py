@@ -278,6 +278,16 @@ class Settings(BaseSettings):
         description="Source for spatial indexes: local (filesystem), s3 (S3 bucket)"
     )
     
+    # S3 Index Configuration (Phase 3B.3.2: Dependency Injection Support)
+    S3_CAMPAIGN_INDEX_PATH: str = Field(
+        default="indexes/campaign_index.json",
+        description="S3 path to campaign spatial index file"
+    )
+    S3_NZ_INDEX_PATH: str = Field(
+        default="indexes/nz_spatial_index.json", 
+        description="S3 path to New Zealand spatial index file"
+    )
+    
     # Geodatabase-specific settings
     GDB_AUTO_DISCOVER: bool = Field(default=True, description="Automatically discover raster layers in geodatabases")
     GDB_PREFERRED_DRIVERS: list = Field(default=["OpenFileGDB", "FileGDB"], description="Preferred drivers for geodatabase access")
