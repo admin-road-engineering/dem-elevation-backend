@@ -196,13 +196,13 @@ async def get_source_info(
         logger.error(f"Unexpected error getting source info for {source_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.post("/point", response_model=PointResponse)
+@router.post("/point", response_model=EnhancedPointResponse)
 @limiter.limit("60/minute")  # Generous for S3, restrictive for API abuse
 async def get_elevation_point(
     request: Request,
     point_request: PointRequest,
     service: DEMService = Depends(get_dem_service)
-) -> PointResponse:
+) -> EnhancedPointResponse:
     """Get elevation for a single point using the unified elevation service."""
     try:
         # Check for API fallback abuse (more restrictive rate limiting)
@@ -237,12 +237,16 @@ async def get_elevation_point(
             point_request.dem_source_id
         )
         
-        # Create standard response (temporarily reverted to test core service)
-        return PointResponse(
+        # Create enhanced response with structured metadata
+        return EnhancedPointResponse(
             latitude=point_request.latitude,
             longitude=point_request.longitude,
-            elevation_m=result.elevation_m,
+            elevation=result.elevation_m,  # Note: EnhancedPointResponse uses 'elevation', not 'elevation_m'
             dem_source_used=result.dem_source_used,
+            resolution=result.resolution,
+            grid_resolution_m=result.grid_resolution_m,
+            data_type=result.data_type,
+            accuracy=result.accuracy,
             message=result.message
         )
         
