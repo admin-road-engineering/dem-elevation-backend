@@ -208,10 +208,6 @@ async def lifespan(app: FastAPI):
         dem_sources = provider.get_dem_sources()
         logger.info(f"Data loading completed: {len(dem_sources)} sources available")
         
-        # Create S3ClientFactory for legacy compatibility
-        s3_factory = create_s3_client_factory()
-        app.state.s3_factory = s3_factory
-        
         # Pre-initialize EnhancedSourceSelector during startup to avoid async event loop conflicts
         logger.info("Pre-initializing EnhancedSourceSelector during lifespan startup...")
         try:
@@ -254,6 +250,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Failed to pre-initialize EnhancedSourceSelector (will fall back to lazy loading): {e}")
             app.state.enhanced_selector = None
+
+        # Create S3ClientFactory for legacy compatibility
+        s3_factory = create_s3_client_factory()
+        app.state.s3_factory = s3_factory
 
         # Initialize service container with loaded data and pre-initialized enhanced selector
         service_container = init_service_container(
