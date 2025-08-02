@@ -183,24 +183,34 @@ class SpatialIndexLoader:
             
         candidates = []
         
-        # Search through all regions and surveys (NZ index structure: regions -> surveys -> files)
-        for region_name, region_data in index.get("regions", {}).items():
-            # Check if region has surveys (new structure) or files directly (old structure)
-            if "surveys" in region_data:
-                # New structure: regions -> surveys -> files
-                for survey_name, survey_data in region_data.get("surveys", {}).items():
-                    for file_info in survey_data.get("files", []):
-                        bounds = file_info.get("bounds", {})
-                        if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
-                            bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
-                            candidates.append(file_info.get("file"))
-            else:
-                # Old structure: regions -> files (fallback)
-                for file_info in region_data.get("files", []):
+        # Support both campaign structure (Phase 1) and legacy regions structure
+        if "campaigns" in index:
+            # Phase 1: Campaign-based structure (campaigns -> files)
+            for campaign_name, campaign_data in index.get("campaigns", {}).items():
+                for file_info in campaign_data.get("files", []):
                     bounds = file_info.get("bounds", {})
                     if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
                         bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
                         candidates.append(file_info.get("file"))
+        else:
+            # Legacy: Search through all regions and surveys (regions -> surveys -> files)
+            for region_name, region_data in index.get("regions", {}).items():
+                # Check if region has surveys (new structure) or files directly (old structure)
+                if "surveys" in region_data:
+                    # New structure: regions -> surveys -> files
+                    for survey_name, survey_data in region_data.get("surveys", {}).items():
+                        for file_info in survey_data.get("files", []):
+                            bounds = file_info.get("bounds", {})
+                            if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
+                                bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
+                                candidates.append(file_info.get("file"))
+                else:
+                    # Old structure: regions -> files (fallback)
+                    for file_info in region_data.get("files", []):
+                        bounds = file_info.get("bounds", {})
+                        if (bounds.get("min_lat", 0) <= lat <= bounds.get("max_lat", 0) and
+                            bounds.get("min_lon", 0) <= lon <= bounds.get("max_lon", 0)):
+                            candidates.append(file_info.get("file"))
         
         logger.info(f"Found {len(candidates)} NZ DEM file candidates for ({lat}, {lon})")
         return candidates
@@ -338,8 +348,13 @@ class EnhancedSourceSelector:
             nz_index = await asyncio.to_thread(self.spatial_index_loader.load_nz_index)
             
             if nz_index:
-                nz_regions = len(nz_index.get('regions', {}))
-                logger.info(f"NZ spatial index loaded asynchronously with {nz_regions} regions")
+                # Support both campaign structure (Phase 1) and legacy regions
+                if "campaigns" in nz_index:
+                    nz_count = len(nz_index.get('campaigns', {}))
+                    logger.info(f"NZ spatial index loaded asynchronously with {nz_count} campaigns")
+                else:
+                    nz_regions = len(nz_index.get('regions', {}))
+                    logger.info(f"NZ spatial index loaded asynchronously with {nz_regions} regions")
             else:
                 logger.warning("NZ spatial index async loading returned None")
                 
