@@ -267,6 +267,16 @@ class Settings(BaseSettings):
         description="Application environment: production (Railway), development (Docker Compose)"
     )
     
+    # Phase 2: Unified Architecture Feature Flags
+    USE_UNIFIED_SPATIAL_INDEX: bool = Field(
+        default=False,
+        description="Enable unified v2.0 spatial index (AU+NZ combined with discriminated unions)"
+    )
+    UNIFIED_INDEX_PATH: str = Field(
+        default="indexes/unified_spatial_index_v2.json",
+        description="S3 path for unified spatial index"
+    )
+    
     # Multi-source environment settings (Phase 3B.2: Enhanced with better field types)
     USE_S3_SOURCES: bool = Field(default=False, description="Enable S3-based DEM sources")
     USE_API_SOURCES: bool = Field(default=False, description="Enable external API sources")

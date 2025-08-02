@@ -189,3 +189,4 @@ src/api/v1/dataset_endpoints_simple.py
 
 # S3 Index Loader is now required for production
 DEM_BACKEND_DEVELOPMENT_REVIEW_PLAN.md
+config/unified_spatial_index_v2.json
