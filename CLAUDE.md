@@ -74,33 +74,67 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 - ✅ **Enhanced Monitoring**: Detailed status tracking, admin reset, multi-service support
 
 ### Phase 3B.4: New Zealand S3 Integration (COMPLETED ✅)
-**Achievement**: *"Complete bi-national elevation coverage with unified S3 performance architecture"*
+**Achievement**: *"Complete bi-national elevation coverage with campaign-based unified architecture"*
 
-#### ✅ NZ S3 Sources Implementation (COMPLETED)
-- ✅ **NZ Spatial Index Generated**: 16 regions, 1.08MB comprehensive index covering Auckland, Wellington, Canterbury
-- ✅ **S3 Integration**: Uploaded to `s3://road-engineering-elevation-data/indexes/nz_spatial_index.json`
+#### ✅ NZ Campaign-Based Structure Implementation (COMPLETED)
+- ✅ **91 Survey Campaigns**: Campaign-based organization matching Australian approach
+- ✅ **29,758 Files Indexed**: All files with actual GeoTIFF bounds extraction using rasterio
+- ✅ **S3 Integration**: Uploaded 26.52MB index to `s3://road-engineering-elevation-data/indexes/nz_spatial_index.json`
 - ✅ **Two-Bucket Architecture**: Main bucket (indexes) + `nz-elevation` bucket (public DEM data)
 - ✅ **Environment Configuration**: `ENABLE_NZ_SOURCES=true` set in Railway production
-- ✅ **Auckland Coverage**: 79 files with 53 covering Auckland CBD coordinates (-36.8485, 174.7633)
+- ✅ **Major Cities Coverage**: Auckland (17 files), Wellington, Christchurch, Queenstown comprehensive coverage
 
 #### 🌏 Production Coverage Enhancement
 - **Australia**: 1,153 S3 campaigns maintaining 54,000x Brisbane speedup
-- **New Zealand**: 16 regions with 1m resolution LiDAR data via public S3 bucket  
+- **New Zealand**: 91 survey campaigns with 1m resolution LiDAR data via public S3 bucket  
 - **Global Fallback**: GPXZ → Google API chain for worldwide coverage
 - **Response Times**: Sub-second for AU/NZ coordinates, <2s for global API fallback
 
-### Phase 3B.5: Future Advanced Pattern Refinements
-**Gemini Roadmap**: *"Strategic refinements to build upon this outstanding bi-national foundation"*
+### Phase 3B.5: Campaign-Based Architecture Unification (IN PROGRESS)
+**Current Status**: Phase 1 Complete - NZ campaign structure implemented
+**Next Phase**: Unified data_collections schema for true architectural unification
 
-**Priority 1: Advanced Architectural Patterns**
+#### ✅ Phase 1: NZ Campaign Structure (COMPLETED)
+- ✅ **Campaign-Based Organization**: 91 NZ campaigns (e.g., `auckland-north_2016-2018_dem`)
+- ✅ **Structural Consistency**: Matches Australian `utm_zones` → files pattern
+- ✅ **DEM/DSM Separation**: Digital Elevation Models properly categorized
+- ✅ **Production Deployment**: 26.52MB campaign index uploaded to S3
+
+#### 🎯 Phase 2: Unified Data Collections Schema (PLANNED)
+**Gemini Architecture**: *"True structural unification with country-agnostic data collections"*
+
+**Proposed Unified Structure**:
+```json
+{
+  "version": "2.0",
+  "data_collections": {
+    "au_qld_z56": {
+      "collection_type": "australian_utm_zone",
+      "country": "AU", "utm_zone": 56,
+      "files": [...], "coverage_bounds": {...}
+    },
+    "nz_auckland_north_2018": {
+      "collection_type": "new_zealand_campaign", 
+      "country": "NZ", "region": "auckland",
+      "survey_name": "auckland-north", "year": 2018,
+      "data_type": "DEM", "resolution_m": 1,
+      "files": [...], "coverage_bounds": {...}
+    }
+  }
+}
+```
+
+**Phase 2 Implementation Steps**:
+- **Unified Schema Design**: Single `data_collections` structure for both AU and NZ
+- **Pydantic Validation**: Schema validation with fail-fast startup behavior
+- **Feature Flag Integration**: `USE_UNIFIED_SPATIAL_INDEX` for safe deployment
+- **S3Source Refactoring**: Country-agnostic query logic
+- **Performance Preservation**: Maintain 54,000x Brisbane speedup
+
+#### 🎯 Phase 3: Advanced Architectural Patterns (FUTURE)
+- **Two-Tier Spatial Index**: Campaign-level R-tree + file-level spatial indexes
 - **Composite Pattern**: FallbackDataSource treating fallback chain as first-class citizen
 - **Decorator Pattern**: CircuitBreakerWrappedDataSource for ultimate decoupling
-- **DI Container**: Centralized containers.py for clean application assembly
-
-**Priority 2: Configuration & Lifecycle Enhancement**  
-- **Environment-Specific Settings**: BaseAppSettings → ProdAppSettings/DevAppSettings classes
-- **FastAPI Lifespan Management**: Replace AsyncSingleton with idiomatic app.state pattern
-- **Custom Exception Hierarchy**: DataSourceError → TimeoutError/NotFoundError for telemetry
 
 ## 🔒 Security & Reliability Model
 
@@ -121,6 +155,7 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Technical architecture, patterns, and design decisions  
 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**: Railway production and Docker development deployment  
 **[docs/SPATIAL_INDEX_MANAGEMENT.md](docs/SPATIAL_INDEX_MANAGEMENT.md)**: Dynamic spatial index generation and maintenance  
+**[docs/PHASE_2_UNIFIED_ARCHITECTURE.md](docs/PHASE_2_UNIFIED_ARCHITECTURE.md)**: Phase 2 unified data collections implementation plan  
 **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**: Systematic debugging and issue resolution  
 **[docs/DOCKER_DEVELOPMENT.md](docs/DOCKER_DEVELOPMENT.md)**: Local development environment setup  
 **[docs/CONTAINERIZED_SCRIPTS.md](docs/CONTAINERIZED_SCRIPTS.md)**: Operational script execution  

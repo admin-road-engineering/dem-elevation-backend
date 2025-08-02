@@ -96,23 +96,33 @@ The DEM Backend uses **dynamic spatial indexing** to efficiently map geographic 
 ```
 
 ### New Zealand Index Structure  
-**File**: `config/nz_spatial_index_dynamic.json`
+**File**: `config/nz_spatial_index.json`
 ```json
 {
-  "generated_at": "2025-01-31T12:00:00.000Z",
+  "generated_at": "2025-08-02T02:23:48.000Z",
   "bucket": "nz-elevation",
-  "method": "dynamic_s3_scan_with_actual_bounds",
-  "regions": {
-    "auckland": {
-      "surveys": {
-        "auckland-north_2016-2018": {
-          "files": [...],
-          "coverage_bounds": {...}
-        }
-      }
+  "method": "campaign_based_grouping_with_actual_bounds",
+  "campaigns": {
+    "auckland-north_2016-2018_dem": {
+      "files": [...],
+      "coverage_bounds": {...},
+      "file_count": 379,
+      "region": "auckland",
+      "survey": "auckland-north_2016-2018",
+      "data_type": "DEM",
+      "resolution": "1m"
+    },
+    "canterbury_2020-2023_dem": {
+      "files": [...],
+      "coverage_bounds": {...},
+      "file_count": 2546,
+      "region": "canterbury",
+      "survey": "canterbury_2020-2023", 
+      "data_type": "DEM",
+      "resolution": "1m"
     }
   },  
-  "file_count": 2500+,
+  "file_count": 29758,
   "coverage_summary": {...}
 }
 ```
@@ -189,7 +199,7 @@ scripts/generate_australian_spatial_index.bat
 
 ### Expected Coverage
 - **Australian**: 1,153 campaigns, ~54,000x Brisbane speedup maintained
-- **New Zealand**: 188+ directories, 2,000+ files with actual bounds
+- **New Zealand**: 91 survey campaigns, 29,758 files with actual bounds
 - **Total Coverage**: Australia + New Zealand + Global API fallback
 
 ### Memory Usage
