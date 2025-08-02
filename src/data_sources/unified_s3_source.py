@@ -201,24 +201,23 @@ class UnifiedS3Source(BaseDataSource):
             return False
         
         try:
-            # Get S3 client for main bucket
-            s3_client = self.s3_client_factory.get_client("private", "ap-southeast-2")
-            
-            # Download unified index
-            response = await asyncio.to_thread(
-                s3_client.get_object,
-                Bucket="road-engineering-elevation-data",
-                Key=self.unified_index_key
-            )
-            
-            content = await asyncio.to_thread(response['Body'].read)
-            index_data = json.loads(content.decode('utf-8'))
-            
-            # Parse with Pydantic
-            self.unified_index = UnifiedSpatialIndex(**index_data)
-            
-            logger.info(f"✅ Loaded unified index from S3: {len(self.unified_index.data_collections)} collections")
-            return True
+            # Get S3 client for main bucket using async context manager
+            async with self.s3_client_factory.get_client("private", "ap-southeast-2") as s3_client:
+                # Download unified index
+                response = await s3_client.get_object(
+                    Bucket="road-engineering-elevation-data",
+                    Key=self.unified_index_key
+                )
+                
+                # Read the content  
+                content_bytes = await response['Body'].read()
+                index_data = json.loads(content_bytes.decode('utf-8'))
+                
+                # Parse with Pydantic
+                self.unified_index = UnifiedSpatialIndex(**index_data)
+                
+                logger.info(f"✅ Loaded unified index from S3: {len(self.unified_index.data_collections)} collections")
+                return True
             
         except Exception as e:
             logger.warning(f"Failed to load unified index from S3: {e}")
