@@ -79,8 +79,8 @@ class S3ConfigurationManager:
         if enable_nz:
             nz_source = S3SourceConfig(
                 name="nz",
-                bucket=getattr(settings, 'S3_NZ_BUCKET', 'nz-elevation'),
-                access_type=getattr(settings, 'S3_NZ_ACCESS_TYPE', 'public'),
+                bucket=getattr(settings, 'S3_INDEX_BUCKET', 'road-engineering-elevation-data'),  # Fixed: Use main bucket for indexes
+                access_type="private",  # Fixed: Use private access for main bucket  
                 index_keys=[getattr(settings, 'S3_NZ_INDEX_KEY', 'indexes/nz_spatial_index.json')],
                 region=getattr(settings, 'S3_NZ_REGION', 'ap-southeast-2'),
                 required=getattr(settings, 'S3_NZ_REQUIRED', False)
