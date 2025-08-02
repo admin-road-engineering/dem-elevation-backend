@@ -6,7 +6,7 @@ import logging
 from typing import List, Dict, Any
 import asyncio
 
-from data_sources.base_source import BaseDataSource, ElevationResult
+from .base_source import BaseDataSource, ElevationResult
 
 logger = logging.getLogger(__name__)
 

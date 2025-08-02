@@ -7,8 +7,8 @@ from typing import Dict, Any, Optional
 import asyncio
 from datetime import datetime
 
-from data_sources.base_source import BaseDataSource, ElevationResult
-from circuit_breakers.base_circuit_breaker import CircuitBreaker
+from .base_source import BaseDataSource, ElevationResult
+from ..interfaces import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 

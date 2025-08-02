@@ -9,10 +9,10 @@ from typing import Dict, List, Optional, Any, Tuple
 import asyncio
 from datetime import datetime
 
-from models.unified_spatial_models import UnifiedSpatialIndex, DataCollection, FileEntry
-from handlers import CollectionHandlerRegistry
-from s3_client_factory import S3ClientFactory
-from data_sources.base_source import BaseDataSource, ElevationResult
+from ..models.unified_spatial_models import UnifiedSpatialIndex, DataCollection, FileEntry
+from ..handlers import CollectionHandlerRegistry
+from ..s3_client_factory import S3ClientFactory
+from .base_source import BaseDataSource, ElevationResult
 
 logger = logging.getLogger(__name__)
 

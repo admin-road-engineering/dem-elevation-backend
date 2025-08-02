@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple, Protocol
 import logging
 
-from models.unified_spatial_models import (
+from ..models.unified_spatial_models import (
     DataCollection, AustralianUTMCollection, NewZealandCampaignCollection,
     FileEntry, CoverageBounds
 )

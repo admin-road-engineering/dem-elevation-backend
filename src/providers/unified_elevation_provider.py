@@ -6,14 +6,14 @@ import logging
 from typing import Dict, List, Optional, Any
 import asyncio
 
-from config import get_settings
-from data_sources.base_source import BaseDataSource, ElevationResult
-from data_sources.unified_s3_source import UnifiedS3Source
-from data_sources.composite_source import FallbackDataSource
-from data_sources.circuit_breaker_source import CircuitBreakerWrappedDataSource
-from s3_client_factory import S3ClientFactory
-from circuit_breakers.redis_circuit_breaker import RedisCircuitBreaker
-from circuit_breakers.in_memory_circuit_breaker import InMemoryCircuitBreaker
+from ..config import get_settings
+from ..data_sources.base_source import BaseDataSource, ElevationResult
+from ..data_sources.unified_s3_source import UnifiedS3Source
+from ..data_sources.composite_source import FallbackDataSource
+from ..data_sources.circuit_breaker_source import CircuitBreakerWrappedDataSource
+from ..s3_client_factory import S3ClientFactory
+from ..circuit_breakers.redis_circuit_breaker import RedisCircuitBreaker
+from ..circuit_breakers.memory_circuit_breaker import InMemoryCircuitBreaker
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +144,8 @@ class UnifiedElevationProvider:
                 )
             
             # Import API sources dynamically to avoid circular imports
-            from data_sources.gpxz_source import GPXZSource
-            from data_sources.google_source import GoogleSource
+            from ..data_sources.gpxz_source import GPXZSource
+            from ..data_sources.google_source import GoogleSource
             
             # Create GPXZ source with circuit breaker
             if hasattr(self.settings, 'GPXZ_API_KEY') and self.settings.GPXZ_API_KEY:
