@@ -34,7 +34,7 @@ class UnifiedS3Source(BaseDataSource):
             unified_index_key: S3 key for unified index
             s3_client_factory: S3 client factory for AWS access
         """
-        super().__init__()
+        super().__init__("unified_s3")
         self.use_unified_index = use_unified_index
         self.unified_index_key = unified_index_key
         self.s3_client_factory = s3_client_factory

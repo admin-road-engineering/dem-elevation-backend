@@ -78,9 +78,11 @@ class UnifiedElevationProvider:
             )
             
             # Initialize API sources for fallback (if enabled)
+            # TODO: Temporarily disabled until API sources are adapted to BaseDataSource interface
             api_sources = []
             if self.settings.USE_API_SOURCES:
-                api_sources = await self._create_api_sources()
+                logger.info("API sources temporarily disabled for Phase 2 - S3 sources only")
+                # api_sources = await self._create_api_sources()
             
             # Create fallback chain: S3 → APIs
             sources = [unified_s3_source] + api_sources

@@ -30,10 +30,10 @@ class CircuitBreakerWrappedDataSource(BaseDataSource):
             circuit_breaker: Circuit breaker instance for protection
             name: Optional name for this wrapped source
         """
-        super().__init__()
+        cb_name = name or f"cb_{wrapped_source.__class__.__name__}"
+        super().__init__(cb_name)
         self.wrapped_source = wrapped_source
         self.circuit_breaker = circuit_breaker
-        self.name = name or f"cb_{wrapped_source.__class__.__name__}"
         
         # Statistics
         self.stats = {

@@ -24,9 +24,8 @@ class FallbackDataSource(BaseDataSource):
             sources: List of data sources to try in order
             name: Name for this composite source
         """
-        super().__init__()
+        super().__init__(name)
         self.sources = sources
-        self.name = name
         self.source_stats = {source.__class__.__name__: {"attempts": 0, "successes": 0} 
                            for source in sources}
         
