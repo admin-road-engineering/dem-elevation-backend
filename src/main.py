@@ -138,139 +138,203 @@ async def validate_index_driven_sources_concurrent(settings, s3_factory):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Phase 3A-Fix: SourceProvider pattern for production-ready startup.
+    Phase 3B.5: Unified Elevation Provider with feature flag control.
     
-    This lifespan handler implements Gemini's approved architecture:
-    - Moves all I/O out of Settings class
-    - Uses SourceProvider with aioboto3 for async S3 operations
-    - Blocks startup until all critical data is loaded
-    - Enables sub-500ms startup time for production deployment
+    This lifespan handler implements both legacy and unified v2.0 architectures:
+    - Feature flag controlled: USE_UNIFIED_SPATIAL_INDEX
+    - Unified v2.0: Country-agnostic discriminated unions with Collection Handlers
+    - Legacy fallback: SourceProvider pattern for compatibility
+    - Production-ready startup with fail-fast behavior
     """
     # Startup
-    logger.info("Starting DEM Elevation Service with SourceProvider pattern...", extra={"event": "startup_begin"})
+    logger.info("Starting DEM Elevation Service with UnifiedElevationProvider...", extra={"event": "startup_begin"})
     
     try:
         # Get static settings (no I/O operations)
         settings = get_settings()
         validate_environment_configuration(settings)
         
-        # Create SourceProvider with dependency-injected configuration
-        # Phase 3B.3.2: S3 index paths injected from settings
-        source_config = SourceProviderConfig(
-            s3_bucket_name=os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data'),
-            campaign_index_key=getattr(settings, 'S3_CAMPAIGN_INDEX_PATH', 'indexes/spatial_index.json'),
-            nz_index_key=getattr(settings, 'S3_NZ_INDEX_PATH', 'indexes/nz_spatial_index.json'),
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            aws_region=settings.AWS_DEFAULT_REGION,
-            enable_nz_sources=getattr(settings, 'ENABLE_NZ_SOURCES', False)
-        )
-        
-        # Create SourceProvider and store on app.state
-        provider = SourceProvider(source_config)
-        app.state.source_provider = provider
-        logger.info("SourceProvider created and stored on app.state")
-        
-        # Load all data asynchronously - BLOCKS startup until complete
-        logger.info("Loading all data sources asynchronously...")
-        try:
-            load_success = await provider.load_all_sources()
-        except Exception as e:
-            # Phase 3B.3.2: Implement fail-fast production behavior
-            from .exceptions import S3IndexNotFoundError, S3AccessError
-            
-            if isinstance(e, S3IndexNotFoundError):
-                critical_msg = (
-                    f"CRITICAL: S3 DataSource failed to initialize: "
-                    f"Index '{e.index_path}' not found in bucket '{e.bucket}'. "
-                    f"Service degrading to API-only mode."
-                )
-                logger.critical(critical_msg)
-                
-                # Fail-fast in production for configuration errors
-                if settings.APP_ENV == "production":
-                    logger.critical("Production environment cannot start with missing S3 index. Exiting.")
-                    raise SystemExit(1)
-                else:
-                    logger.warning("Development environment - continuing with API fallback")
-                    load_success = False
-            else:
-                # Re-raise other exceptions
-                raise e
-        
-        if not load_success and settings.APP_ENV == "production":
-            logger.critical(f"Production service cannot start without critical data sources: {provider.get_load_errors()}")
-            raise SystemExit(1)
-        elif not load_success:
-            logger.warning(f"Development service starting in degraded mode: {provider.get_load_errors()}")
-        
-        # Get loaded sources for service container
-        dem_sources = provider.get_dem_sources()
-        logger.info(f"Data loading completed: {len(dem_sources)} sources available")
-        
-        # Pre-initialize EnhancedSourceSelector during startup to avoid async event loop conflicts
-        logger.info("Pre-initializing EnhancedSourceSelector during lifespan startup...")
-        try:
-            from .enhanced_source_selector import EnhancedSourceSelector
-            from .gpxz_client import GPXZConfig
-            
-            # Prepare configurations for external services
-            gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
-            google_api_key = settings.GOOGLE_ELEVATION_API_KEY
-            aws_creds = {
-                "access_key_id": settings.AWS_ACCESS_KEY_ID,
-                "secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                "region": settings.AWS_DEFAULT_REGION
-            } if settings.AWS_ACCESS_KEY_ID else None
-            
-            # Create and fully initialize EnhancedSourceSelector here (with event loop available)
-            enhanced_selector = EnhancedSourceSelector(
-                config=dem_sources,
-                use_s3=getattr(settings, 'USE_S3_SOURCES', False),
-                use_apis=getattr(settings, 'USE_API_SOURCES', False),
-                gpxz_config=gpxz_config,
-                google_api_key=google_api_key,
-                aws_credentials=aws_creds,
-                redis_manager=None,  # Will be created lazily
-                enable_nz=getattr(settings, 'ENABLE_NZ_SOURCES', False)
-            )
-            
-            # Trigger NZ index loading if enabled (now we have a running event loop)
-            if getattr(settings, 'ENABLE_NZ_SOURCES', False):
-                logger.info("Loading NZ spatial index during lifespan startup...")
-                try:
-                    await enhanced_selector._load_nz_index_async()
-                    logger.info("NZ spatial index loaded successfully during startup")
-                except Exception as nz_error:
-                    logger.warning(f"Failed to load NZ index during startup: {nz_error}")
-            
-            # Store on app.state for dependency injection
-            app.state.enhanced_selector = enhanced_selector
-            logger.info("EnhancedSourceSelector pre-initialized and stored on app.state")
-        except Exception as e:
-            logger.warning(f"Failed to pre-initialize EnhancedSourceSelector (will fall back to lazy loading): {e}")
-            app.state.enhanced_selector = None
-
-        # Create S3ClientFactory for legacy compatibility
+        # Create S3ClientFactory for all architectures
         s3_factory = create_s3_client_factory()
         app.state.s3_factory = s3_factory
-
-        # Initialize service container with loaded data and pre-initialized enhanced selector
-        service_container = init_service_container(
-            settings, 
-            source_provider=provider,
-            enhanced_selector=getattr(app.state, 'enhanced_selector', None)
-        )
         
-        logger.info(
-            "DEM Elevation Service started successfully with SourceProvider pattern",
-            extra={
-                "event": "startup_complete",
-                "sources_loaded": len(dem_sources),
-                "load_success": load_success,
-                "provider_stats": provider.get_performance_stats()
-            }
-        )
+        # Phase 3B.5: Feature flag controlled provider selection
+        if settings.USE_UNIFIED_SPATIAL_INDEX:
+            logger.info("🚀 Using Phase 2 Unified Architecture (v2.0) with discriminated unions")
+            
+            # Import UnifiedElevationProvider
+            from .providers.unified_elevation_provider import UnifiedElevationProvider
+            
+            # Create and initialize unified provider
+            unified_provider = UnifiedElevationProvider(s3_client_factory=s3_factory)
+            
+            # Initialize unified system - BLOCKS startup until complete
+            logger.info("Initializing unified elevation system...")
+            unified_success = await unified_provider.initialize()
+            
+            if not unified_success and settings.APP_ENV == "production":
+                logger.critical("Production service cannot start without unified system")
+                raise SystemExit(1)
+            elif not unified_success:
+                logger.warning("Development service: unified system failed, falling back to legacy")
+                # Fall through to legacy initialization below
+                settings.USE_UNIFIED_SPATIAL_INDEX = False
+            else:
+                # Unified system success - store on app.state
+                app.state.unified_provider = unified_provider
+                app.state.source_provider = None  # Clear legacy reference
+                logger.info("✅ Unified elevation provider initialized successfully")
+        
+        if not settings.USE_UNIFIED_SPATIAL_INDEX:
+            logger.info("📊 Using Legacy Architecture (SourceProvider pattern)")
+            
+            # Create SourceProvider with dependency-injected configuration
+            # Phase 3B.3.2: S3 index paths injected from settings
+            source_config = SourceProviderConfig(
+                s3_bucket_name=os.getenv('DEM_S3_BUCKET', 'road-engineering-elevation-data'),
+                campaign_index_key=getattr(settings, 'S3_CAMPAIGN_INDEX_PATH', 'indexes/spatial_index.json'),
+                nz_index_key=getattr(settings, 'S3_NZ_INDEX_PATH', 'indexes/nz_spatial_index.json'),
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                aws_region=settings.AWS_DEFAULT_REGION,
+                enable_nz_sources=getattr(settings, 'ENABLE_NZ_SOURCES', False)
+            )
+            
+            # Create SourceProvider and store on app.state
+            provider = SourceProvider(source_config)
+            app.state.source_provider = provider
+            app.state.unified_provider = None  # Clear unified reference
+            logger.info("SourceProvider created and stored on app.state")
+        
+        # Load all data asynchronously - BLOCKS startup until complete (legacy only)
+        if not settings.USE_UNIFIED_SPATIAL_INDEX:
+            logger.info("Loading legacy data sources asynchronously...")
+            try:
+                load_success = await provider.load_all_sources()
+            except Exception as e:
+                # Phase 3B.3.2: Implement fail-fast production behavior
+                from .exceptions import S3IndexNotFoundError, S3AccessError
+                
+                if isinstance(e, S3IndexNotFoundError):
+                    critical_msg = (
+                        f"CRITICAL: S3 DataSource failed to initialize: "
+                        f"Index '{e.index_path}' not found in bucket '{e.bucket}'. "
+                        f"Service degrading to API-only mode."
+                    )
+                    logger.critical(critical_msg)
+                    
+                    # Fail-fast in production for configuration errors
+                    if settings.APP_ENV == "production":
+                        logger.critical("Production environment cannot start with missing S3 index. Exiting.")
+                        raise SystemExit(1)
+                    else:
+                        logger.warning("Development environment - continuing with API fallback")
+                        load_success = False
+                else:
+                    # Re-raise other exceptions
+                    raise e
+            
+            if not load_success and settings.APP_ENV == "production":
+                logger.critical(f"Production service cannot start without critical data sources: {provider.get_load_errors()}")
+                raise SystemExit(1)
+            elif not load_success:
+                logger.warning(f"Development service starting in degraded mode: {provider.get_load_errors()}")
+            
+            # Get loaded sources for service container
+            dem_sources = provider.get_dem_sources()
+            logger.info(f"Legacy data loading completed: {len(dem_sources)} sources available")
+        else:
+            # Unified provider already initialized above
+            dem_sources = {}  # Unified provider doesn't use dem_sources dict
+            logger.info("Unified provider initialization completed")
+        
+        # Pre-initialize EnhancedSourceSelector during startup (legacy mode only)
+        if not settings.USE_UNIFIED_SPATIAL_INDEX:
+            logger.info("Pre-initializing EnhancedSourceSelector during lifespan startup...")
+            try:
+                from .enhanced_source_selector import EnhancedSourceSelector
+                from .gpxz_client import GPXZConfig
+                
+                # Prepare configurations for external services
+                gpxz_config = GPXZConfig(api_key=settings.GPXZ_API_KEY) if settings.GPXZ_API_KEY else None
+                google_api_key = settings.GOOGLE_ELEVATION_API_KEY
+                aws_creds = {
+                    "access_key_id": settings.AWS_ACCESS_KEY_ID,
+                    "secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                    "region": settings.AWS_DEFAULT_REGION
+                } if settings.AWS_ACCESS_KEY_ID else None
+                
+                # Create and fully initialize EnhancedSourceSelector here (with event loop available)
+                enhanced_selector = EnhancedSourceSelector(
+                    config=dem_sources,
+                    use_s3=getattr(settings, 'USE_S3_SOURCES', False),
+                    use_apis=getattr(settings, 'USE_API_SOURCES', False),
+                    gpxz_config=gpxz_config,
+                    google_api_key=google_api_key,
+                    aws_credentials=aws_creds,
+                    redis_manager=None,  # Will be created lazily
+                    enable_nz=getattr(settings, 'ENABLE_NZ_SOURCES', False)
+                )
+                
+                # Trigger NZ index loading if enabled (now we have a running event loop)
+                if getattr(settings, 'ENABLE_NZ_SOURCES', False):
+                    logger.info("Loading NZ spatial index during lifespan startup...")
+                    try:
+                        await enhanced_selector._load_nz_index_async()
+                        logger.info("NZ spatial index loaded successfully during startup")
+                    except Exception as nz_error:
+                        logger.warning(f"Failed to load NZ index during startup: {nz_error}")
+                
+                # Store on app.state for dependency injection
+                app.state.enhanced_selector = enhanced_selector
+                logger.info("EnhancedSourceSelector pre-initialized and stored on app.state")
+            except Exception as e:
+                logger.warning(f"Failed to pre-initialize EnhancedSourceSelector (will fall back to lazy loading): {e}")
+                app.state.enhanced_selector = None
+        else:
+            # Unified mode doesn't use EnhancedSourceSelector
+            app.state.enhanced_selector = None
+            logger.info("Unified mode: Skipping EnhancedSourceSelector initialization")
+
+        # Initialize service container with loaded data and provider
+        if settings.USE_UNIFIED_SPATIAL_INDEX:
+            # Unified provider mode
+            service_container = init_service_container(
+                settings, 
+                source_provider=None,  # No legacy provider
+                enhanced_selector=None,  # No enhanced selector
+                unified_provider=getattr(app.state, 'unified_provider', None)
+            )
+        else:
+            # Legacy provider mode
+            service_container = init_service_container(
+                settings, 
+                source_provider=provider,
+                enhanced_selector=getattr(app.state, 'enhanced_selector', None)
+            )
+        
+        # Log startup completion with appropriate provider info
+        if settings.USE_UNIFIED_SPATIAL_INDEX:
+            logger.info(
+                "DEM Elevation Service started successfully with Unified Provider (v2.0)",
+                extra={
+                    "event": "startup_complete",
+                    "provider_type": "unified",
+                    "unified_mode": True,
+                    "unified_index_path": settings.UNIFIED_INDEX_PATH
+                }
+            )
+        else:
+            logger.info(
+                "DEM Elevation Service started successfully with Legacy SourceProvider pattern",
+                extra={
+                    "event": "startup_complete",
+                    "provider_type": "legacy",
+                    "sources_loaded": len(dem_sources),
+                    "load_success": load_success,
+                    "provider_stats": provider.get_performance_stats()
+                }
+            )
         
         yield  # App ready for traffic
         
@@ -288,11 +352,15 @@ async def lifespan(app: FastAPI):
         # Clean up service container
         await close_service_container()
         
-        # Clear references
+        # Clear references for both provider types
         if hasattr(app.state, 'source_provider'):
             app.state.source_provider = None
+        if hasattr(app.state, 'unified_provider'):
+            app.state.unified_provider = None
         if hasattr(app.state, 's3_factory'):
             app.state.s3_factory = None
+        if hasattr(app.state, 'enhanced_selector'):
+            app.state.enhanced_selector = None
         
         logger.info("DEM Elevation Service shut down successfully", extra={"event": "shutdown_complete"})
     except Exception as e:
@@ -640,10 +708,30 @@ async def health_check():
             "last_check": f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}"
         }
         
-        # Try to get source count safely
+        # Try to get source information safely
         try:
-            # Check if app.state.source_provider is available
-            if hasattr(app.state, 'source_provider') and app.state.source_provider:
+            # Check provider type and get appropriate information
+            if hasattr(app.state, 'unified_provider') and app.state.unified_provider:
+                # Unified provider mode
+                health_response["provider_type"] = "unified"
+                health_response["unified_mode"] = True
+                
+                # Get unified provider health info
+                provider_health = await app.state.unified_provider.health_check()
+                health_response["provider_health"] = provider_health
+                
+                # Get coverage info for collection count
+                try:
+                    coverage_info = await app.state.unified_provider.coverage_info()
+                    health_response["collections_available"] = coverage_info.get("total_collections", 0)
+                except Exception:
+                    health_response["collections_available"] = "unknown"
+                
+            elif hasattr(app.state, 'source_provider') and app.state.source_provider:
+                # Legacy provider mode
+                health_response["provider_type"] = "legacy"
+                health_response["unified_mode"] = False
+                
                 dem_sources = app.state.source_provider.get_dem_sources()
                 health_response["sources_available"] = len(dem_sources) if dem_sources else 0
                 health_response["s3_indexes"] = {
@@ -653,13 +741,16 @@ async def health_check():
                     "cache_info": {"hits": 0, "misses": 0, "maxsize": 1, "currsize": 0}
                 }
             else:
-                # Fallback during startup
+                # No provider available - service starting
+                health_response["provider_type"] = "unknown"
+                health_response["unified_mode"] = False
                 health_response["sources_available"] = 0
                 health_response["status"] = "starting"
         except Exception as e:
-            # Don't fail health check due to source counting issues
+            # Don't fail health check due to provider issues
+            health_response["provider_type"] = "error"
             health_response["sources_available"] = 0
-            health_response["startup_note"] = "Sources still initializing"
+            health_response["startup_note"] = "Providers still initializing"
         
         return health_response
         

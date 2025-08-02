@@ -47,12 +47,15 @@ class UnifiedElevationService:
     
     def __init__(self, settings: Settings, redis_manager: Optional[RedisStateManager] = None, 
                  source_provider: Optional[SourceProvider] = None,
-                 enhanced_selector: Optional[EnhancedSourceSelector] = None):
+                 enhanced_selector: Optional[EnhancedSourceSelector] = None,
+                 unified_provider=None):
         """
-        Initialize UnifiedElevationService with optional SourceProvider and pre-initialized EnhancedSourceSelector.
+        Initialize UnifiedElevationService with optional providers.
         
         Phase 3A-Fix: Added SourceProvider parameter to decouple from Settings.DEM_SOURCES.
         Phase 3B.5: Added enhanced_selector parameter for lifespan-initialized selector (avoids async conflicts).
+        Phase 3B.5: Added unified_provider parameter for Phase 2 unified architecture.
+        When unified_provider is provided, use the Phase 2 unified architecture.
         When source_provider is provided, use its dynamically loaded data instead of Settings.
         When enhanced_selector is provided, use it instead of creating a new one (preventing event loop issues).
         """
@@ -61,6 +64,20 @@ class UnifiedElevationService:
             self.redis_manager = redis_manager
             self.source_provider = source_provider
             self.pre_initialized_enhanced_selector = enhanced_selector
+            self.unified_provider = unified_provider
+            
+            # Phase 3B.5: Feature flag controlled architecture selection
+            if unified_provider and settings.USE_UNIFIED_SPATIAL_INDEX:
+                logger.info("🚀 Using Phase 2 Unified Architecture (v2.0) with discriminated unions")
+                self.source_selector = None  # Not used in unified mode
+                self.using_enhanced_selector = False
+                self.using_index_driven_selector = False
+                self.using_unified_provider = True
+                return  # Skip legacy initialization
+            
+            # Legacy architecture initialization
+            logger.info("📊 Using Legacy Architecture")
+            self.using_unified_provider = False
             
             # Get DEM sources from provider or fallback to settings
             if source_provider and source_provider.is_loading_complete():
@@ -175,7 +192,10 @@ class UnifiedElevationService:
             raise DEMCoordinateError(f"Invalid longitude: {longitude}. Must be between -180 and 180.")
         
         try:
-            if hasattr(self, 'using_index_driven_selector') and self.using_index_driven_selector:
+            # Phase 3B.5: Check for unified provider first (highest priority)
+            if hasattr(self, 'using_unified_provider') and self.using_unified_provider:
+                return await self._get_elevation_unified(latitude, longitude, dem_source_id)
+            elif hasattr(self, 'using_index_driven_selector') and self.using_index_driven_selector:
                 return await self._get_elevation_index_driven(latitude, longitude, dem_source_id)
             elif self.using_enhanced_selector:
                 return await self._get_elevation_enhanced(latitude, longitude, dem_source_id)
@@ -436,6 +456,56 @@ class UnifiedElevationService:
                 elevation_m=None,
                 dem_source_used="legacy_error", 
                 message=f"Legacy selector error: {str(e)}"
+            )
+    
+    async def _get_elevation_unified(self, latitude: float, longitude: float, dem_source_id: Optional[str] = None) -> ElevationResult:
+        """
+        Phase 3B.5: Get elevation using the unified v2.0 provider with discriminated unions.
+        
+        This method delegates to the UnifiedElevationProvider which handles:
+        - Country-agnostic collection lookup via discriminated unions
+        - Collection Handler Strategy pattern for file selection
+        - S3 → API fallback chains with circuit breaker protection
+        - Type-safe polymorphism with Pydantic validation
+        """
+        try:
+            if not self.unified_provider:
+                logger.error("Unified provider not available")
+                return ElevationResult(
+                    elevation_m=None,
+                    dem_source_used="unified_error",
+                    message="Unified provider not initialized"
+                )
+            
+            # Delegate to unified provider
+            result = await self.unified_provider.get_elevation(latitude, longitude)
+            
+            # Convert UnifiedElevationProvider result to UnifiedElevationService result
+            if result.elevation is not None:
+                return ElevationResult(
+                    elevation_m=result.elevation,
+                    dem_source_used=result.source,
+                    message=result.error or "Success via unified architecture",
+                    metadata=result.metadata,
+                    resolution=result.metadata.get("resolution") if result.metadata else None,
+                    data_type=result.metadata.get("data_type") if result.metadata else None,
+                    accuracy=result.metadata.get("accuracy") if result.metadata else None
+                )
+            else:
+                return ElevationResult(
+                    elevation_m=None,
+                    dem_source_used=result.source,
+                    message=result.error or "No elevation found via unified architecture",
+                    metadata=result.metadata
+                )
+                
+        except Exception as e:
+            logger.error(f"Unified elevation query failed: {e}")
+            return ElevationResult(
+                elevation_m=None,
+                dem_source_used="unified_error",
+                message=f"Unified provider error: {str(e)}",
+                metadata={"error_type": type(e).__name__}
             )
     
     async def get_elevations_batch(self, points: List[Tuple[float, float]], 

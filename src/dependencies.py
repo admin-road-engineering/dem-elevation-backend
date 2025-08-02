@@ -30,16 +30,18 @@ class ServiceContainer:
     dependency graph at startup and providing clean interfaces for testing.
     """
     
-    def __init__(self, settings: Settings, source_provider: Optional[SourceProvider] = None, enhanced_selector=None):
+    def __init__(self, settings: Settings, source_provider: Optional[SourceProvider] = None, enhanced_selector=None, unified_provider=None):
         """
-        Initialize ServiceContainer with optional SourceProvider and EnhancedSourceSelector.
+        Initialize ServiceContainer with optional providers.
         
         Phase 3A-Fix: Added SourceProvider parameter for dependency injection.
         Phase 3B.5: Added enhanced_selector parameter for lifespan-initialized selector.
+        Phase 3B.5: Added unified_provider parameter for Phase 2 unified architecture.
         """
         self.settings = settings
         self.source_provider = source_provider
         self.enhanced_selector = enhanced_selector
+        self.unified_provider = unified_provider
         self._dataset_manager: Optional[DatasetManager] = None
         self._contour_service: Optional[ContourService] = None
         self._elevation_service: Optional[UnifiedElevationService] = None
@@ -51,7 +53,7 @@ class ServiceContainer:
         # Initialize UnifiedIndexLoader for enhanced index management (Phase 1)
         self._unified_index_loader: Optional[UnifiedIndexLoader] = None
         
-        logger.info("ServiceContainer initialized with Redis state management and SourceProvider support")
+        logger.info(f"ServiceContainer initialized with Redis state management, SourceProvider: {source_provider is not None}, UnifiedProvider: {unified_provider is not None}")
     
     @property
     def redis_manager(self) -> RedisStateManager:
@@ -93,12 +95,13 @@ class ServiceContainer:
                 self.settings, 
                 redis_manager=self.redis_manager,
                 source_provider=self.source_provider,
-                enhanced_selector=self.enhanced_selector
+                enhanced_selector=self.enhanced_selector,
+                unified_provider=self.unified_provider
             )
             # Inject dataset manager if the service supports it
             if hasattr(self._elevation_service, 'set_dataset_manager'):
                 self._elevation_service.set_dataset_manager(self.dataset_manager)
-            logger.info("UnifiedElevationService created with Redis state management and SourceProvider")
+            logger.info(f"UnifiedElevationService created with Redis, SourceProvider: {self.source_provider is not None}, UnifiedProvider: {self.unified_provider is not None}")
         return self._elevation_service
     
     @property
@@ -158,17 +161,23 @@ def get_service_container() -> ServiceContainer:
     return _service_container
 
 
-def init_service_container(settings: Settings, source_provider: Optional[SourceProvider] = None, enhanced_selector=None) -> ServiceContainer:
+def init_service_container(settings: Settings, source_provider: Optional[SourceProvider] = None, enhanced_selector=None, unified_provider=None) -> ServiceContainer:
     """
-    Initialize the global service container with settings and optional SourceProvider.
+    Initialize the global service container with settings and optional providers.
     
     Phase 3A-Fix: Added SourceProvider parameter for dependency injection.
     Phase 3B.5: Added enhanced_selector parameter for lifespan-initialized selector.
+    Phase 3B.5: Added unified_provider parameter for Phase 2 unified architecture.
     """
     global _service_container
     try:
-        _service_container = ServiceContainer(settings, source_provider=source_provider, enhanced_selector=enhanced_selector)
-        logger.info("Service container initialized successfully with SourceProvider and EnhancedSourceSelector support")
+        _service_container = ServiceContainer(
+            settings, 
+            source_provider=source_provider, 
+            enhanced_selector=enhanced_selector,
+            unified_provider=unified_provider
+        )
+        logger.info("Service container initialized successfully with provider support")
         return _service_container
     except Exception as e:
         logger.error(f"Failed to initialize service container: {e}")

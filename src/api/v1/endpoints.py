@@ -35,6 +35,72 @@ limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/v1/elevation", tags=["elevation"])
 
+@router.get("", summary="Get elevation for a single point via query parameters")
+@limiter.limit("60/minute")  # Generous for S3, restrictive for API abuse  
+async def get_elevation_simple(
+    request: Request,
+    lat: float,
+    lon: float, 
+    source_id: Optional[str] = None,
+    service: DEMService = Depends(get_dem_service)
+) -> Dict[str, Any]:
+    """Get elevation for a single point using simple query parameters.
+    
+    This is a simplified GET endpoint for basic elevation queries.
+    For more advanced features, use the POST /point endpoint.
+    """
+    try:
+        # Check for API fallback abuse (same logic as POST endpoint)
+        if is_api_fallback_coordinate(lat, lon):
+            # Apply stricter rate limiting for expensive API coordinates
+            from slowapi.errors import RateLimitExceeded
+            import time
+            current_minute = int(time.time() // 60)
+            rate_key = f"api_fallback:{get_remote_address(request)}:{current_minute}"
+            
+            # Simple in-memory rate limiting for API coordinates (10/minute)
+            if not hasattr(get_elevation_simple, '_api_rate_cache'):
+                get_elevation_simple._api_rate_cache = {}
+            
+            current_count = get_elevation_simple._api_rate_cache.get(rate_key, 0)
+            if current_count >= 10:
+                logger.warning(f"API fallback rate limit exceeded for {get_remote_address(request)}")
+                raise HTTPException(
+                    status_code=429, 
+                    detail="Rate limit exceeded for non-Australian coordinates (10/minute). These coordinates require expensive API calls."
+                )
+            get_elevation_simple._api_rate_cache[rate_key] = current_count + 1
+            
+            # Clean old cache entries
+            get_elevation_simple._api_rate_cache = {k: v for k, v in get_elevation_simple._api_rate_cache.items() 
+                                                  if k.endswith(f":{current_minute}")}
+        
+        # Use unified elevation service
+        result = await service.elevation_service.get_elevation(lat, lon, source_id)
+        
+        # Return simple JSON response
+        return {
+            "latitude": lat,
+            "longitude": lon,
+            "elevation_m": result.elevation_m,
+            "source": result.dem_source_used,
+            "message": result.message,
+            "metadata": result.metadata or {}
+        }
+        
+    except DEMCoordinateError as e:
+        logger.warning(f"Invalid coordinates in simple elevation: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid coordinates: {str(e)}")
+    except DEMServiceError as e:
+        logger.error(f"DEM service error in simple elevation: {e}")
+        raise HTTPException(status_code=502, detail=f"Elevation service error: {str(e)}")
+    except ValueError as e:
+        logger.warning(f"ValueError in simple elevation: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error in simple elevation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 def is_api_fallback_coordinate(lat: float, lon: float) -> bool:
     """Check if coordinates will likely trigger expensive API fallback"""
     # Australia/NZ bounds (S3 coverage)
