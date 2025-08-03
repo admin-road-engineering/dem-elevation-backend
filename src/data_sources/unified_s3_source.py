@@ -333,7 +333,17 @@ class UnifiedS3Source(BaseDataSource):
             
             target_srs = osr.SpatialReference()
             if target_crs and target_crs != "EPSG:4326":
-                target_srs.ImportFromUserInput(target_crs)
+                # Handle common Australian coordinate system names
+                if target_crs == "GDA94":
+                    # Brisbane is in UTM Zone 56, use GDA94 MGA Zone 56
+                    target_srs.ImportFromEPSG(28356)
+                    logger.warning(f"🔧 CRS Fix: Converted 'GDA94' to EPSG:28356 (GDA94 MGA Zone 56)")
+                elif target_crs == "GDA2020":
+                    # Use GDA2020 MGA Zone 56 for Brisbane area
+                    target_srs.ImportFromEPSG(7856)
+                    logger.warning(f"🔧 CRS Fix: Converted 'GDA2020' to EPSG:7856 (GDA2020 MGA Zone 56)")
+                else:
+                    target_srs.ImportFromUserInput(target_crs)
             else:
                 target_srs.ImportFromEPSG(4326)  # Default to WGS84
             
