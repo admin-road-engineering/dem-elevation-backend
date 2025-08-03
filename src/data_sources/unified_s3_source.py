@@ -291,7 +291,12 @@ class UnifiedS3Source(BaseDataSource):
         dataset = None
         try:
             # Import GDAL here to avoid import issues in main thread
-            from osgeo import gdal, osr
+            try:
+                from osgeo import gdal, osr
+            except ImportError:
+                # Fallback import paths for different environments
+                import gdal
+                import osr
             
             # Configure GDAL for S3 access
             gdal.SetConfigOption('GDAL_HTTP_MERGE_CONSECUTIVE_RANGES', 'YES')
@@ -340,12 +345,50 @@ class UnifiedS3Source(BaseDataSource):
                 
             return None
             
+        except ImportError as e:
+            logger.warning(f"GDAL not available ({e}), falling back to rasterio")
+            return self._extract_elevation_rasterio_fallback(file_path, lat, lon)
         except Exception as e:
             logger.warning(f"GDAL extraction failed for {file_path}: {e}")
             return None
         finally:
             if dataset:
                 dataset = None  # Close dataset
+    
+    def _extract_elevation_rasterio_fallback(self, file_path: str, lat: float, lon: float) -> Optional[float]:
+        """Fallback elevation extraction using rasterio when GDAL is not available"""
+        try:
+            import rasterio
+            from rasterio.warp import transform as warp_transform
+            
+            # Open raster file
+            with rasterio.open(file_path) as dataset:
+                # Transform coordinate to dataset CRS if needed
+                if dataset.crs.to_string() != 'EPSG:4326':
+                    # Transform from WGS84 to dataset CRS
+                    xs, ys = warp_transform('EPSG:4326', dataset.crs, [lon], [lat])
+                    x, y = xs[0], ys[0]
+                else:
+                    x, y = lon, lat
+                
+                # Sample elevation at coordinate
+                row, col = dataset.index(x, y)
+                
+                # Check if coordinate is within raster bounds
+                if (0 <= row < dataset.height and 0 <= col < dataset.width):
+                    elevation = dataset.read(1)[row, col]
+                    
+                    # Handle nodata values
+                    if dataset.nodata is not None and elevation == dataset.nodata:
+                        return None
+                    
+                    return float(elevation)
+                else:
+                    return None
+                    
+        except Exception as e:
+            logger.debug(f"Rasterio fallback failed for {file_path}: {e}")
+            return None
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get source statistics"""
