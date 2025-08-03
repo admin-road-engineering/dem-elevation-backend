@@ -321,8 +321,10 @@ class UnifiedS3Source(BaseDataSource):
                 gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
             
             # Open dataset
+            logger.warning(f"🔍 GDAL Debug: Opening file {file_path} with target CRS: {target_crs}")
             dataset = gdal.Open(file_path)
             if not dataset:
+                logger.warning(f"❌ GDAL FAIL: Could not open dataset {file_path}")
                 return None
                 
             # Transform coordinates from WGS84 to file's native CRS
@@ -338,14 +340,21 @@ class UnifiedS3Source(BaseDataSource):
             transform = osr.CoordinateTransformation(source_srs, target_srs)
             x, y, z = transform.TransformPoint(lon, lat)
             
+            # ✅ DEBUGGING: Log coordinate transformation results
+            logger.warning(f"🔍 CRS Debug: Transformed ({lat}, {lon}) WGS84 → ({x:.2f}, {y:.2f}) {target_crs}")
+            
             # Convert to pixel coordinates
             gt = dataset.GetGeoTransform()
             inv_gt = gdal.InvGeoTransform(gt)
             px = int(inv_gt[0] + x * inv_gt[1] + y * inv_gt[2])
             py = int(inv_gt[3] + x * inv_gt[4] + y * inv_gt[5])
             
+            # ✅ DEBUGGING: Log pixel coordinate calculation
+            logger.warning(f"🔍 Pixel Debug: Calculated pixel coords ({px}, {py}). Raster size: ({dataset.RasterXSize}, {dataset.RasterYSize})")
+            
             # Check if pixel coordinates are within bounds
             if not (0 <= px < dataset.RasterXSize and 0 <= py < dataset.RasterYSize):
+                logger.warning(f"❌ BOUNDS FAIL: Pixel ({px}, {py}) outside raster bounds ({dataset.RasterXSize}, {dataset.RasterYSize}). Check CRS!")
                 return None
             
             # Read elevation value
