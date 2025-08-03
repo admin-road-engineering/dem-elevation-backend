@@ -119,10 +119,16 @@ class UnifiedS3Source(BaseDataSource):
                     
                     # Try each file with non-blocking GDAL
                     for file_entry in candidate_files[:3]:  # Limit attempts
-                        file_path = f"/vsis3/{file_entry.bucket}/{file_entry.file}" if hasattr(file_entry, 'bucket') else f"/vsis3/{file_entry.file[5:]}"  # Remove 's3://' prefix
-                        target_crs = getattr(file_entry, 'crs', None) or "EPSG:4326"
+                        # FileEntry.file contains the full S3 path like "s3://bucket/key"
+                        if file_entry.file.startswith('s3://'):
+                            file_path = f"/vsis3/{file_entry.file[5:]}"  # Remove 's3://' prefix
+                        else:
+                            file_path = f"/vsis3/{file_entry.file}"  # Already without prefix
+                        
+                        target_crs = getattr(file_entry, 'coordinate_system', None) or "EPSG:4326"
                         
                         # ✅ CRITICAL: Run GDAL in thread pool to prevent event loop blocking
+                        logger.debug(f"Attempting elevation extraction: {file_path} for ({lat}, {lon}) with CRS {target_crs}")
                         elevation = await loop.run_in_executor(
                             None,
                             self._extract_elevation_sync,
@@ -301,7 +307,18 @@ class UnifiedS3Source(BaseDataSource):
             # Configure GDAL for S3 access
             gdal.SetConfigOption('GDAL_HTTP_MERGE_CONSECUTIVE_RANGES', 'YES')
             gdal.SetConfigOption('VSI_CACHE', 'YES')
+            gdal.SetConfigOption('VSI_CACHE_SIZE', '67108864')  # 64MB cache
+            gdal.SetConfigOption('GDAL_DISABLE_READDIR_ON_OPEN', 'YES')
             gdal.SetConfigOption('AWS_S3_REQUEST_PAYER', 'requester')  # For security
+            
+            # Ensure AWS credentials are available to GDAL
+            import os
+            if 'AWS_ACCESS_KEY_ID' in os.environ:
+                gdal.SetConfigOption('AWS_ACCESS_KEY_ID', os.environ['AWS_ACCESS_KEY_ID'])
+            if 'AWS_SECRET_ACCESS_KEY' in os.environ:
+                gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', os.environ['AWS_SECRET_ACCESS_KEY'])
+            if 'AWS_DEFAULT_REGION' in os.environ:
+                gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
             
             # Open dataset
             dataset = gdal.Open(file_path)
