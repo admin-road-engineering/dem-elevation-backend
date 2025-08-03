@@ -313,10 +313,17 @@ class UnifiedS3Source(BaseDataSource):
             
             # Configure authentication based on bucket type
             import os
+            
+            # Always set region for both public and private buckets
+            if 'AWS_DEFAULT_REGION' in os.environ:
+                gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
+            else:
+                gdal.SetConfigOption('AWS_REGION', 'ap-southeast-2')  # Default region for both buckets
+            
             if 'nz-elevation' in file_path:
                 # Public bucket - use unsigned requests
                 gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'YES')
-                logger.debug(f"Using unsigned requests for public bucket")
+                logger.debug(f"Using unsigned requests for public NZ bucket with region")
             else:
                 # Private bucket - use credentials
                 gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'NO')
@@ -324,9 +331,7 @@ class UnifiedS3Source(BaseDataSource):
                     gdal.SetConfigOption('AWS_ACCESS_KEY_ID', os.environ['AWS_ACCESS_KEY_ID'])
                 if 'AWS_SECRET_ACCESS_KEY' in os.environ:
                     gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', os.environ['AWS_SECRET_ACCESS_KEY'])
-                if 'AWS_DEFAULT_REGION' in os.environ:
-                    gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
-                logger.debug(f"Using signed requests for private bucket")
+                logger.debug(f"Using signed requests for private AU bucket with credentials")
             
             # Open dataset
             dataset = gdal.Open(file_path)
