@@ -337,6 +337,8 @@ class UnifiedS3Source(BaseDataSource):
             # Transform coordinates from WGS84 to file's native CRS
             source_srs = osr.SpatialReference()
             source_srs.ImportFromEPSG(4326)  # WGS84
+            # ✅ CRITICAL FIX: Enforce traditional GIS axis order (Lon/Lat)
+            source_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
             
             target_srs = osr.SpatialReference()
             actual_epsg = None
@@ -378,8 +380,17 @@ class UnifiedS3Source(BaseDataSource):
                 target_srs.ImportFromEPSG(4326)  # Default to WGS84
                 actual_epsg = 4326
             
+            # ✅ CRITICAL FIX: Enforce traditional GIS axis order for target CRS
+            target_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+            
             transform = osr.CoordinateTransformation(source_srs, target_srs)
             x, y, z = transform.TransformPoint(lon, lat)
+            
+            # ✅ DEFENSIVE CHECK: Verify transformation succeeded
+            import math
+            if math.isinf(x) or math.isinf(y):
+                logger.error(f"Coordinate transformation failed: ({lat}, {lon}) → (inf, inf) for EPSG:{actual_epsg}")
+                return None
             
             # Log the actual transformation result
             logger.info(f"🔍 Transform: ({lat}, {lon}) WGS84 → ({x:.2f}, {y:.2f}) EPSG:{actual_epsg}")
