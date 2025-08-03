@@ -374,8 +374,13 @@ class UnifiedS3Source(BaseDataSource):
                         target_srs.ImportFromEPSG(actual_epsg)
                         logger.debug(f"GDA2020 fallback to EPSG:{actual_epsg} (no zone detected)")
                 else:
-                    target_srs.ImportFromUserInput(target_crs)
-                    actual_epsg = target_crs
+                    try:
+                        target_srs.ImportFromUserInput(target_crs)
+                        actual_epsg = target_crs
+                    except AttributeError:
+                        # Fallback for older OSR versions
+                        target_srs.SetFromUserInput(target_crs)
+                        actual_epsg = target_crs
             else:
                 target_srs.ImportFromEPSG(4326)  # Default to WGS84
                 actual_epsg = 4326
