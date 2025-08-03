@@ -306,19 +306,27 @@ class UnifiedS3Source(BaseDataSource):
             
             # Configure GDAL for S3 access
             gdal.SetConfigOption('GDAL_HTTP_MERGE_CONSECUTIVE_RANGES', 'YES')
-            gdal.SetConfigOption('VSI_CACHE', 'YES')
+            gdal.SetConfigOption('VSI_CACHE', 'YES')  
             gdal.SetConfigOption('VSI_CACHE_SIZE', '67108864')  # 64MB cache
             gdal.SetConfigOption('GDAL_DISABLE_READDIR_ON_OPEN', 'YES')
             # REMOVED: AWS_S3_REQUEST_PAYER - causes 403 errors on public/standard buckets
             
-            # Ensure AWS credentials are available to GDAL
+            # Configure authentication based on bucket type
             import os
-            if 'AWS_ACCESS_KEY_ID' in os.environ:
-                gdal.SetConfigOption('AWS_ACCESS_KEY_ID', os.environ['AWS_ACCESS_KEY_ID'])
-            if 'AWS_SECRET_ACCESS_KEY' in os.environ:
-                gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', os.environ['AWS_SECRET_ACCESS_KEY'])
-            if 'AWS_DEFAULT_REGION' in os.environ:
-                gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
+            if 'nz-elevation' in file_path:
+                # Public bucket - use unsigned requests
+                gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'YES')
+                logger.warning(f"🌐 S3 Config: Using unsigned requests for public NZ bucket")
+            else:
+                # Private bucket - use credentials
+                gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'NO')
+                if 'AWS_ACCESS_KEY_ID' in os.environ:
+                    gdal.SetConfigOption('AWS_ACCESS_KEY_ID', os.environ['AWS_ACCESS_KEY_ID'])
+                if 'AWS_SECRET_ACCESS_KEY' in os.environ:
+                    gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', os.environ['AWS_SECRET_ACCESS_KEY'])
+                if 'AWS_DEFAULT_REGION' in os.environ:
+                    gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
+                logger.warning(f"🔐 S3 Config: Using signed requests for private AU bucket")
             
             # Open dataset
             logger.warning(f"🔍 GDAL Debug: Opening file {file_path} with target CRS: {target_crs}")
@@ -333,15 +341,33 @@ class UnifiedS3Source(BaseDataSource):
             
             target_srs = osr.SpatialReference()
             if target_crs and target_crs != "EPSG:4326":
-                # Handle common Australian coordinate system names
+                # Handle common Australian coordinate system names with dynamic UTM zone detection
                 if target_crs == "GDA94":
-                    # Brisbane is in UTM Zone 56, use GDA94 MGA Zone 56
-                    target_srs.ImportFromEPSG(28356)
-                    logger.warning(f"🔧 CRS Fix: Converted 'GDA94' to EPSG:28356 (GDA94 MGA Zone 56)")
+                    # Extract UTM zone from file path (e.g., z55, z56)
+                    import re
+                    zone_match = re.search(r'/z(\d{2})/', file_path)
+                    if zone_match:
+                        utm_zone = int(zone_match.group(1))
+                        epsg_code = 28300 + utm_zone  # GDA94 MGA Zone (28354=Zone54, 28355=Zone55, etc.)
+                        target_srs.ImportFromEPSG(epsg_code)
+                        logger.warning(f"🔧 CRS Fix: Converted 'GDA94' + Zone {utm_zone} to EPSG:{epsg_code}")
+                    else:
+                        # Fallback to Zone 56 if no zone found
+                        target_srs.ImportFromEPSG(28356)
+                        logger.warning(f"🔧 CRS Fix: GDA94 fallback to EPSG:28356 (no zone detected)")
                 elif target_crs == "GDA2020":
-                    # Use GDA2020 MGA Zone 56 for Brisbane area
-                    target_srs.ImportFromEPSG(7856)
-                    logger.warning(f"🔧 CRS Fix: Converted 'GDA2020' to EPSG:7856 (GDA2020 MGA Zone 56)")
+                    # Extract UTM zone for GDA2020
+                    import re
+                    zone_match = re.search(r'/z(\d{2})/', file_path)
+                    if zone_match:
+                        utm_zone = int(zone_match.group(1))
+                        epsg_code = 7800 + utm_zone  # GDA2020 MGA Zone (7854=Zone54, 7855=Zone55, etc.)
+                        target_srs.ImportFromEPSG(epsg_code)
+                        logger.warning(f"🔧 CRS Fix: Converted 'GDA2020' + Zone {utm_zone} to EPSG:{epsg_code}")
+                    else:
+                        # Fallback to Zone 56
+                        target_srs.ImportFromEPSG(7856)
+                        logger.warning(f"🔧 CRS Fix: GDA2020 fallback to EPSG:7856 (no zone detected)")
                 else:
                     target_srs.ImportFromUserInput(target_crs)
             else:
