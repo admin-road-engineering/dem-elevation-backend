@@ -137,18 +137,22 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 - **Architecture**: Country-agnostic discriminated unions operational
 - **Coverage**: AU + NZ via single unified system
 
-#### 🔧 Phase 4: Elevation Extraction Implementation (NEXT)
-**Current Status**: Architecture complete, elevation extraction logic needed
+#### 🔧 Phase 4: GDAL Elevation Extraction (IN PROGRESS)
+**Current Status**: Architecture complete, implementing GDAL elevation extraction with thread pool execution
 
 **Gap Analysis**: Unified system correctly identifies collections and files but needs GDAL implementation:
-- ✅ **Collection Discovery**: Finds appropriate collections for coordinates
-- ✅ **File Identification**: Locates GeoTIFF files within collections  
-- ❌ **Elevation Extraction**: Missing GDAL/rasterio logic to read elevation values
+- ✅ **Collection Discovery**: Finds appropriate collections for coordinates  
+- ✅ **File Identification**: Locates GeoTIFF files within collections
+- 🔄 **Elevation Extraction**: Adding GDAL/rasterio with async thread pool execution
+- 🔄 **Enhanced Response Format**: Implementing unit-explicit fields (elevation_m, resolution_m)
 
-**Implementation Target**: Add elevation extraction to `UnifiedS3Source.get_elevation()` method
+**Current Brisbane Analysis**: System selects Brisbane2009LGA (15-year-old survey) instead of Brisbane2019Prj (5-year-old) due to missing survey year prioritization in AustralianUTMHandler - scheduled for Phase 5 optimization.
+
+**Implementation Target**: Complete `UnifiedS3Source.get_elevation()` with proper async GDAL execution
 
 #### 🎯 Phase 5: Enterprise-Grade Enhancements (PLANNED)
 **Gemini Roadmap to A++**:
+- **Survey Year Prioritization**: Update AustralianUTMHandler to prefer Brisbane2019Prj over Brisbane2009LGA
 - **Event-Driven Indexing**: S3 Events → Lambda → Auto-update (eliminates manual scripts)
 - **CLI Consolidation**: `dem-cli` tool for unified operations
 - **Two-Tier Memory Strategy**: R-tree + on-demand loading for GB-scale

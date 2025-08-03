@@ -78,15 +78,33 @@ async def get_elevation_simple(
         # Use unified elevation service
         result = await service.elevation_service.get_elevation(lat, lon, source_id)
         
-        # Return simple JSON response
-        return {
+        # Return enhanced JSON response with unit-explicit fields
+        response_data = {
+            "elevation_m": result.elevation_m,  # Unit-explicit for global app
             "latitude": lat,
             "longitude": lon,
-            "elevation_m": result.elevation_m,
-            "source": result.dem_source_used,
-            "message": result.message,
-            "metadata": result.metadata or {}
+            "dem_source_used": result.dem_source_used,  # Standard field name
+            "message": result.message
         }
+        
+        # Add enhanced metadata fields if available
+        if result.metadata:
+            response_data["resolution_m"] = result.metadata.get("grid_resolution_m", 1.0)
+            response_data["grid_resolution_m"] = result.metadata.get("grid_resolution_m", 1.0)
+            response_data["data_type"] = result.metadata.get("data_type", "LiDAR")
+            response_data["accuracy"] = result.metadata.get("accuracy", "±0.1m")
+            
+            # Include processing metadata for debugging
+            if "processing_time_ms" in result.metadata:
+                response_data["processing_time_ms"] = result.metadata["processing_time_ms"]
+        else:
+            # Default enhanced fields for consistent API
+            response_data["resolution_m"] = 1.0
+            response_data["grid_resolution_m"] = 1.0  
+            response_data["data_type"] = "LiDAR"
+            response_data["accuracy"] = "±0.1m"
+        
+        return response_data
         
     except DEMCoordinateError as e:
         logger.warning(f"Invalid coordinates in simple elevation: {e}")
