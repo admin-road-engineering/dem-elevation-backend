@@ -339,6 +339,8 @@ class UnifiedS3Source(BaseDataSource):
             source_srs.ImportFromEPSG(4326)  # WGS84
             
             target_srs = osr.SpatialReference()
+            actual_epsg = None
+            
             if target_crs and target_crs != "EPSG:4326":
                 # Handle common Australian coordinate system names with dynamic UTM zone detection
                 if target_crs == "GDA94":
@@ -347,33 +349,40 @@ class UnifiedS3Source(BaseDataSource):
                     zone_match = re.search(r'/z(\d{2})/', file_path)
                     if zone_match:
                         utm_zone = int(zone_match.group(1))
-                        epsg_code = 28300 + utm_zone  # GDA94 MGA Zone (28354=Zone54, 28355=Zone55, etc.)
-                        target_srs.ImportFromEPSG(epsg_code)
-                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{epsg_code}")
+                        actual_epsg = 28300 + utm_zone  # GDA94 MGA Zone (28354=Zone54, 28355=Zone55, etc.)
+                        target_srs.ImportFromEPSG(actual_epsg)
+                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{actual_epsg}")
                     else:
                         # Fallback to Zone 56 if no zone found
-                        target_srs.ImportFromEPSG(28356)
-                        logger.debug(f"GDA94 fallback to EPSG:28356 (no zone detected)")
+                        actual_epsg = 28356
+                        target_srs.ImportFromEPSG(actual_epsg)
+                        logger.debug(f"GDA94 fallback to EPSG:{actual_epsg} (no zone detected)")
                 elif target_crs == "GDA2020":
                     # Extract UTM zone for GDA2020
                     import re
                     zone_match = re.search(r'/z(\d{2})/', file_path)
                     if zone_match:
                         utm_zone = int(zone_match.group(1))
-                        epsg_code = 7800 + utm_zone  # GDA2020 MGA Zone (7854=Zone54, 7855=Zone55, etc.)
-                        target_srs.ImportFromEPSG(epsg_code)
-                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{epsg_code}")
+                        actual_epsg = 7800 + utm_zone  # GDA2020 MGA Zone (7854=Zone54, 7855=Zone55, etc.)
+                        target_srs.ImportFromEPSG(actual_epsg)
+                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{actual_epsg}")
                     else:
                         # Fallback to Zone 56
-                        target_srs.ImportFromEPSG(7856)
-                        logger.debug(f"GDA2020 fallback to EPSG:7856 (no zone detected)")
+                        actual_epsg = 7856
+                        target_srs.ImportFromEPSG(actual_epsg)
+                        logger.debug(f"GDA2020 fallback to EPSG:{actual_epsg} (no zone detected)")
                 else:
                     target_srs.ImportFromUserInput(target_crs)
+                    actual_epsg = target_crs
             else:
                 target_srs.ImportFromEPSG(4326)  # Default to WGS84
+                actual_epsg = 4326
             
             transform = osr.CoordinateTransformation(source_srs, target_srs)
             x, y, z = transform.TransformPoint(lon, lat)
+            
+            # Log the actual transformation result
+            logger.info(f"🔍 Transform: ({lat}, {lon}) WGS84 → ({x:.2f}, {y:.2f}) EPSG:{actual_epsg}")
             
             # Convert to pixel coordinates
             gt = dataset.GetGeoTransform()
