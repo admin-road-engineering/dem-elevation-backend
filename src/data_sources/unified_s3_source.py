@@ -309,7 +309,7 @@ class UnifiedS3Source(BaseDataSource):
             gdal.SetConfigOption('VSI_CACHE', 'YES')
             gdal.SetConfigOption('VSI_CACHE_SIZE', '67108864')  # 64MB cache
             gdal.SetConfigOption('GDAL_DISABLE_READDIR_ON_OPEN', 'YES')
-            gdal.SetConfigOption('AWS_S3_REQUEST_PAYER', 'requester')  # For security
+            # REMOVED: AWS_S3_REQUEST_PAYER - causes 403 errors on public/standard buckets
             
             # Ensure AWS credentials are available to GDAL
             import os
