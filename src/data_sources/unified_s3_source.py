@@ -316,7 +316,7 @@ class UnifiedS3Source(BaseDataSource):
             if 'nz-elevation' in file_path:
                 # Public bucket - use unsigned requests
                 gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'YES')
-                logger.warning(f"🌐 S3 Config: Using unsigned requests for public NZ bucket")
+                logger.debug(f"Using unsigned requests for public bucket")
             else:
                 # Private bucket - use credentials
                 gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'NO')
@@ -326,13 +326,12 @@ class UnifiedS3Source(BaseDataSource):
                     gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', os.environ['AWS_SECRET_ACCESS_KEY'])
                 if 'AWS_DEFAULT_REGION' in os.environ:
                     gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
-                logger.warning(f"🔐 S3 Config: Using signed requests for private AU bucket")
+                logger.debug(f"Using signed requests for private bucket")
             
             # Open dataset
-            logger.warning(f"🔍 GDAL Debug: Opening file {file_path} with target CRS: {target_crs}")
             dataset = gdal.Open(file_path)
             if not dataset:
-                logger.warning(f"❌ GDAL FAIL: Could not open dataset {file_path}")
+                logger.debug(f"Could not open dataset: {file_path}")
                 return None
                 
             # Transform coordinates from WGS84 to file's native CRS
@@ -350,11 +349,11 @@ class UnifiedS3Source(BaseDataSource):
                         utm_zone = int(zone_match.group(1))
                         epsg_code = 28300 + utm_zone  # GDA94 MGA Zone (28354=Zone54, 28355=Zone55, etc.)
                         target_srs.ImportFromEPSG(epsg_code)
-                        logger.warning(f"🔧 CRS Fix: Converted 'GDA94' + Zone {utm_zone} to EPSG:{epsg_code}")
+                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{epsg_code}")
                     else:
                         # Fallback to Zone 56 if no zone found
                         target_srs.ImportFromEPSG(28356)
-                        logger.warning(f"🔧 CRS Fix: GDA94 fallback to EPSG:28356 (no zone detected)")
+                        logger.debug(f"GDA94 fallback to EPSG:28356 (no zone detected)")
                 elif target_crs == "GDA2020":
                     # Extract UTM zone for GDA2020
                     import re
@@ -363,11 +362,11 @@ class UnifiedS3Source(BaseDataSource):
                         utm_zone = int(zone_match.group(1))
                         epsg_code = 7800 + utm_zone  # GDA2020 MGA Zone (7854=Zone54, 7855=Zone55, etc.)
                         target_srs.ImportFromEPSG(epsg_code)
-                        logger.warning(f"🔧 CRS Fix: Converted 'GDA2020' + Zone {utm_zone} to EPSG:{epsg_code}")
+                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{epsg_code}")
                     else:
                         # Fallback to Zone 56
                         target_srs.ImportFromEPSG(7856)
-                        logger.warning(f"🔧 CRS Fix: GDA2020 fallback to EPSG:7856 (no zone detected)")
+                        logger.debug(f"GDA2020 fallback to EPSG:7856 (no zone detected)")
                 else:
                     target_srs.ImportFromUserInput(target_crs)
             else:
@@ -376,21 +375,15 @@ class UnifiedS3Source(BaseDataSource):
             transform = osr.CoordinateTransformation(source_srs, target_srs)
             x, y, z = transform.TransformPoint(lon, lat)
             
-            # ✅ DEBUGGING: Log coordinate transformation results
-            logger.warning(f"🔍 CRS Debug: Transformed ({lat}, {lon}) WGS84 → ({x:.2f}, {y:.2f}) {target_crs}")
-            
             # Convert to pixel coordinates
             gt = dataset.GetGeoTransform()
             inv_gt = gdal.InvGeoTransform(gt)
             px = int(inv_gt[0] + x * inv_gt[1] + y * inv_gt[2])
             py = int(inv_gt[3] + x * inv_gt[4] + y * inv_gt[5])
             
-            # ✅ DEBUGGING: Log pixel coordinate calculation
-            logger.warning(f"🔍 Pixel Debug: Calculated pixel coords ({px}, {py}). Raster size: ({dataset.RasterXSize}, {dataset.RasterYSize})")
-            
             # Check if pixel coordinates are within bounds
             if not (0 <= px < dataset.RasterXSize and 0 <= py < dataset.RasterYSize):
-                logger.warning(f"❌ BOUNDS FAIL: Pixel ({px}, {py}) outside raster bounds ({dataset.RasterXSize}, {dataset.RasterYSize}). Check CRS!")
+                logger.debug(f"Coordinate ({lat}, {lon}) → pixel ({px}, {py}) outside raster ({dataset.RasterXSize}x{dataset.RasterYSize})")
                 return None
             
             # Read elevation value
@@ -402,7 +395,9 @@ class UnifiedS3Source(BaseDataSource):
                 # Check for NODATA values
                 nodata = band.GetNoDataValue()
                 if nodata is not None and elevation == nodata:
+                    logger.debug(f"NODATA value encountered at coordinate")
                     return None
+                logger.info(f"✅ SUCCESS: Extracted elevation {elevation}m from {file_path}")
                 return elevation
                 
             return None
