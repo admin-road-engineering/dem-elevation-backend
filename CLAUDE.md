@@ -302,8 +302,8 @@ nz-elevation/                         # Public bucket
 #### AWS Connection Process
 ```bash
 # Using environment variables from .env or Railway
-AWS_ACCESS_KEY_ID=AKIA5SIDYET7N3U4JQ5H
-AWS_SECRET_ACCESS_KEY=[credential]
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 AWS_DEFAULT_REGION=ap-southeast-2
 
 # Upload spatial indexes (when needed)

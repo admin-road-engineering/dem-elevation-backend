@@ -33,10 +33,10 @@ ENABLE_NZ_SOURCES=true                     # Enables New Zealand S3 sources
 USE_S3_SOURCES=true                        # Enables Australian S3 campaigns
 SPATIAL_INDEX_SOURCE=s3                    # Use S3-hosted spatial indexes
 APP_ENV=production                         # Production safety behaviors
-AWS_ACCESS_KEY_ID=AKIA5SIDYET7N3U4JQ5H    # S3 access credentials
+AWS_ACCESS_KEY_ID=your_aws_access_key    # S3 access credentials
 AWS_SECRET_ACCESS_KEY=[masked]             # S3 secret key
 AWS_DEFAULT_REGION=ap-southeast-2          # Sydney region
-GPXZ_API_KEY=ak_zj8pF60R_1h0s4aVF52KDSBMq # GPXZ fallback API
+GPXZ_API_KEY=your_gpxz_api_key # GPXZ fallback API
 GOOGLE_ELEVATION_API_KEY=[masked]          # Google fallback API
 REDIS_URL=[auto-configured]                # Railway Redis addon
 ```
@@ -64,7 +64,7 @@ nz-elevation/                              # Public bucket (no credentials)
 ```
 
 ### AWS Credentials & Access
-- **Access Key**: `AKIA5SIDYET7N3U4JQ5H`
+- **Access Key**: `your_aws_access_key`
 - **Region**: `ap-southeast-2` (Sydney)
 - **Main Bucket**: Private access via AWS credentials
 - **NZ Bucket**: Public access with `AWS_NO_SIGN_REQUEST=YES`
