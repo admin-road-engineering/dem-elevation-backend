@@ -169,15 +169,15 @@ class AustralianCampaignHandler(BaseCollectionHandler):
                     projected_point = query_point.get_or_create_projection(epsg_code, self.crs_service)
                     bounds = file_entry.bounds
                     
-                    # Check if projected point intersects file bounds
+                    # Check if point intersects file bounds
                     if hasattr(bounds, 'min_x') and hasattr(bounds, 'min_y'):
-                        # UTM bounds format
+                        # UTM bounds format - use projected coordinates
                         is_inside = (bounds.min_x <= projected_point.x <= bounds.max_x and
                                     bounds.min_y <= projected_point.y <= bounds.max_y)
                     else:
-                        # Legacy WGS84 bounds format (file bounds are typically still in WGS84)
-                        is_inside = (bounds.min_lon <= projected_point.x <= bounds.max_lon and
-                                    bounds.min_lat <= projected_point.y <= bounds.max_lat)
+                        # WGS84 bounds format - use original WGS84 coordinates for file bounds
+                        is_inside = (bounds.min_lat <= lat <= bounds.max_lat and
+                                    bounds.min_lon <= lon <= bounds.max_lon)
                     
                     if is_inside:
                         candidates.append(file_entry)
