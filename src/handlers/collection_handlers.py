@@ -44,9 +44,11 @@ class BaseCollectionHandler(ABC):
         
         for file_entry in collection.files:
             bounds = file_entry.bounds
-            if (bounds.min_lat <= lat <= bounds.max_lat and
-                bounds.min_lon <= lon <= bounds.max_lon):
-                candidates.append(file_entry)
+            # Only do WGS84 bounds checking if WGS84 bounds are available
+            if hasattr(bounds, 'min_lat') and hasattr(bounds, 'min_lon'):
+                if (bounds.min_lat <= lat <= bounds.max_lat and
+                    bounds.min_lon <= lon <= bounds.max_lon):
+                    candidates.append(file_entry)
         
         logger.debug(f"Found {len(candidates)} file candidates in collection {collection.id}")
         return candidates
@@ -137,10 +139,16 @@ class AustralianCampaignHandler(BaseCollectionHandler):
             
         except Exception as e:
             logger.error(f"CRS transformation failed for collection {collection.id}: {e}")
-            # Graceful degradation to WGS84 bounds checking
+            # Graceful degradation - check if we can still do WGS84 bounds checking
             bounds = collection.coverage_bounds
-            return (bounds.min_lat <= query_point.wgs84.lat <= bounds.max_lat and
-                   bounds.min_lon <= query_point.wgs84.lon <= bounds.max_lon)
+            if hasattr(bounds, 'min_lat') and hasattr(bounds, 'min_lon'):
+                # WGS84 bounds available
+                return (bounds.min_lat <= query_point.wgs84.lat <= bounds.max_lat and
+                       bounds.min_lon <= query_point.wgs84.lon <= bounds.max_lon)
+            else:
+                # UTM bounds only - cannot do WGS84 fallback safely
+                logger.warning(f"Collection {collection.id} has UTM bounds but CRS transformation failed - skipping")
+                return False
     
     def find_files_for_coordinate(self, collection: DataCollection, lat: float, lon: float) -> List[FileEntry]:
         """Find files with CRS-aware coordinate transformation (overrides base implementation)"""
@@ -175,18 +183,21 @@ class AustralianCampaignHandler(BaseCollectionHandler):
                         candidates.append(file_entry)
                         logger.debug(f"✅ File {file_entry.filename} contains UTM point ({projected_point.x:.1f}, {projected_point.y:.1f})")
                 except Exception as e:
-                    logger.error(f"CRS transformation failed for file {file_entry.file_path}: {e}")
-                    # Fallback to standard bounds checking
+                    logger.error(f"CRS transformation failed for file {getattr(file_entry, 'filename', 'unknown')}: {e}")
+                    # Fallback to standard bounds checking if WGS84 bounds available
                     bounds = file_entry.bounds
-                    if (bounds.min_lat <= lat <= bounds.max_lat and
-                        bounds.min_lon <= lon <= bounds.max_lon):
-                        candidates.append(file_entry)
+                    if hasattr(bounds, 'min_lat') and hasattr(bounds, 'min_lon'):
+                        if (bounds.min_lat <= lat <= bounds.max_lat and
+                            bounds.min_lon <= lon <= bounds.max_lon):
+                            candidates.append(file_entry)
+                    # If UTM bounds only, skip this file in fallback
             else:
                 # Standard WGS84 bounds checking (fallback)
                 bounds = file_entry.bounds
-                if (bounds.min_lat <= lat <= bounds.max_lat and
-                    bounds.min_lon <= lon <= bounds.max_lon):
-                    candidates.append(file_entry)
+                if hasattr(bounds, 'min_lat') and hasattr(bounds, 'min_lon'):
+                    if (bounds.min_lat <= lat <= bounds.max_lat and
+                        bounds.min_lon <= lon <= bounds.max_lon):
+                        candidates.append(file_entry)
         
         logger.info(f"Found {len(candidates)} files in collection {collection.id} for coordinate ({lat}, {lon})")
         return candidates
