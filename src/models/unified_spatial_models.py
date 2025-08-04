@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Literal, Union, Any
 from datetime import datetime
 import uuid
 
-class CoverageBounds(BaseModel):
+class WGS84Bounds(BaseModel):
     """Geographic bounding box in WGS84 coordinates"""
     min_lat: float = Field(..., ge=-90, le=90, description="Minimum latitude")
     max_lat: float = Field(..., ge=-90, le=90, description="Maximum latitude") 
@@ -26,11 +26,33 @@ class CoverageBounds(BaseModel):
             raise ValueError('max_lon must be >= min_lon')
         return v
 
+class UTMBounds(BaseModel):
+    """Projected bounding box in UTM coordinates (meters)"""
+    min_x: float = Field(..., description="Minimum easting (meters)")
+    max_x: float = Field(..., description="Maximum easting (meters)")
+    min_y: float = Field(..., description="Minimum northing (meters)")
+    max_y: float = Field(..., description="Maximum northing (meters)")
+    
+    @validator('max_x')
+    def validate_x_order(cls, v, values):
+        if 'min_x' in values and v < values['min_x']:
+            raise ValueError('max_x must be >= min_x')
+        return v
+    
+    @validator('max_y')
+    def validate_y_order(cls, v, values):
+        if 'min_y' in values and v < values['min_y']:
+            raise ValueError('max_y must be >= min_y')
+        return v
+
+# Union type for flexible bounds handling
+CoverageBounds = Union[WGS84Bounds, UTMBounds]
+
 class FileEntry(BaseModel):
     """Individual elevation data file with metadata"""
     file: str = Field(..., description="S3 path to the file")
     filename: str = Field(..., description="Base filename")
-    bounds: CoverageBounds = Field(..., description="File coverage bounds")
+    bounds: Union[WGS84Bounds, UTMBounds] = Field(..., description="File coverage bounds")
     size_mb: float = Field(..., ge=0, description="File size in megabytes")
     last_modified: str = Field(..., description="ISO format timestamp")
     resolution: str = Field(..., description="Spatial resolution (e.g., '1m')")
@@ -68,9 +90,13 @@ class AustralianUTMCollection(BaseCollection):
     utm_zone: conint(ge=1, le=60) = Field(..., description="UTM zone number")
     state: str = Field(..., description="Australian state/territory")
     region: Optional[str] = Field(None, description="Specific region within state")
-    campaign_year: Optional[int] = Field(None, description="Survey campaign year")
+    campaign_name: str = Field(..., description="Campaign name")
+    survey_year: Optional[int] = Field(None, description="Survey campaign year")
+    campaign_year: Optional[int] = Field(None, description="Survey campaign year (legacy)")
     data_type: Literal["DEM", "DSM"] = Field(default="DEM", description="Digital Elevation Model type")
     resolution_m: float = Field(default=1.0, gt=0, description="Resolution in meters")
+    epsg: str = Field(..., description="EPSG code for CRS-aware spatial queries")
+    bounds_transformation: Optional[Dict[str, Any]] = Field(None, description="Bounds transformation metadata")
 
 class NewZealandCampaignCollection(BaseCollection):
     """New Zealand elevation data organized by survey campaigns"""
@@ -87,21 +113,23 @@ DataCollection = Union[AustralianUTMCollection, NewZealandCampaignCollection]
 
 class SchemaMetadata(BaseModel):
     """Metadata about the unified spatial index"""
-    generated_at: datetime = Field(default_factory=datetime.now, description="Generation timestamp")
+    generated_at: Union[datetime, str] = Field(default_factory=datetime.now, description="Generation timestamp")
     generator: str = Field(default="unified_spatial_index_v2", description="Generator name")
     total_collections: int = Field(..., ge=0, description="Total number of collections")
     total_files: int = Field(..., ge=0, description="Total number of files")
     countries: List[str] = Field(..., min_items=1, description="Countries represented")
     collection_types: List[str] = Field(..., min_items=1, description="Collection types present")
+    note: Optional[str] = Field(None, description="Additional notes about the index")
 
 class UnifiedSpatialIndex(BaseModel):
     """Top-level unified spatial index with discriminated unions"""
     version: Literal["2.0"] = "2.0"
     schema_metadata: SchemaMetadata = Field(..., description="Index metadata")
     data_collections: List[DataCollection] = Field(..., min_items=1, description="List of all data collections")
+    transformation_metadata: Optional[Dict[str, Any]] = Field(None, description="Bounds transformation metadata")
     
     class Config:
-        extra = "forbid"  # Strict validation - no additional fields allowed
+        extra = "allow"  # Allow additional fields for transformation metadata
         
     def get_collections_by_country(self, country: str) -> List[DataCollection]:
         """Get all collections for a specific country"""
