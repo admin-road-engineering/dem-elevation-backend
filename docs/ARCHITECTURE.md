@@ -3,10 +3,10 @@
 ## 🏗️ System Architecture
 
 ### Production Architecture Status
-**Current Rating**: ✅ **"Well-Architected" Status** (Gemini validated)  
-**Target**: A+ "Exceptional" with advanced pattern refinements
+**Current Rating**: ✅ **A- "Excellent" Architecture** (Gemini validated) - Phase 4 Complete  
+**Target**: A+ "Exceptional" through CRS-aware spatial architecture
 
-**Phase 3B.3.1**: Core architectural decoupling through DataSource Strategy Pattern and Circuit Breaker dependency injection successfully completed. Gemini assessment: *"Top-tier refactoring demonstrating deep understanding of modern software architecture principles."*
+**Phase 4**: Unified campaign-based architecture with 1,582 individual collections successfully deployed. Gemini assessment: *"Industry-leading example of well-architected microservice with clear path to A+ status."*
 
 ### Core Components
 
@@ -28,18 +28,24 @@
 - **Sub-500ms Startup**: Kubernetes/Railway health check compatible
 - **Dependency Injection**: Clean DI pattern throughout service stack
 
-#### Data Source Implementation Strategy
-1. **S3Source** (Priority 1): 1,153 Australian campaigns, maintains 54,000x Brisbane speedup through spatial indexing
-2. **GPXZSource** (Priority 2): Global coverage via GPXZ.io API, 100 req/day free tier, circuit breaker protected
+#### Unified Data Source Architecture (Phase 4) ✅
+1. **UnifiedS3Source** (Priority 1): 1,582 collections (1,394 AU campaigns + 188 NZ campaigns) with campaign-level prioritization
+2. **GPXZSource** (Priority 2): Global coverage via GPXZ.io API, 100 req/day free tier, circuit breaker protected  
 3. **GoogleSource** (Priority 3): Final fallback via Google Elevation API, 2,500 req/day free tier, comprehensive error handling
+
+**Collection Handler Strategy Pattern**:
+- **AustralianCampaignHandler**: Individual campaign prioritization with survey year logic (Brisbane_2019_Prj > Brisbane_2014_LGA > Brisbane_2009_LGA)
+- **NewZealandCampaignHandler**: NZ campaign handling with DEM/DSM prioritization
+- **Handler Registry**: Extensible pattern for adding new countries/collection types
 
 ### Performance Architecture
 
-#### Spatial Indexing
-- **Campaign-Based Selection**: O(log N) lookup via spatial grid
-- **54,000x Brisbane Speedup**: Direct S3 campaign vs API calls
-- **Grid Structure**: 50x50 cells, 849/2500 occupied, avg 4.5 campaigns/cell
-- **Memory Efficient**: ~600MB for complete spatial indexes
+#### Spatial Indexing (Phase 4)
+- **Individual Campaign Collections**: 1,582 collections with campaign-level granularity
+- **Campaign Prioritization**: Survey year-based selection (newer campaigns prioritized)
+- **Current Performance**: O(N) iteration across 1,394 AU campaigns (**requires R-tree optimization**)
+- **Memory Efficient**: ~400MB for unified spatial indexes (382.7 MB index file)
+- **Target**: Brisbane 54,000x speedup restoration through CRS-aware spatial queries
 
 #### Async Operations
 - **True Async I/O**: No blocking operations in request handlers
