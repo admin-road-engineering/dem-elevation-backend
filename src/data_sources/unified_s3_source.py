@@ -447,31 +447,48 @@ class UnifiedS3Source(BaseDataSource):
         try:
             import rasterio
             from rasterio.warp import transform as warp_transform
+            from rasterio.env import Env
+            import os
             
-            # Open raster file
-            with rasterio.open(file_path) as dataset:
-                # Transform coordinate to dataset CRS if needed
-                if dataset.crs.to_string() != 'EPSG:4326':
-                    # Transform from WGS84 to dataset CRS
-                    xs, ys = warp_transform('EPSG:4326', dataset.crs, [lon], [lat])
-                    x, y = xs[0], ys[0]
-                else:
-                    x, y = lon, lat
-                
-                # Sample elevation at coordinate
-                row, col = dataset.index(x, y)
-                
-                # Check if coordinate is within raster bounds
-                if (0 <= row < dataset.height and 0 <= col < dataset.width):
-                    elevation = dataset.read(1)[row, col]
+            # Configure S3 authentication for rasterio based on bucket type
+            if 'nz-elevation' in file_path:
+                # Public bucket - use unsigned requests
+                env_config = {'AWS_NO_SIGN_REQUEST': 'YES', 'AWS_REGION': 'ap-southeast-2'}
+                logger.debug(f"Rasterio fallback: Using unsigned requests for public NZ bucket")
+            else:
+                # Private bucket - use credentials from environment
+                env_config = {'AWS_REGION': 'ap-southeast-2'}
+                if 'AWS_ACCESS_KEY_ID' in os.environ:
+                    env_config['AWS_ACCESS_KEY_ID'] = os.environ['AWS_ACCESS_KEY_ID']
+                if 'AWS_SECRET_ACCESS_KEY' in os.environ:
+                    env_config['AWS_SECRET_ACCESS_KEY'] = os.environ['AWS_SECRET_ACCESS_KEY']
+                logger.debug(f"Rasterio fallback: Using signed requests for private AU bucket")
+            
+            # Open raster file with proper S3 configuration
+            with Env(**env_config):
+                with rasterio.open(file_path) as dataset:
+                    # Transform coordinate to dataset CRS if needed
+                    if dataset.crs.to_string() != 'EPSG:4326':
+                        # Transform from WGS84 to dataset CRS
+                        xs, ys = warp_transform('EPSG:4326', dataset.crs, [lon], [lat])
+                        x, y = xs[0], ys[0]
+                    else:
+                        x, y = lon, lat
                     
-                    # Handle nodata values
-                    if dataset.nodata is not None and elevation == dataset.nodata:
+                    # Sample elevation at coordinate
+                    row, col = dataset.index(x, y)
+                    
+                    # Check if coordinate is within raster bounds
+                    if (0 <= row < dataset.height and 0 <= col < dataset.width):
+                        elevation = dataset.read(1)[row, col]
+                        
+                        # Handle nodata values
+                        if dataset.nodata is not None and elevation == dataset.nodata:
+                            return None
+                        
+                        return float(elevation)
+                    else:
                         return None
-                    
-                    return float(elevation)
-                else:
-                    return None
                     
         except Exception as e:
             logger.debug(f"Rasterio fallback failed for {file_path}: {e}")
