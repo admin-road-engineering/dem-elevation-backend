@@ -27,7 +27,8 @@ class UnifiedS3Source(BaseDataSource):
     def __init__(self, 
                  use_unified_index: bool = False,
                  unified_index_key: str = "indexes/unified_spatial_index_v2.json",
-                 s3_client_factory: Optional[S3ClientFactory] = None):
+                 s3_client_factory: Optional[S3ClientFactory] = None,
+                 crs_service=None):
         """
         Initialize unified S3 source
         
@@ -35,6 +36,7 @@ class UnifiedS3Source(BaseDataSource):
             use_unified_index: If True, use unified v2.0 index
             unified_index_key: S3 key for unified index
             s3_client_factory: S3 client factory for AWS access
+            crs_service: CRS transformation service for CRS-aware spatial queries
         """
         super().__init__("unified_s3")
         self.use_unified_index = use_unified_index
@@ -43,7 +45,7 @@ class UnifiedS3Source(BaseDataSource):
         
         # Core components
         self.unified_index: Optional[UnifiedSpatialIndex] = None
-        self.handler_registry = CollectionHandlerRegistry()
+        self.handler_registry = CollectionHandlerRegistry(crs_service)
         
         # Local fallback
         self.config_dir = Path("config")

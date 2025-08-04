@@ -18,6 +18,7 @@ from .dem_service import DEMService
 from .redis_state_manager import RedisStateManager
 from .unified_index_loader import UnifiedIndexLoader
 from .source_provider import SourceProvider
+from .services.crs_service import CRSTransformationService
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,9 @@ class ServiceContainer:
         
         # Initialize UnifiedIndexLoader for enhanced index management (Phase 1)
         self._unified_index_loader: Optional[UnifiedIndexLoader] = None
+        
+        # Initialize CRS transformation service for CRS-aware spatial queries (Phase 5)
+        self._crs_service: Optional[CRSTransformationService] = None
         
         logger.info(f"ServiceContainer initialized with Redis state management, SourceProvider: {source_provider is not None}, UnifiedProvider: {unified_provider is not None}")
     
@@ -127,6 +131,14 @@ class ServiceContainer:
             logger.info("UnifiedIndexLoader created with data-driven configuration")
         return self._unified_index_loader
     
+    @property
+    def crs_service(self) -> CRSTransformationService:
+        """Get CRS transformation service (Phase 5 - for CRS-aware spatial queries)"""
+        if self._crs_service is None:
+            self._crs_service = CRSTransformationService()
+            logger.info("CRSTransformationService created for data-driven coordinate transformations")
+        return self._crs_service
+    
     async def close(self):
         """Close all managed services and clean up resources."""
         services_to_close = [
@@ -134,6 +146,7 @@ class ServiceContainer:
             ("elevation_service", self._elevation_service),
             ("dataset_manager", self._dataset_manager),
             ("redis_manager", self._redis_manager),
+            ("crs_service", self._crs_service),
         ]
         
         for service_name, service in services_to_close:
@@ -228,3 +241,8 @@ def get_enhanced_selector_from_app_state(request: Request):
     if hasattr(request.app.state, 'enhanced_selector'):
         return request.app.state.enhanced_selector
     return None
+
+
+def get_crs_service() -> CRSTransformationService:
+    """FastAPI dependency to get CRSTransformationService instance."""
+    return get_service_container().crs_service

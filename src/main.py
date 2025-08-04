@@ -162,11 +162,16 @@ async def lifespan(app: FastAPI):
         if settings.USE_UNIFIED_SPATIAL_INDEX:
             logger.info("🚀 Using Phase 2 Unified Architecture (v2.0) with discriminated unions")
             
-            # Import UnifiedElevationProvider
+            # Import UnifiedElevationProvider and CRS service  
             from .providers.unified_elevation_provider import UnifiedElevationProvider
+            from .services.crs_service import CRSTransformationService
             
-            # Create and initialize unified provider
-            unified_provider = UnifiedElevationProvider(s3_client_factory=s3_factory)
+            # Create CRS transformation service for CRS-aware spatial queries
+            crs_service = CRSTransformationService()
+            logger.info("CRS transformation service created for Brisbane coordinate system fix")
+            
+            # Create and initialize unified provider with CRS service
+            unified_provider = UnifiedElevationProvider(s3_client_factory=s3_factory, crs_service=crs_service)
             
             # Initialize unified system - BLOCKS startup until complete
             logger.info("Initializing unified elevation system...")

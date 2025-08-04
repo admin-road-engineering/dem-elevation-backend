@@ -14,6 +14,7 @@ from ..data_sources.circuit_breaker_source import CircuitBreakerWrappedDataSourc
 from ..s3_client_factory import S3ClientFactory
 from ..circuit_breakers.redis_circuit_breaker import RedisCircuitBreaker
 from ..circuit_breakers.memory_circuit_breaker import InMemoryCircuitBreaker
+from ..services.crs_service import CRSTransformationService
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +24,19 @@ class UnifiedElevationProvider:
     Feature flag controlled for safe deployment
     """
     
-    def __init__(self, s3_client_factory: Optional[S3ClientFactory] = None):
+    def __init__(self, s3_client_factory: Optional[S3ClientFactory] = None, crs_service: Optional[CRSTransformationService] = None):
         """
         Initialize unified elevation provider
         
         Args:
             s3_client_factory: S3 client factory for AWS access
+            crs_service: CRS transformation service for CRS-aware spatial queries
         """
         self.settings = get_settings()
         self.s3_client_factory = s3_client_factory
+        
+        # Create CRS service if not provided
+        self.crs_service = crs_service or CRSTransformationService()
         
         # Core data source
         self.elevation_source: Optional[BaseDataSource] = None
@@ -70,11 +75,12 @@ class UnifiedElevationProvider:
         logger.info("🔄 Initializing unified v2.0 elevation system...")
         
         try:
-            # Create unified S3 source
+            # Create unified S3 source with CRS service injection
             unified_s3_source = UnifiedS3Source(
                 use_unified_index=True,
-                unified_index_key=self.settings.UNIFIED_INDEX_PATH,
-                s3_client_factory=self.s3_client_factory
+                unified_index_key=self.settings.UNIFIED_INDEX_PATH,  
+                s3_client_factory=self.s3_client_factory,
+                crs_service=self.crs_service
             )
             
             # Initialize API sources for fallback (if enabled)
