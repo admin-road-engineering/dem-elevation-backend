@@ -113,15 +113,25 @@ class AustralianCampaignHandler(BaseCollectionHandler):
             # Transform point to collection's native CRS
             projected_point = query_point.get_or_create_projection(epsg_code, self.crs_service)
             
-            # Check if projected point is within UTM bounds  
+            # Check if projected point is within bounds  
             bounds = collection.coverage_bounds
-            # Note: bounds are stored as min_lat/max_lat but for UTM they represent y coordinates (northing)
-            # and min_lon/max_lon represent x coordinates (easting)
-            is_inside = (bounds.min_lon <= projected_point.x <= bounds.max_lon and
-                        bounds.min_lat <= projected_point.y <= bounds.max_lat)
+            
+            # Handle both UTM bounds (min_x/max_x/min_y/max_y) and WGS84 bounds (min_lat/max_lat/min_lon/max_lon)
+            if hasattr(bounds, 'min_x') and hasattr(bounds, 'min_y'):
+                # UTM bounds format (transformed data)
+                is_inside = (bounds.min_x <= projected_point.x <= bounds.max_x and
+                            bounds.min_y <= projected_point.y <= bounds.max_y)
+                logger.debug(f"Using UTM bounds: x={bounds.min_x:.0f}-{bounds.max_x:.0f}, y={bounds.min_y:.0f}-{bounds.max_y:.0f}")
+            else:
+                # Legacy WGS84 bounds format (assume they represent UTM coordinates in lat/lon fields)
+                is_inside = (bounds.min_lon <= projected_point.x <= bounds.max_lon and
+                            bounds.min_lat <= projected_point.y <= bounds.max_lat)
+                logger.debug(f"Using legacy UTM bounds: x={bounds.min_lon:.0f}-{bounds.max_lon:.0f}, y={bounds.min_lat:.0f}-{bounds.max_lat:.0f}")
             
             if is_inside:
-                logger.debug(f"✅ Collection {collection.id} contains UTM point ({projected_point.x:.1f}, {projected_point.y:.1f})")
+                logger.debug(f"✅ Collection {collection.campaign_name} contains UTM point ({projected_point.x:.1f}, {projected_point.y:.1f})")
+            else:
+                logger.debug(f"❌ Collection {collection.campaign_name} does NOT contain UTM point ({projected_point.x:.1f}, {projected_point.y:.1f})")
             
             return is_inside
             
@@ -151,11 +161,19 @@ class AustralianCampaignHandler(BaseCollectionHandler):
                     projected_point = query_point.get_or_create_projection(epsg_code, self.crs_service)
                     bounds = file_entry.bounds
                     
-                    # Check if projected point intersects file bounds (UTM coordinates)
-                    if (bounds.min_lon <= projected_point.x <= bounds.max_lon and
-                        bounds.min_lat <= projected_point.y <= bounds.max_lat):
+                    # Check if projected point intersects file bounds
+                    if hasattr(bounds, 'min_x') and hasattr(bounds, 'min_y'):
+                        # UTM bounds format
+                        is_inside = (bounds.min_x <= projected_point.x <= bounds.max_x and
+                                    bounds.min_y <= projected_point.y <= bounds.max_y)
+                    else:
+                        # Legacy WGS84 bounds format (file bounds are typically still in WGS84)
+                        is_inside = (bounds.min_lon <= projected_point.x <= bounds.max_lon and
+                                    bounds.min_lat <= projected_point.y <= bounds.max_lat)
+                    
+                    if is_inside:
                         candidates.append(file_entry)
-                        logger.debug(f"✅ File {file_entry.file_path} contains UTM point ({projected_point.x:.1f}, {projected_point.y:.1f})")
+                        logger.debug(f"✅ File {file_entry.filename} contains UTM point ({projected_point.x:.1f}, {projected_point.y:.1f})")
                 except Exception as e:
                     logger.error(f"CRS transformation failed for file {file_entry.file_path}: {e}")
                     # Fallback to standard bounds checking
