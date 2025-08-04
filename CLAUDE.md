@@ -6,8 +6,9 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 
 **Role**: Critical elevation data microservice providing sub-100ms responses for road engineering applications through intelligent data source selection and spatial indexing.
 
-**Current Status**: ✅ **A- "Excellent" Architecture** (Gemini validated) - Phase 4 Complete  
-**Target**: A+ "Exceptional" through CRS-aware spatial architecture
+**Current Status**: **Under Maintenance - Data-Code Contract Resolution**  
+**Architecture Framework**: A- "Excellent" patterns and design principles established  
+**Target**: A+ "Exceptional" through unified data-code contract architecture
 
 ## 🏗️ Architectural Principles
 
@@ -42,7 +43,7 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 
 ## 📊 Performance Metrics
 
-- **Brisbane CBD**: Target 11.523m elevation, 54,000x speedup (requires CRS fix)
+- **Brisbane CBD**: CRS transformation working correctly, pending GDAL configuration for elevation extraction
 - **Auckland Harbor**: ✅ 25.084m elevation via unified architecture  
 - **Startup Time**: <2s with complete 1,582 collection index loading
 - **Memory Usage**: ~400MB for unified spatial indexes in production
@@ -89,6 +90,25 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 - **New Zealand**: ✅ 188 survey campaigns with 1m resolution LiDAR data via public S3 bucket  
 - **Global Fallback**: GPXZ → Google API chain for worldwide coverage
 - **Response Times**: ✅ <1s for NZ coordinates, pending CRS fix for AU coordinates
+
+### Phase 5: CRS-Aware Spatial Architecture (COMPLETED ✅)
+**Achievement**: *"Production-ready CRS transformation framework with data-driven coordinate system handling"*
+
+#### ✅ CRS Transformation Infrastructure (COMPLETED)
+**Gemini Assessment**: *"Outstanding microservice demonstrating sophisticated approach to software architecture with pattern-driven design"*
+
+**Implementation Achieved**:
+- ✅ **CRSTransformationService**: Data-driven coordinate transformations with EPSG codes (28354, 28355, 28356)
+- ✅ **Transform-Once Pattern**: QueryPoint model with PointWGS84/PointProjected for efficient coordinate reuse
+- ✅ **Dependency Injection**: CRS service integrated through ServiceContainer → UnifiedElevationProvider → CollectionHandlerRegistry
+- ✅ **CRS-Aware Collection Handlers**: AustralianCampaignHandler with coordinate transformation and bounds checking
+- ✅ **Production Architecture**: 1,582 collections with CRS framework deployed to Railway
+
+#### 🔍 Critical Discovery: Data-Code Contract Issue
+**Root Cause**: Australian campaign bounds remain in WGS84 coordinates while CRS service correctly transforms input to UTM
+- **Brisbane Example**: Input transforms to UTM (x=502,000, y=6,961,000) but bounds are WGS84 (lat=-27.67, lon=153.47)
+- **Impact**: No intersection between UTM point and WGS84 bounds → "No elevation found"
+- **Solution Path**: Transform campaign bounds from WGS84 to native UTM coordinates in unified index
 
 ### Phase 3B.5: Campaign-Based Architecture Unification (COMPLETED ✅)
 **Achievement**: *"Ideal campaign-based structure with 1,582 individual collections enabling true temporal prioritization"*
@@ -146,20 +166,38 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 - 🔄 **AU Coordinates**: Requires CRS transformation fix (coordinate system mismatch)
 - ✅ **Campaign Prioritization**: Brisbane_2019_Prj prioritized over older campaigns
 
-#### 🎯 Phase 5: CRS-Aware Spatial Architecture (CRITICAL)
-**Gemini Assessment**: *"Evolution from data structure unification to true domain model unification"*
+#### ✅ Phase 6: CRS-Aware Spatial Architecture (COMPLETED)
+**Status**: **CRS Transformation Framework RESOLVED** - Brisbane coordinate system mismatch fixed
 
-**P0 Critical Priorities**:
-- **CRS Transformation Fix**: Implement pyproj coordinate transformations for Australian campaign bounds
-- **R-tree Spatial Indexing**: Restore O(log N) performance from O(N) regression across 1,394 campaigns
-- **Brisbane Validation**: Enable 11.523m elevation with Brisbane_2019_Prj prioritization
+**P0 Achievements**:
+- ✅ **Bounds Transformation**: Australian campaign bounds transformed from WGS84 to UTM coordinates
+- ✅ **CRS-Aware Collection Handlers**: UTM coordinate intersection working correctly
+- ✅ **Brisbane Pipeline Working**: Collections found (797), campaigns prioritized, files discovered (1 per collection)
+- ✅ **Transform-Once Pattern**: Efficient coordinate reuse via QueryPoint model
+- 🔧 **GDAL Issue**: Environment configuration preventing final elevation extraction
 
-**Architectural Evolution to A+**:
-- **Spatially-Aware Architecture**: CRS as first-class citizen in data model
-- **Performance Optimization**: Two-tier memory strategy with R-tree + on-demand loading
-- **Operational Excellence**: CLI consolidation and event-driven indexing
+**Brisbane Test Results (Production)**:
+```
+🏆 Brisbane campaign 'brisbane_2019_prj' (2019) priority: 30.0
+🔍 Transform: (-27.4698, 153.0251) WGS84 → (502479.87, 6961528.09) EPSG:28356
+Found 1 files in collection for coordinate (-27.4698, 153.0251)
+```
 
-**Target Result**: Complete spatial awareness enabling true 54,000x Brisbane speedup through proper coordinate system handling
+#### 🎯 Phase 7: Unified Data-Code Contract Architecture (NEXT)
+**Gemini Assessment**: *"Elevate from A- to A+ by treating spatial index generation as integral, version-controlled component"*
+
+**P0 Next Priorities**:
+- **Unified CLI Tooling**: Deprecate `.bat` scripts, create `python -m dem_backend.cli index generate-au`
+- **Schema Versioning**: Add `schema_version` and `bounds_crs` metadata with startup validation
+- **GDAL Environment Fix**: Resolve Railway GDAL configuration for elevation extraction
+
+**Strategic Architectural Enhancements**:
+- **Two-Tier R-Tree**: WGS84 coarse search + UTM precision checks for O(log N) performance
+- **Nested Configuration**: Replace flat environment variables with structured Pydantic models
+- **Documentation Restructure**: Break monolithic CLAUDE.md into focused documents
+- **Performance Restoration**: CRS-aware R-tree implementation for true O(log N) performance at 1,582 collection scale
+
+**Target Result**: Self-consistent, resilient architecture with Brisbane 11.523m elevation via proper coordinate system data preparation
 
 ## 🔒 Security & Reliability Model
 
