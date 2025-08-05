@@ -343,11 +343,15 @@ class UnifiedS3Source(BaseDataSource):
                     gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', secret_key)
                 logger.debug(f"GDAL: Using signed requests for private bucket ({bucket_type.value})")
             
-            # Open dataset
+            # Open dataset with enhanced logging
+            logger.info(f"📡 GDAL: Opening S3 file: {file_path}")
             dataset = gdal.Open(file_path)
             if not dataset:
-                logger.debug(f"Could not open dataset: {file_path}")
+                logger.error(f"❌ GDAL FAILURE: Could not open dataset: {file_path}")
+                logger.error(f"📊 GDAL Error Details: {gdal.GetLastErrorMsg()}")
                 return None
+            
+            logger.info(f"✅ GDAL SUCCESS: Opened {file_path}. Size: {dataset.RasterXSize}x{dataset.RasterYSize}, Bands: {dataset.RasterCount}")
             
             # Transform coordinates from WGS84 to file's native CRS
             source_srs = osr.SpatialReference()
@@ -446,7 +450,7 @@ class UnifiedS3Source(BaseDataSource):
             logger.warning(f"GDAL not available ({e}), falling back to rasterio")
             return self._extract_elevation_rasterio_fallback(file_path, lat, lon)
         except Exception as e:
-            logger.warning(f"GDAL extraction failed for {file_path}: {e}")
+            logger.error(f"❌ CRITICAL GDAL EXTRACTION FAILURE for {file_path}: {e}", exc_info=True)
             return None
         finally:
             if dataset:
@@ -463,7 +467,7 @@ class UnifiedS3Source(BaseDataSource):
             # Determine bucket type for configuration
             from ..utils.bucket_detector import BucketDetector
             bucket_type = BucketDetector.detect_bucket_type(file_path)
-            logger.debug(f"Rasterio fallback: Detected bucket type {bucket_type.value}")
+            logger.info(f"🔍 RASTERIO FALLBACK: Attempting {file_path} with bucket type {bucket_type.value}")
             
             # TACTICAL FIX: Use explicit rasterio.env.Env for BOTH bucket types
             # Don't use s3_environment_for_file as it may interfere with rasterio.Env
@@ -475,7 +479,7 @@ class UnifiedS3Source(BaseDataSource):
                     'AWS_NO_SIGN_REQUEST': 'YES',
                     'AWS_REGION': 'ap-southeast-2'
                 }
-                logger.debug("Rasterio: Configuring for NZ public bucket (unsigned)")
+                logger.info("🔧 Rasterio: Configuring for NZ public bucket (unsigned)")
             else:
                 # AU private bucket needs credentials
                 # Build config dict with non-None values only
@@ -490,11 +494,13 @@ class UnifiedS3Source(BaseDataSource):
                 if secret_key:
                     env_config['AWS_SECRET_ACCESS_KEY'] = secret_key
                 
-                logger.debug(f"Rasterio: Configuring for AU private bucket (signed)")
+                logger.info(f"🔧 Rasterio: Configuring for AU private bucket (signed)")
             
             # Create Env context with the appropriate config
+            logger.info(f"📡 Opening S3 file: {file_path}")
             with Env(**env_config):
                 with rasterio.open(file_path) as dataset:
+                    logger.info(f"✅ Successfully opened {file_path}. CRS: {dataset.crs}, Count: {dataset.count}, Bounds: {dataset.bounds}")
                         # Transform coordinate to dataset CRS if needed
                         if dataset.crs.to_string() != 'EPSG:4326':
                             # Transform from WGS84 to dataset CRS
@@ -520,7 +526,7 @@ class UnifiedS3Source(BaseDataSource):
                             return None
                         
         except Exception as e:
-            logger.debug(f"Rasterio fallback failed for {file_path}: {e}")
+            logger.error(f"❌ CRITICAL RASTERIO FAILURE opening {file_path}: {e}", exc_info=True)
             return None
     
     def get_statistics(self) -> Dict[str, Any]:
