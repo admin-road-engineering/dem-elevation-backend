@@ -326,9 +326,9 @@ class UnifiedS3Source(BaseDataSource):
                 if s3_env.bucket_type == BucketType.PUBLIC_UNSIGNED:
                     # Public bucket - use unsigned requests
                     gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'YES')
-                    # Clear AWS credentials to ensure unsigned requests
-                    gdal.SetConfigOption('AWS_ACCESS_KEY_ID', None)
-                    gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', None)
+                    # Clear AWS credentials to ensure unsigned requests (use empty string, not None)
+                    gdal.SetConfigOption('AWS_ACCESS_KEY_ID', '')
+                    gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', '')
                     logger.debug(f"GDAL: Using unsigned requests for public bucket ({s3_env.bucket_type.value})")
                 else:
                     # Private bucket - use signed requests
