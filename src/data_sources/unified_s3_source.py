@@ -453,14 +453,30 @@ class UnifiedS3Source(BaseDataSource):
         try:
             import rasterio
             from rasterio.warp import transform as warp_transform
+            from rasterio.env import Env
+            from ..utils.bucket_detector import BucketType
             
             # Use bucket-aware environment configuration
-            # The s3_environment_for_file context manager sets all necessary environment variables
             with s3_environment_for_file(file_path) as s3_env:
                 logger.debug(f"Rasterio fallback: Using {s3_env.bucket_type.value} configuration")
                 
-                # Open raster file with bucket-appropriate environment already set
-                with rasterio.open(file_path) as dataset:
+                # TACTICAL FIX: Use explicit rasterio.env.Env for BOTH bucket types
+                # This ensures rasterio properly handles S3 access patterns
+                if s3_env.bucket_type == BucketType.PUBLIC_UNSIGNED:
+                    # NZ public bucket needs explicit unsigned configuration
+                    env_ctx = Env(AWS_NO_SIGN_REQUEST='YES', AWS_REGION='ap-southeast-2')
+                else:
+                    # AU private bucket needs credentials (from OS environment)
+                    import os
+                    env_ctx = Env(
+                        AWS_REGION='ap-southeast-2',
+                        AWS_ACCESS_KEY_ID=os.environ.get('AWS_ACCESS_KEY_ID'),
+                        AWS_SECRET_ACCESS_KEY=os.environ.get('AWS_SECRET_ACCESS_KEY')
+                    )
+                
+                # Use the appropriate Env context for S3 access
+                with env_ctx:
+                    with rasterio.open(file_path) as dataset:
                         # Transform coordinate to dataset CRS if needed
                         if dataset.crs.to_string() != 'EPSG:4326':
                             # Transform from WGS84 to dataset CRS
