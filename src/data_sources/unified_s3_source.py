@@ -14,7 +14,6 @@ from datetime import datetime
 from ..models.unified_spatial_models import UnifiedSpatialIndex, DataCollection, FileEntry
 from ..handlers import CollectionHandlerRegistry
 from ..s3_client_factory import S3ClientFactory
-from ..utils.s3_environment import s3_environment_for_file
 from .base_source import BaseDataSource, ElevationResult
 
 logger = logging.getLogger(__name__)
