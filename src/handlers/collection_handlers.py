@@ -324,21 +324,31 @@ class CollectionHandlerRegistry:
         
         for collection in collections:
             try:
-                # Handle Australian UTM collections with CRS-aware bounds checking
+                # Check bounds format to determine which bounds checking method to use
+                bounds = collection.coverage_bounds
+                has_wgs84_bounds = (hasattr(bounds, 'min_lat') and hasattr(bounds, 'max_lat') and
+                                   hasattr(bounds, 'min_lon') and hasattr(bounds, 'max_lon'))
+                has_utm_bounds = (hasattr(bounds, 'min_x') and hasattr(bounds, 'max_x') and
+                                 hasattr(bounds, 'min_y') and hasattr(bounds, 'max_y'))
+                
+                # Use CRS-aware bounds checking only for AU collections with UTM bounds
                 if (isinstance(collection, AustralianUTMCollection) and 
-                    hasattr(collection, 'epsg') and self.crs_service):
+                    hasattr(collection, 'epsg') and self.crs_service and has_utm_bounds):
                     
                     # Get the appropriate handler for CRS-aware checking
                     handler = self.get_handler_for_collection(collection)
                     if (isinstance(handler, AustralianCampaignHandler) and 
                         not handler._is_point_in_collection_bounds(collection, query_point)):
                         continue
-                else:
-                    # Standard WGS84 bounds checking for NZ and other collections
-                    bounds = collection.coverage_bounds
+                elif has_wgs84_bounds:
+                    # Standard WGS84 bounds checking for all collections with WGS84 bounds
                     if not (bounds.min_lat <= lat <= bounds.max_lat and
                            bounds.min_lon <= lon <= bounds.max_lon):
                         continue
+                else:
+                    # Skip collections with unknown bounds format
+                    logger.warning(f"Collection {collection.id} has unknown bounds format")
+                    continue
                 
                 # Get priority score
                 priority = self.get_collection_priority(collection, lat, lon)
