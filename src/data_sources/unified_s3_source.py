@@ -318,14 +318,17 @@ class UnifiedS3Source(BaseDataSource):
             import os
             
             # Use bucket-aware GDAL configuration
+            from ..utils.bucket_detector import BucketType
             with s3_environment_for_file(file_path) as s3_env:
-                # Set GDAL options based on bucket type
+                # Set GDAL options based on bucket type directly
                 gdal.SetConfigOption('AWS_REGION', os.environ.get('AWS_REGION', 'ap-southeast-2'))
                 
-                if os.environ.get('AWS_NO_SIGN_REQUEST') == 'YES':
+                if s3_env.bucket_type == BucketType.PUBLIC_UNSIGNED:
+                    # Public bucket - use unsigned requests
                     gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'YES')
                     logger.debug(f"GDAL: Using unsigned requests for public bucket ({s3_env.bucket_type.value})")
                 else:
+                    # Private bucket - use signed requests
                     gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'NO')
                     if 'AWS_ACCESS_KEY_ID' in os.environ:
                         gdal.SetConfigOption('AWS_ACCESS_KEY_ID', os.environ['AWS_ACCESS_KEY_ID'])
