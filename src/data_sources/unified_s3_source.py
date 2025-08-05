@@ -456,40 +456,41 @@ class UnifiedS3Source(BaseDataSource):
             from rasterio.env import Env
             from ..utils.bucket_detector import BucketType
             
-            # Use bucket-aware environment configuration
-            with s3_environment_for_file(file_path) as s3_env:
-                logger.debug(f"Rasterio fallback: Using {s3_env.bucket_type.value} configuration")
+            # Determine bucket type for configuration
+            from ..utils.bucket_detector import BucketDetector
+            bucket_type = BucketDetector.detect_bucket_type(file_path)
+            logger.debug(f"Rasterio fallback: Detected bucket type {bucket_type.value}")
+            
+            # TACTICAL FIX: Use explicit rasterio.env.Env for BOTH bucket types
+            # Don't use s3_environment_for_file as it may interfere with rasterio.Env
+            import os
+            
+            if bucket_type == BucketType.PUBLIC_UNSIGNED:
+                # NZ public bucket needs explicit unsigned configuration
+                env_config = {
+                    'AWS_NO_SIGN_REQUEST': 'YES',
+                    'AWS_REGION': 'ap-southeast-2'
+                }
+                logger.debug("Rasterio: Configuring for NZ public bucket (unsigned)")
+            else:
+                # AU private bucket needs credentials
+                # Build config dict with non-None values only
+                env_config = {'AWS_REGION': 'ap-southeast-2'}
                 
-                # TACTICAL FIX: Use explicit rasterio.env.Env for BOTH bucket types
-                # This ensures rasterio properly handles S3 access patterns
-                import os
+                # Add credentials if available
+                access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
+                secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
                 
-                if s3_env.bucket_type == BucketType.PUBLIC_UNSIGNED:
-                    # NZ public bucket needs explicit unsigned configuration
-                    env_config = {
-                        'AWS_NO_SIGN_REQUEST': 'YES',
-                        'AWS_REGION': 'ap-southeast-2'
-                    }
-                else:
-                    # AU private bucket needs credentials
-                    # Build config dict with non-None values only
-                    env_config = {'AWS_REGION': 'ap-southeast-2'}
-                    
-                    # Add credentials if available
-                    access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
-                    secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
-                    
-                    if access_key:
-                        env_config['AWS_ACCESS_KEY_ID'] = access_key
-                    if secret_key:
-                        env_config['AWS_SECRET_ACCESS_KEY'] = secret_key
+                if access_key:
+                    env_config['AWS_ACCESS_KEY_ID'] = access_key
+                if secret_key:
+                    env_config['AWS_SECRET_ACCESS_KEY'] = secret_key
                 
-                # Create Env context with the appropriate config
-                env_ctx = Env(**env_config)
-                
-                # Use the appropriate Env context for S3 access
-                with env_ctx:
-                    with rasterio.open(file_path) as dataset:
+                logger.debug(f"Rasterio: Configuring for AU private bucket (signed)")
+            
+            # Create Env context with the appropriate config
+            with Env(**env_config):
+                with rasterio.open(file_path) as dataset:
                         # Transform coordinate to dataset CRS if needed
                         if dataset.crs.to_string() != 'EPSG:4326':
                             # Transform from WGS84 to dataset CRS

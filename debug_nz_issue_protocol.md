@@ -74,7 +74,15 @@ with s3_environment_for_file(file_path) as s3_env:
 
 ## Phase 3: Implementation & Validation
 
-### 7. Proposed Fix
+### 7. Implementation Status
+
+**Tactical Fix Applied (per Gemini's recommendation)**:
+- Using `rasterio.env.Env` for BOTH bucket types
+- NZ: `Env(AWS_NO_SIGN_REQUEST='YES', AWS_REGION='ap-southeast-2')`
+- AU: `Env` with AWS credentials from environment/fallbacks
+- Building config dict dynamically to avoid None value issues
+
+### 8. Proposed Fix
 
 ```python
 def _extract_elevation_rasterio_fallback(self, file_path: str, lat: float, lon: float) -> Optional[float]:
