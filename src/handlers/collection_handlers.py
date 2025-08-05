@@ -326,10 +326,18 @@ class CollectionHandlerRegistry:
             try:
                 # Check bounds format to determine which bounds checking method to use
                 bounds = collection.coverage_bounds
-                has_wgs84_bounds = (hasattr(bounds, 'min_lat') and hasattr(bounds, 'max_lat') and
-                                   hasattr(bounds, 'min_lon') and hasattr(bounds, 'max_lon'))
-                has_utm_bounds = (hasattr(bounds, 'min_x') and hasattr(bounds, 'max_x') and
-                                 hasattr(bounds, 'min_y') and hasattr(bounds, 'max_y'))
+                
+                # Handle both dictionary and object bounds formats
+                if isinstance(bounds, dict):
+                    has_wgs84_bounds = ('min_lat' in bounds and 'max_lat' in bounds and
+                                       'min_lon' in bounds and 'max_lon' in bounds)
+                    has_utm_bounds = ('min_x' in bounds and 'max_x' in bounds and
+                                     'min_y' in bounds and 'max_y' in bounds)
+                else:
+                    has_wgs84_bounds = (hasattr(bounds, 'min_lat') and hasattr(bounds, 'max_lat') and
+                                       hasattr(bounds, 'min_lon') and hasattr(bounds, 'max_lon'))
+                    has_utm_bounds = (hasattr(bounds, 'min_x') and hasattr(bounds, 'max_x') and
+                                     hasattr(bounds, 'min_y') and hasattr(bounds, 'max_y'))
                 
                 # Use CRS-aware bounds checking only for AU collections with UTM bounds
                 if (isinstance(collection, AustralianUTMCollection) and 
@@ -342,9 +350,15 @@ class CollectionHandlerRegistry:
                         continue
                 elif has_wgs84_bounds:
                     # Standard WGS84 bounds checking for all collections with WGS84 bounds
-                    if not (bounds.min_lat <= lat <= bounds.max_lat and
-                           bounds.min_lon <= lon <= bounds.max_lon):
-                        continue
+                    # Handle both dictionary and object access patterns
+                    if isinstance(bounds, dict):
+                        if not (bounds['min_lat'] <= lat <= bounds['max_lat'] and
+                               bounds['min_lon'] <= lon <= bounds['max_lon']):
+                            continue
+                    else:
+                        if not (bounds.min_lat <= lat <= bounds.max_lat and
+                               bounds.min_lon <= lon <= bounds.max_lon):
+                            continue
                 else:
                     # Skip collections with unknown bounds format
                     logger.warning(f"Collection {collection.id} has unknown bounds format")
