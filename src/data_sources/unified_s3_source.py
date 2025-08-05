@@ -453,34 +453,14 @@ class UnifiedS3Source(BaseDataSource):
         try:
             import rasterio
             from rasterio.warp import transform as warp_transform
-            from rasterio.env import Env
-            from ..utils.bucket_detector import BucketType
             
             # Use bucket-aware environment configuration
+            # The s3_environment_for_file context manager sets all necessary environment variables
             with s3_environment_for_file(file_path) as s3_env:
                 logger.debug(f"Rasterio fallback: Using {s3_env.bucket_type.value} configuration")
                 
-                # Configure rasterio environment based on bucket type
-                if s3_env.bucket_type == BucketType.PUBLIC_UNSIGNED:
-                    # Public bucket - use unsigned requests
-                    env_config = {
-                        'AWS_NO_SIGN_REQUEST': 'YES',
-                        'AWS_REGION': 'ap-southeast-2'
-                    }
-                    logger.debug("Rasterio: Configured for unsigned requests (NZ public bucket)")
-                else:
-                    # Private bucket - use signed requests
-                    import os
-                    env_config = {
-                        'AWS_REGION': 'ap-southeast-2',
-                        'AWS_ACCESS_KEY_ID': os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H'),
-                        'AWS_SECRET_ACCESS_KEY': os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
-                    }
-                    logger.debug("Rasterio: Configured for signed requests (AU private bucket)")
-                
-                # Open raster file with bucket-appropriate environment
-                with Env(**env_config):
-                    with rasterio.open(file_path) as dataset:
+                # Open raster file with bucket-appropriate environment already set
+                with rasterio.open(file_path) as dataset:
                         # Transform coordinate to dataset CRS if needed
                         if dataset.crs.to_string() != 'EPSG:4326':
                             # Transform from WGS84 to dataset CRS
