@@ -453,21 +453,35 @@ class UnifiedS3Source(BaseDataSource):
             import os
             
             # Configure S3 authentication for rasterio based on bucket type
+            # DEBUGGING PROTOCOL PHASE 3 FIX: Set environment variables directly
+            # Railway environment may not properly pass credentials through Env() context manager
+            original_env = {}
+            
             if 'nz-elevation' in file_path:
                 # Public bucket - use unsigned requests
-                env_config = {'AWS_NO_SIGN_REQUEST': 'YES', 'AWS_REGION': 'ap-southeast-2'}
+                original_env['AWS_NO_SIGN_REQUEST'] = os.environ.get('AWS_NO_SIGN_REQUEST')
+                original_env['AWS_REGION'] = os.environ.get('AWS_REGION')
+                os.environ['AWS_NO_SIGN_REQUEST'] = 'YES'
+                os.environ['AWS_REGION'] = 'ap-southeast-2'
                 logger.debug(f"Rasterio fallback: Using unsigned requests for public NZ bucket")
             else:
                 # Private bucket - use credentials from environment
-                env_config = {'AWS_REGION': 'ap-southeast-2'}
-                if 'AWS_ACCESS_KEY_ID' in os.environ:
-                    env_config['AWS_ACCESS_KEY_ID'] = os.environ['AWS_ACCESS_KEY_ID']
-                if 'AWS_SECRET_ACCESS_KEY' in os.environ:
-                    env_config['AWS_SECRET_ACCESS_KEY'] = os.environ['AWS_SECRET_ACCESS_KEY']
+                # Store original values to restore later
+                original_env['AWS_REGION'] = os.environ.get('AWS_REGION')
+                original_env['AWS_ACCESS_KEY_ID'] = os.environ.get('AWS_ACCESS_KEY_ID')
+                original_env['AWS_SECRET_ACCESS_KEY'] = os.environ.get('AWS_SECRET_ACCESS_KEY')
+                
+                # Set environment variables directly (more reliable than Env context manager)
+                os.environ['AWS_REGION'] = 'ap-southeast-2'
+                # AWS credentials should already be set, but ensure they're available
+                if not os.environ.get('AWS_ACCESS_KEY_ID') or not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+                    logger.error("AWS credentials not available in environment for rasterio fallback")
+                    return None
+                
                 logger.debug(f"Rasterio fallback: Using signed requests for private AU bucket")
             
-            # Open raster file with proper S3 configuration
-            with Env(**env_config):
+            try:
+                # Open raster file without Env context manager - use direct environment variables
                 with rasterio.open(file_path) as dataset:
                     # Transform coordinate to dataset CRS if needed
                     if dataset.crs.to_string() != 'EPSG:4326':
@@ -491,9 +505,26 @@ class UnifiedS3Source(BaseDataSource):
                         return float(elevation)
                     else:
                         return None
-                    
+            
+            finally:
+                # Restore original environment variables
+                for key, value in original_env.items():
+                    if value is not None:
+                        os.environ[key] = value
+                    elif key in os.environ:
+                        del os.environ[key]
+                        
         except Exception as e:
             logger.debug(f"Rasterio fallback failed for {file_path}: {e}")
+            # Ensure environment is restored even on exception
+            try:
+                for key, value in original_env.items():
+                    if value is not None:
+                        os.environ[key] = value
+                    elif key in os.environ:
+                        del os.environ[key]
+            except:
+                pass  # Don't fail on environment restoration errors
             return None
     
     def get_statistics(self) -> Dict[str, Any]:
