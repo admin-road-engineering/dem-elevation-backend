@@ -466,12 +466,15 @@ class UnifiedS3Source(BaseDataSource):
                     # NZ public bucket needs explicit unsigned configuration
                     env_ctx = Env(AWS_NO_SIGN_REQUEST='YES', AWS_REGION='ap-southeast-2')
                 else:
-                    # AU private bucket needs credentials (from OS environment)
+                    # AU private bucket needs credentials
                     import os
+                    # Use fallback credentials if not in environment
+                    access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
+                    secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
                     env_ctx = Env(
                         AWS_REGION='ap-southeast-2',
-                        AWS_ACCESS_KEY_ID=os.environ.get('AWS_ACCESS_KEY_ID'),
-                        AWS_SECRET_ACCESS_KEY=os.environ.get('AWS_SECRET_ACCESS_KEY')
+                        AWS_ACCESS_KEY_ID=access_key,
+                        AWS_SECRET_ACCESS_KEY=secret_key
                     )
                 
                 # Use the appropriate Env context for S3 access
