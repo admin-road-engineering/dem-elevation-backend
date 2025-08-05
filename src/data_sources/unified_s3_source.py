@@ -538,7 +538,6 @@ class UnifiedS3Source(BaseDataSource):
                 # Simple rasterio access - no complex session management
                 logger.info(f"📡 Opening with simple rasterio: {file_path}")
                 with rasterio.open(file_path) as dataset:
-                with rasterio.open(file_path) as dataset:
                     logger.info(f"✅ Successfully opened {file_path}. CRS: {dataset.crs}, Count: {dataset.count}, Bounds: {dataset.bounds}")
                     # Transform coordinate to dataset CRS if needed
                     if dataset.crs.to_string() != 'EPSG:4326':
@@ -563,6 +562,15 @@ class UnifiedS3Source(BaseDataSource):
                         return float(elevation)
                     else:
                         return None
+                        
+            finally:
+                # Restore original environment
+                for var, value in env_backup.items():
+                    if value is None:
+                        if var in os.environ:
+                            del os.environ[var]
+                    else:
+                        os.environ[var] = value
                         
         except Exception as e:
             logger.error(f"❌ CRITICAL RASTERIO FAILURE opening {file_path}: {e}", exc_info=True)
