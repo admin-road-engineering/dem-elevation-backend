@@ -14,6 +14,7 @@ from datetime import datetime
 from ..models.unified_spatial_models import UnifiedSpatialIndex, DataCollection, FileEntry
 from ..handlers import CollectionHandlerRegistry
 from ..s3_client_factory import S3ClientFactory
+from ..utils.s3_environment import s3_environment_for_file
 from .base_source import BaseDataSource, ElevationResult
 
 logger = logging.getLogger(__name__)
@@ -313,126 +314,123 @@ class UnifiedS3Source(BaseDataSource):
             gdal.SetConfigOption('GDAL_DISABLE_READDIR_ON_OPEN', 'YES')
             # REMOVED: AWS_S3_REQUEST_PAYER - causes 403 errors on public/standard buckets
             
-            # Configure authentication based on bucket type
+            # Configure authentication using bucket-aware environment management
             import os
             
-            # Always set region for both public and private buckets
-            if 'AWS_DEFAULT_REGION' in os.environ:
-                gdal.SetConfigOption('AWS_REGION', os.environ['AWS_DEFAULT_REGION'])
-            else:
-                gdal.SetConfigOption('AWS_REGION', 'ap-southeast-2')  # Default region for both buckets
-            
-            if 'nz-elevation' in file_path:
-                # Public bucket - use unsigned requests
-                gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'YES')
-                logger.debug(f"Using unsigned requests for public NZ bucket with region")
-            else:
-                # Private bucket - use credentials
-                gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'NO')
-                if 'AWS_ACCESS_KEY_ID' in os.environ:
-                    gdal.SetConfigOption('AWS_ACCESS_KEY_ID', os.environ['AWS_ACCESS_KEY_ID'])
-                if 'AWS_SECRET_ACCESS_KEY' in os.environ:
-                    gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', os.environ['AWS_SECRET_ACCESS_KEY'])
-                logger.debug(f"Using signed requests for private AU bucket with credentials")
-            
-            # Open dataset
-            dataset = gdal.Open(file_path)
-            if not dataset:
-                logger.debug(f"Could not open dataset: {file_path}")
-                return None
+            # Use bucket-aware GDAL configuration
+            with s3_environment_for_file(file_path) as s3_env:
+                # Set GDAL options based on bucket type
+                gdal.SetConfigOption('AWS_REGION', os.environ.get('AWS_REGION', 'ap-southeast-2'))
                 
-            # Transform coordinates from WGS84 to file's native CRS
-            source_srs = osr.SpatialReference()
-            source_srs.ImportFromEPSG(4326)  # WGS84
-            # ✅ CRITICAL FIX: Enforce traditional GIS axis order (Lon/Lat)
-            source_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-            
-            target_srs = osr.SpatialReference()
-            actual_epsg = None
-            
-            if target_crs and target_crs != "EPSG:4326":
-                # Handle common Australian coordinate system names with dynamic UTM zone detection
-                if target_crs == "GDA94":
-                    # Extract UTM zone from file path (e.g., z55, z56)
-                    import re
-                    zone_match = re.search(r'/z(\d{2})/', file_path)
-                    if zone_match:
-                        utm_zone = int(zone_match.group(1))
-                        actual_epsg = 28300 + utm_zone  # GDA94 MGA Zone (28354=Zone54, 28355=Zone55, etc.)
-                        target_srs.ImportFromEPSG(actual_epsg)
-                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{actual_epsg}")
-                    else:
-                        # Fallback to Zone 56 if no zone found
-                        actual_epsg = 28356
-                        target_srs.ImportFromEPSG(actual_epsg)
-                        logger.debug(f"GDA94 fallback to EPSG:{actual_epsg} (no zone detected)")
-                elif target_crs == "GDA2020":
-                    # Extract UTM zone for GDA2020
-                    import re
-                    zone_match = re.search(r'/z(\d{2})/', file_path)
-                    if zone_match:
-                        utm_zone = int(zone_match.group(1))
-                        actual_epsg = 7800 + utm_zone  # GDA2020 MGA Zone (7854=Zone54, 7855=Zone55, etc.)
-                        target_srs.ImportFromEPSG(actual_epsg)
-                        logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{actual_epsg}")
-                    else:
-                        # Fallback to Zone 56
-                        actual_epsg = 7856
-                        target_srs.ImportFromEPSG(actual_epsg)
-                        logger.debug(f"GDA2020 fallback to EPSG:{actual_epsg} (no zone detected)")
+                if os.environ.get('AWS_NO_SIGN_REQUEST') == 'YES':
+                    gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'YES')
+                    logger.debug(f"GDAL: Using unsigned requests for public bucket ({s3_env.bucket_type.value})")
                 else:
-                    try:
-                        target_srs.ImportFromUserInput(target_crs)
-                        actual_epsg = target_crs
-                    except AttributeError:
-                        # Fallback for older OSR versions
-                        target_srs.SetFromUserInput(target_crs)
-                        actual_epsg = target_crs
-            else:
-                target_srs.ImportFromEPSG(4326)  # Default to WGS84
-                actual_epsg = 4326
-            
-            # ✅ CRITICAL FIX: Enforce traditional GIS axis order for target CRS
-            target_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-            
-            transform = osr.CoordinateTransformation(source_srs, target_srs)
-            x, y, z = transform.TransformPoint(lon, lat)
-            
-            # ✅ DEFENSIVE CHECK: Verify transformation succeeded
-            import math
-            if math.isinf(x) or math.isinf(y):
-                logger.error(f"Coordinate transformation failed: ({lat}, {lon}) → (inf, inf) for EPSG:{actual_epsg}")
-                return None
-            
-            # Log the actual transformation result
-            logger.info(f"🔍 Transform: ({lat}, {lon}) WGS84 → ({x:.2f}, {y:.2f}) EPSG:{actual_epsg}")
-            
-            # Convert to pixel coordinates
-            gt = dataset.GetGeoTransform()
-            inv_gt = gdal.InvGeoTransform(gt)
-            px = int(inv_gt[0] + x * inv_gt[1] + y * inv_gt[2])
-            py = int(inv_gt[3] + x * inv_gt[4] + y * inv_gt[5])
-            
-            # Check if pixel coordinates are within bounds
-            if not (0 <= px < dataset.RasterXSize and 0 <= py < dataset.RasterYSize):
-                logger.debug(f"Coordinate ({lat}, {lon}) → pixel ({px}, {py}) outside raster ({dataset.RasterXSize}x{dataset.RasterYSize})")
-                return None
-            
-            # Read elevation value
-            band = dataset.GetRasterBand(1)
-            elevation_array = band.ReadAsArray(px, py, 1, 1)
-            
-            if elevation_array is not None and elevation_array.size > 0:
-                elevation = float(elevation_array[0, 0])
-                # Check for NODATA values
-                nodata = band.GetNoDataValue()
-                if nodata is not None and elevation == nodata:
-                    logger.debug(f"NODATA value encountered at coordinate")
-                    return None
-                logger.info(f"✅ SUCCESS: Extracted elevation {elevation}m from {file_path}")
-                return elevation
+                    gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'NO')
+                    if 'AWS_ACCESS_KEY_ID' in os.environ:
+                        gdal.SetConfigOption('AWS_ACCESS_KEY_ID', os.environ['AWS_ACCESS_KEY_ID'])
+                    if 'AWS_SECRET_ACCESS_KEY' in os.environ:
+                        gdal.SetConfigOption('AWS_SECRET_ACCESS_KEY', os.environ['AWS_SECRET_ACCESS_KEY'])
+                    logger.debug(f"GDAL: Using signed requests for private bucket ({s3_env.bucket_type.value})")
                 
-            return None
+                # Open dataset
+                dataset = gdal.Open(file_path)
+                if not dataset:
+                    logger.debug(f"Could not open dataset: {file_path}")
+                    return None
+                
+                # Transform coordinates from WGS84 to file's native CRS
+                source_srs = osr.SpatialReference()
+                source_srs.ImportFromEPSG(4326)  # WGS84
+                # ✅ CRITICAL FIX: Enforce traditional GIS axis order (Lon/Lat)
+                source_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+                
+                target_srs = osr.SpatialReference()
+                actual_epsg = None
+                
+                if target_crs and target_crs != "EPSG:4326":
+                    # Handle common Australian coordinate system names with dynamic UTM zone detection
+                    if target_crs == "GDA94":
+                        # Extract UTM zone from file path (e.g., z55, z56)
+                        import re
+                        zone_match = re.search(r'/z(\d{2})/', file_path)
+                        if zone_match:
+                            utm_zone = int(zone_match.group(1))
+                            actual_epsg = 28300 + utm_zone  # GDA94 MGA Zone (28354=Zone54, 28355=Zone55, etc.)
+                            target_srs.ImportFromEPSG(actual_epsg)
+                            logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{actual_epsg}")
+                        else:
+                            # Fallback to Zone 56 if no zone found
+                            actual_epsg = 28356
+                            target_srs.ImportFromEPSG(actual_epsg)
+                            logger.debug(f"GDA94 fallback to EPSG:{actual_epsg} (no zone detected)")
+                    elif target_crs == "GDA2020":
+                        # Extract UTM zone for GDA2020
+                        import re
+                        zone_match = re.search(r'/z(\d{2})/', file_path)
+                        if zone_match:
+                            utm_zone = int(zone_match.group(1))
+                            actual_epsg = 7800 + utm_zone  # GDA2020 MGA Zone (7854=Zone54, 7855=Zone55, etc.)
+                            target_srs.ImportFromEPSG(actual_epsg)
+                            logger.debug(f"Using UTM Zone {utm_zone} → EPSG:{actual_epsg}")
+                        else:
+                            # Fallback to Zone 56
+                            actual_epsg = 7856
+                            target_srs.ImportFromEPSG(actual_epsg)
+                            logger.debug(f"GDA2020 fallback to EPSG:{actual_epsg} (no zone detected)")
+                    else:
+                        try:
+                            target_srs.ImportFromUserInput(target_crs)
+                            actual_epsg = target_crs
+                        except AttributeError:
+                            # Fallback for older OSR versions
+                            target_srs.SetFromUserInput(target_crs)
+                            actual_epsg = target_crs
+                else:
+                    target_srs.ImportFromEPSG(4326)  # Default to WGS84
+                    actual_epsg = 4326
+                
+                # ✅ CRITICAL FIX: Enforce traditional GIS axis order for target CRS
+                target_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+                
+                transform = osr.CoordinateTransformation(source_srs, target_srs)
+                x, y, z = transform.TransformPoint(lon, lat)
+                
+                # ✅ DEFENSIVE CHECK: Verify transformation succeeded
+                import math
+                if math.isinf(x) or math.isinf(y):
+                    logger.error(f"Coordinate transformation failed: ({lat}, {lon}) → (inf, inf) for EPSG:{actual_epsg}")
+                    return None
+                
+                # Log the actual transformation result
+                logger.info(f"🔍 Transform: ({lat}, {lon}) WGS84 → ({x:.2f}, {y:.2f}) EPSG:{actual_epsg}")
+                
+                # Convert to pixel coordinates
+                gt = dataset.GetGeoTransform()
+                inv_gt = gdal.InvGeoTransform(gt)
+                px = int(inv_gt[0] + x * inv_gt[1] + y * inv_gt[2])
+                py = int(inv_gt[3] + x * inv_gt[4] + y * inv_gt[5])
+                
+                # Check if pixel coordinates are within bounds
+                if not (0 <= px < dataset.RasterXSize and 0 <= py < dataset.RasterYSize):
+                    logger.debug(f"Coordinate ({lat}, {lon}) → pixel ({px}, {py}) outside raster ({dataset.RasterXSize}x{dataset.RasterYSize})")
+                    return None
+                
+                # Read elevation value
+                band = dataset.GetRasterBand(1)
+                elevation_array = band.ReadAsArray(px, py, 1, 1)
+                
+                if elevation_array is not None and elevation_array.size > 0:
+                    elevation = float(elevation_array[0, 0])
+                    # Check for NODATA values
+                    nodata = band.GetNoDataValue()
+                    if nodata is not None and elevation == nodata:
+                        logger.debug(f"NODATA value encountered at coordinate")
+                        return None
+                    logger.info(f"✅ SUCCESS: Extracted elevation {elevation}m from {file_path}")
+                    return elevation
+                    
+                return None
             
         except ImportError as e:
             logger.warning(f"GDAL not available ({e}), falling back to rasterio")
@@ -449,39 +447,12 @@ class UnifiedS3Source(BaseDataSource):
         try:
             import rasterio
             from rasterio.warp import transform as warp_transform
-            from rasterio.env import Env
-            import os
             
-            # Configure S3 authentication for rasterio based on bucket type
-            # DEBUGGING PROTOCOL PHASE 3 FIX: Set environment variables directly
-            # Railway environment may not properly pass credentials through Env() context manager
-            original_env = {}
-            
-            if 'nz-elevation' in file_path:
-                # Public bucket - use unsigned requests
-                original_env['AWS_NO_SIGN_REQUEST'] = os.environ.get('AWS_NO_SIGN_REQUEST')
-                original_env['AWS_REGION'] = os.environ.get('AWS_REGION')
-                os.environ['AWS_NO_SIGN_REQUEST'] = 'YES'
-                os.environ['AWS_REGION'] = 'ap-southeast-2'
-                logger.debug(f"Rasterio fallback: Using unsigned requests for public NZ bucket")
-            else:
-                # Private bucket - use credentials from environment
-                # Store original values to restore later
-                original_env['AWS_REGION'] = os.environ.get('AWS_REGION')
-                original_env['AWS_ACCESS_KEY_ID'] = os.environ.get('AWS_ACCESS_KEY_ID')
-                original_env['AWS_SECRET_ACCESS_KEY'] = os.environ.get('AWS_SECRET_ACCESS_KEY')
+            # Use bucket-aware environment configuration
+            with s3_environment_for_file(file_path) as s3_env:
+                logger.debug(f"Rasterio fallback: Using {s3_env.bucket_type.value} configuration")
                 
-                # Set environment variables directly (more reliable than Env context manager)
-                os.environ['AWS_REGION'] = 'ap-southeast-2'
-                # AWS credentials should already be set, but ensure they're available
-                if not os.environ.get('AWS_ACCESS_KEY_ID') or not os.environ.get('AWS_SECRET_ACCESS_KEY'):
-                    logger.error("AWS credentials not available in environment for rasterio fallback")
-                    return None
-                
-                logger.debug(f"Rasterio fallback: Using signed requests for private AU bucket")
-            
-            try:
-                # Open raster file without Env context manager - use direct environment variables
+                # Open raster file with bucket-appropriate environment
                 with rasterio.open(file_path) as dataset:
                     # Transform coordinate to dataset CRS if needed
                     if dataset.crs.to_string() != 'EPSG:4326':
@@ -502,29 +473,13 @@ class UnifiedS3Source(BaseDataSource):
                         if dataset.nodata is not None and elevation == dataset.nodata:
                             return None
                         
+                        logger.info(f"✅ SUCCESS: Rasterio extracted elevation {float(elevation)}m from {file_path}")
                         return float(elevation)
                     else:
                         return None
-            
-            finally:
-                # Restore original environment variables
-                for key, value in original_env.items():
-                    if value is not None:
-                        os.environ[key] = value
-                    elif key in os.environ:
-                        del os.environ[key]
                         
         except Exception as e:
             logger.debug(f"Rasterio fallback failed for {file_path}: {e}")
-            # Ensure environment is restored even on exception
-            try:
-                for key, value in original_env.items():
-                    if value is not None:
-                        os.environ[key] = value
-                    elif key in os.environ:
-                        del os.environ[key]
-            except:
-                pass  # Don't fail on environment restoration errors
             return None
     
     def get_statistics(self) -> Dict[str, Any]:
