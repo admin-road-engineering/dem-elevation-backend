@@ -500,29 +500,29 @@ class UnifiedS3Source(BaseDataSource):
             with Env(**env_config):
                 with rasterio.open(file_path) as dataset:
                     logger.info(f"✅ Successfully opened {file_path}. CRS: {dataset.crs}, Count: {dataset.count}, Bounds: {dataset.bounds}")
-                        # Transform coordinate to dataset CRS if needed
-                        if dataset.crs.to_string() != 'EPSG:4326':
-                            # Transform from WGS84 to dataset CRS
-                            xs, ys = warp_transform('EPSG:4326', dataset.crs, [lon], [lat])
-                            x, y = xs[0], ys[0]
-                        else:
-                            x, y = lon, lat
+                    # Transform coordinate to dataset CRS if needed
+                    if dataset.crs.to_string() != 'EPSG:4326':
+                        # Transform from WGS84 to dataset CRS
+                        xs, ys = warp_transform('EPSG:4326', dataset.crs, [lon], [lat])
+                        x, y = xs[0], ys[0]
+                    else:
+                        x, y = lon, lat
+                    
+                    # Sample elevation at coordinate
+                    row, col = dataset.index(x, y)
+                    
+                    # Check if coordinate is within raster bounds
+                    if (0 <= row < dataset.height and 0 <= col < dataset.width):
+                        elevation = dataset.read(1)[row, col]
                         
-                        # Sample elevation at coordinate
-                        row, col = dataset.index(x, y)
-                        
-                        # Check if coordinate is within raster bounds
-                        if (0 <= row < dataset.height and 0 <= col < dataset.width):
-                            elevation = dataset.read(1)[row, col]
-                            
-                            # Handle nodata values
-                            if dataset.nodata is not None and elevation == dataset.nodata:
-                                return None
-                            
-                            logger.info(f"SUCCESS: Rasterio extracted elevation {float(elevation)}m from {file_path}")
-                            return float(elevation)
-                        else:
+                        # Handle nodata values
+                        if dataset.nodata is not None and elevation == dataset.nodata:
                             return None
+                        
+                        logger.info(f"SUCCESS: Rasterio extracted elevation {float(elevation)}m from {file_path}")
+                        return float(elevation)
+                    else:
+                        return None
                         
         except Exception as e:
             logger.error(f"❌ CRITICAL RASTERIO FAILURE opening {file_path}: {e}", exc_info=True)
