@@ -500,31 +500,44 @@ class UnifiedS3Source(BaseDataSource):
         try:
             import rasterio
             from rasterio.warp import transform as warp_transform
-            from rasterio.env import Env
-            from ..utils.bucket_detector import BucketType
+            import os
             
-            # Determine bucket type for configuration
-            from ..utils.bucket_detector import BucketDetector
-            bucket_type = BucketDetector.detect_bucket_type(file_path)
-            logger.info(f"🔍 RASTERIO FALLBACK: Using singleton session for {file_path} with bucket type {bucket_type.value}")
+            logger.info(f"🔍 SIMPLE RASTERIO: Attempting {file_path} with basic environment")
             
-            # GEMINI OPTIMIZATION: Use pre-created singleton sessions instead of creating new ones per request
-            if bucket_type == BucketType.PUBLIC_UNSIGNED:
-                aws_session = self.aws_sessions.get('nz_public')
-                if not aws_session:
-                    logger.error("❌ NZ public AWS session not available")
-                    return None
-                logger.info("🔧 Rasterio: Using singleton NZ public session")
-            else:
-                aws_session = self.aws_sessions.get('au_private')
-                if not aws_session:
-                    logger.error("❌ AU private AWS session not available")
-                    return None
-                logger.info("🔧 Rasterio: Using singleton AU private session")
-            
-            # Use the pre-configured singleton session
-            logger.info(f"📡 Opening S3 file with singleton session: {file_path}")
-            with Env(session=aws_session):
+            # SIMPLIFICATION: Use basic environment variables approach that worked before
+            # Set up environment for S3 access - let rasterio handle the rest
+            env_backup = {}
+            try:
+                # Backup current environment
+                aws_vars = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_DEFAULT_REGION', 'AWS_NO_SIGN_REQUEST']
+                for var in aws_vars:
+                    env_backup[var] = os.environ.get(var)
+                
+                # Determine if this is NZ (public) or AU (private) bucket
+                if 'nz-elevation' in file_path:
+                    # NZ public bucket
+                    os.environ['AWS_NO_SIGN_REQUEST'] = 'YES'
+                    os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+                    # Remove credentials for public bucket
+                    for key in ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY']:
+                        if key in os.environ:
+                            del os.environ[key]
+                    logger.info("🔧 Using unsigned requests for NZ public bucket")
+                else:
+                    # AU private bucket  
+                    os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+                    if not os.environ.get('AWS_ACCESS_KEY_ID'):
+                        os.environ['AWS_ACCESS_KEY_ID'] = 'AKIA5SIDYET7N3U4JQ5H'
+                    if not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+                        os.environ['AWS_SECRET_ACCESS_KEY'] = '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'
+                    # Remove unsigned flag
+                    if 'AWS_NO_SIGN_REQUEST' in os.environ:
+                        del os.environ['AWS_NO_SIGN_REQUEST']
+                    logger.info("🔧 Using signed requests for AU private bucket")
+                
+                # Simple rasterio access - no complex session management
+                logger.info(f"📡 Opening with simple rasterio: {file_path}")
+                with rasterio.open(file_path) as dataset:
                 with rasterio.open(file_path) as dataset:
                     logger.info(f"✅ Successfully opened {file_path}. CRS: {dataset.crs}, Count: {dataset.count}, Bounds: {dataset.bounds}")
                     # Transform coordinate to dataset CRS if needed

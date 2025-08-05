@@ -183,8 +183,8 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 Found 1 files in collection for coordinate (-27.4698, 153.0251)
 ```
 
-#### ✅ Phase 6.1: Gemini Architectural Review & P0 Optimizations (COMPLETED)
-**Gemini Assessment**: *"Exceptionally well-documented and well-architected project moving from A- (Excellent) to A+ (Exceptional)"*
+#### ⚠️ Phase 6.1: Over-Engineering Crisis & Recovery (LEARNING PHASE)
+**Critical Lesson**: *"Exceptional architecture is resilience and working functionality, not just sophisticated patterns"*
 
 **Completed P0 Optimizations**:
 - ✅ **Enhanced Diagnostic Logging**: Full GDAL/rasterio error capture with exc_info=True
@@ -192,9 +192,13 @@ Found 1 files in collection for coordinate (-27.4698, 153.0251)
 - ✅ **Singleton Session Pattern**: AWS sessions created once at startup (performance + security)
 - ✅ **Bucket-Aware Architecture**: AU private (signed) vs NZ public (unsigned) session management
 
-**Current Status**: **Service Healthy - Debugging S3 Access Failures**
-- **Brisbane (AU)**: ❌ 4.5s processing time, GDAL opens files but _gdal_array import fails → rasterio fallback still failing
-- **Auckland (NZ)**: ❌ 11ms processing time, collections found but 0 files in collections (bounds/CRS issue)
+**Crisis Status**: **Both Coordinates Broken Due to Over-Engineering**
+- **Brisbane (AU)**: ❌ Previously worked (10.872m) → Now broken after complex session management changes
+- **Auckland (NZ)**: ❌ Previously worked (~25m) → Now broken after bounds/CRS logic changes  
+
+**Key Lesson Learned**: *"Make it work, then make it better"* - NOT the other way around
+
+**Recovery Approach**: Systematic minimal changes to restore basic functionality before ANY optimizations
 
 #### 🎯 Phase 7: A+ Architectural Excellence (IN PROGRESS)
 **Gemini Roadmap**: *"Four key areas to achieve A+ (Exceptional) status"*
