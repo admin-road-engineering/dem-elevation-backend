@@ -28,7 +28,8 @@ class UnifiedS3Source(BaseDataSource):
                  use_unified_index: bool = False,
                  unified_index_key: str = "indexes/unified_spatial_index_v2.json",
                  s3_client_factory: Optional[S3ClientFactory] = None,
-                 crs_service=None):
+                 crs_service=None,
+                 aws_sessions: Optional[Dict[str, Any]] = None):
         """
         Initialize unified S3 source
         
@@ -37,6 +38,7 @@ class UnifiedS3Source(BaseDataSource):
             unified_index_key: S3 key for unified index
             s3_client_factory: S3 client factory for AWS access
             crs_service: CRS transformation service for CRS-aware spatial queries
+            aws_sessions: Pre-configured AWS sessions for rasterio (singleton pattern)
         """
         super().__init__("unified_s3")
         self.use_unified_index = use_unified_index
@@ -47,10 +49,48 @@ class UnifiedS3Source(BaseDataSource):
         self.unified_index: Optional[UnifiedSpatialIndex] = None
         self.handler_registry = CollectionHandlerRegistry(crs_service)
         
+        # AWS Sessions (singleton pattern per Gemini recommendation)
+        self.aws_sessions = aws_sessions or self._create_default_sessions()
+        
         # Local fallback
         self.config_dir = Path("config")
         
         logger.info(f"UnifiedS3Source initialized (unified_index={use_unified_index})")
+    
+    def _create_default_sessions(self) -> Dict[str, Any]:
+        """Create default AWS sessions following Gemini's singleton pattern recommendation"""
+        import boto3
+        from rasterio.session import AWSSession
+        from botocore.client import Config
+        from botocore import UNSIGNED
+        import os
+        
+        sessions = {}
+        
+        try:
+            # AU Private Bucket Session (signed)
+            access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
+            secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
+            
+            au_boto_session = boto3.Session(
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name='ap-southeast-2'
+            )
+            sessions['au_private'] = AWSSession(au_boto_session)
+            
+            # NZ Public Bucket Session (unsigned) 
+            nz_boto_session = boto3.Session(region_name='ap-southeast-2')
+            nz_s3_client = nz_boto_session.client('s3', config=Config(signature_version=UNSIGNED))
+            sessions['nz_public'] = AWSSession(session=nz_boto_session, client=nz_s3_client)
+            
+            logger.info("✅ Created singleton AWS sessions for AU private and NZ public buckets")
+            
+        except Exception as e:
+            logger.error(f"Failed to create AWS sessions: {e}")
+            sessions = {}
+            
+        return sessions
     
     async def initialize(self) -> bool:
         """Initialize the source by loading spatial indexes"""
@@ -461,39 +501,29 @@ class UnifiedS3Source(BaseDataSource):
             import rasterio
             from rasterio.warp import transform as warp_transform
             from rasterio.env import Env
-            from rasterio.session import AWSSession
-            import boto3
             from ..utils.bucket_detector import BucketType
             
             # Determine bucket type for configuration
             from ..utils.bucket_detector import BucketDetector
             bucket_type = BucketDetector.detect_bucket_type(file_path)
-            logger.info(f"🔍 RASTERIO FALLBACK: Attempting {file_path} with bucket type {bucket_type.value}")
+            logger.info(f"🔍 RASTERIO FALLBACK: Using singleton session for {file_path} with bucket type {bucket_type.value}")
             
-            # FIXED: Use boto3 session instead of direct AWS environment variables
-            # Railway environment requires boto3 session for rasterio S3 access
-            import os
-            
+            # GEMINI OPTIMIZATION: Use pre-created singleton sessions instead of creating new ones per request
             if bucket_type == BucketType.PUBLIC_UNSIGNED:
-                # NZ public bucket - create unsigned session
-                boto_session = boto3.Session()
-                aws_session = AWSSession(boto_session, aws_unsigned=True)
-                logger.info("🔧 Rasterio: Using boto3 unsigned session for NZ public bucket")
+                aws_session = self.aws_sessions.get('nz_public')
+                if not aws_session:
+                    logger.error("❌ NZ public AWS session not available")
+                    return None
+                logger.info("🔧 Rasterio: Using singleton NZ public session")
             else:
-                # AU private bucket - create session with credentials
-                access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
-                secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
-                
-                boto_session = boto3.Session(
-                    aws_access_key_id=access_key,
-                    aws_secret_access_key=secret_key,
-                    region_name='ap-southeast-2'
-                )
-                aws_session = AWSSession(boto_session)
-                logger.info(f"🔧 Rasterio: Using boto3 session for AU private bucket")
+                aws_session = self.aws_sessions.get('au_private')
+                if not aws_session:
+                    logger.error("❌ AU private AWS session not available")
+                    return None
+                logger.info("🔧 Rasterio: Using singleton AU private session")
             
-            # Use the boto3 session with rasterio
-            logger.info(f"📡 Opening S3 file with boto3 session: {file_path}")
+            # Use the pre-configured singleton session
+            logger.info(f"📡 Opening S3 file with singleton session: {file_path}")
             with Env(session=aws_session):
                 with rasterio.open(file_path) as dataset:
                     logger.info(f"✅ Successfully opened {file_path}. CRS: {dataset.crs}, Count: {dataset.count}, Bounds: {dataset.bounds}")
