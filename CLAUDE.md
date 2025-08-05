@@ -183,21 +183,38 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 Found 1 files in collection for coordinate (-27.4698, 153.0251)
 ```
 
-#### 🎯 Phase 7: Unified Data-Code Contract Architecture (NEXT)
-**Gemini Assessment**: *"Elevate from A- to A+ by treating spatial index generation as integral, version-controlled component"*
+#### ✅ Phase 6.1: Gemini Architectural Review & P0 Optimizations (COMPLETED)
+**Gemini Assessment**: *"Exceptionally well-documented and well-architected project moving from A- (Excellent) to A+ (Exceptional)"*
 
-**P0 Next Priorities**:
-- **Unified CLI Tooling**: Deprecate `.bat` scripts, create `python -m dem_backend.cli index generate-au`
+**Completed P0 Optimizations**:
+- ✅ **Enhanced Diagnostic Logging**: Full GDAL/rasterio error capture with exc_info=True
+- ✅ **Root Cause Analysis**: Railway environment requires boto3 sessions, not direct AWS env vars
+- ✅ **Singleton Session Pattern**: AWS sessions created once at startup (performance + security)
+- ✅ **Bucket-Aware Architecture**: AU private (signed) vs NZ public (unsigned) session management
+
+**Current Status**: **Service Healthy - Debugging S3 Access Failures**
+- **Brisbane (AU)**: ❌ 4.5s processing time, GDAL opens files but _gdal_array import fails → rasterio fallback still failing
+- **Auckland (NZ)**: ❌ 11ms processing time, collections found but 0 files in collections (bounds/CRS issue)
+
+#### 🎯 Phase 7: A+ Architectural Excellence (IN PROGRESS)
+**Gemini Roadmap**: *"Four key areas to achieve A+ (Exceptional) status"*
+
+**P0 - Critical Fixes (NEXT)**:
+- **Fix GDAL Array Import**: Resolve `_gdal_array` import failure forcing broken rasterio fallback
+- **Fix NZ File Discovery**: 0 files found in 73 eligible collections (bounds/CRS mismatch)
 - **Schema Versioning**: Add `schema_version` and `bounds_crs` metadata with startup validation
-- **GDAL Environment Fix**: Resolve Railway GDAL configuration for elevation extraction
 
-**Strategic Architectural Enhancements**:
-- **Two-Tier R-Tree**: WGS84 coarse search + UTM precision checks for O(log N) performance
-- **Nested Configuration**: Replace flat environment variables with structured Pydantic models
-- **Documentation Restructure**: Break monolithic CLAUDE.md into focused documents
-- **Performance Restoration**: CRS-aware R-tree implementation for true O(log N) performance at 1,582 collection scale
+**P1 - Security & Performance**:
+- **IAM Roles**: Replace static AWS keys with Railway IAM role assumption  
+- **Two-Tier R-Tree**: WGS84 coarse filter → UTM precise check for O(log N) performance
+- **Index Optimization**: Switch from 382.7MB JSON to MessagePack/FlatBuffers
 
-**Target Result**: Self-consistent, resilient architecture with Brisbane 11.523m elevation via proper coordinate system data preparation
+**P2 - Architecture Refinement**:
+- **Nested Configuration**: Pydantic structured settings replacing flat env vars
+- **Unified CLI Tooling**: Replace `.bat` scripts with `python -m dem_backend.cli`
+- **Documentation Restructure**: Break monolithic CLAUDE.md into focused role-specific guides
+
+**Target Result**: Both Brisbane (10.872m) and Auckland (25.084m) elevations working simultaneously with <100ms response times
 
 ## 🔒 Security & Reliability Model
 
