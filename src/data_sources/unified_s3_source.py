@@ -461,6 +461,8 @@ class UnifiedS3Source(BaseDataSource):
             import rasterio
             from rasterio.warp import transform as warp_transform
             from rasterio.env import Env
+            from rasterio.session import AWSSession
+            import boto3
             from ..utils.bucket_detector import BucketType
             
             # Determine bucket type for configuration
@@ -468,36 +470,31 @@ class UnifiedS3Source(BaseDataSource):
             bucket_type = BucketDetector.detect_bucket_type(file_path)
             logger.info(f"🔍 RASTERIO FALLBACK: Attempting {file_path} with bucket type {bucket_type.value}")
             
-            # TACTICAL FIX: Use explicit rasterio.env.Env for BOTH bucket types
-            # Don't use s3_environment_for_file as it may interfere with rasterio.Env
+            # FIXED: Use boto3 session instead of direct AWS environment variables
+            # Railway environment requires boto3 session for rasterio S3 access
             import os
             
             if bucket_type == BucketType.PUBLIC_UNSIGNED:
-                # NZ public bucket needs explicit unsigned configuration
-                env_config = {
-                    'AWS_NO_SIGN_REQUEST': 'YES',
-                    'AWS_REGION': 'ap-southeast-2'
-                }
-                logger.info("🔧 Rasterio: Configuring for NZ public bucket (unsigned)")
+                # NZ public bucket - create unsigned session
+                boto_session = boto3.Session()
+                aws_session = AWSSession(boto_session, aws_unsigned=True)
+                logger.info("🔧 Rasterio: Using boto3 unsigned session for NZ public bucket")
             else:
-                # AU private bucket needs credentials
-                # Build config dict with non-None values only
-                env_config = {'AWS_REGION': 'ap-southeast-2'}
-                
-                # Add credentials if available
+                # AU private bucket - create session with credentials
                 access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
                 secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
                 
-                if access_key:
-                    env_config['AWS_ACCESS_KEY_ID'] = access_key
-                if secret_key:
-                    env_config['AWS_SECRET_ACCESS_KEY'] = secret_key
-                
-                logger.info(f"🔧 Rasterio: Configuring for AU private bucket (signed)")
+                boto_session = boto3.Session(
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key,
+                    region_name='ap-southeast-2'
+                )
+                aws_session = AWSSession(boto_session)
+                logger.info(f"🔧 Rasterio: Using boto3 session for AU private bucket")
             
-            # Create Env context with the appropriate config
-            logger.info(f"📡 Opening S3 file: {file_path}")
-            with Env(**env_config):
+            # Use the boto3 session with rasterio
+            logger.info(f"📡 Opening S3 file with boto3 session: {file_path}")
+            with Env(session=aws_session):
                 with rasterio.open(file_path) as dataset:
                     logger.info(f"✅ Successfully opened {file_path}. CRS: {dataset.crs}, Count: {dataset.count}, Bounds: {dataset.bounds}")
                     # Transform coordinate to dataset CRS if needed
