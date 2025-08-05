@@ -462,20 +462,30 @@ class UnifiedS3Source(BaseDataSource):
                 
                 # TACTICAL FIX: Use explicit rasterio.env.Env for BOTH bucket types
                 # This ensures rasterio properly handles S3 access patterns
+                import os
+                
                 if s3_env.bucket_type == BucketType.PUBLIC_UNSIGNED:
                     # NZ public bucket needs explicit unsigned configuration
-                    env_ctx = Env(AWS_NO_SIGN_REQUEST='YES', AWS_REGION='ap-southeast-2')
+                    env_config = {
+                        'AWS_NO_SIGN_REQUEST': 'YES',
+                        'AWS_REGION': 'ap-southeast-2'
+                    }
                 else:
                     # AU private bucket needs credentials
-                    import os
-                    # Use fallback credentials if not in environment
+                    # Build config dict with non-None values only
+                    env_config = {'AWS_REGION': 'ap-southeast-2'}
+                    
+                    # Add credentials if available
                     access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
                     secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
-                    env_ctx = Env(
-                        AWS_REGION='ap-southeast-2',
-                        AWS_ACCESS_KEY_ID=access_key,
-                        AWS_SECRET_ACCESS_KEY=secret_key
-                    )
+                    
+                    if access_key:
+                        env_config['AWS_ACCESS_KEY_ID'] = access_key
+                    if secret_key:
+                        env_config['AWS_SECRET_ACCESS_KEY'] = secret_key
+                
+                # Create Env context with the appropriate config
+                env_ctx = Env(**env_config)
                 
                 # Use the appropriate Env context for S3 access
                 with env_ctx:
