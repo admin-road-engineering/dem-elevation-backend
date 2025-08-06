@@ -67,14 +67,17 @@ class BaseCollectionHandler(ABC):
                     bounds.min_lon <= lon <= bounds.max_lon):
                     candidates.append(file_entry)
                     if is_auckland and hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
-                        logger.info(f"✅ Found NZ file for Auckland: {file_entry.path.split('/')[-1]}")
+                        file_name = getattr(file_entry, 'filename', file_entry.file.split('/')[-1])
+                        logger.info(f"✅ Found NZ file for Auckland: {file_name}")
             elif isinstance(bounds, dict) and 'min_lat' in bounds and 'min_lon' in bounds:
                 # Plain dict (for backwards compatibility)
                 if (bounds['min_lat'] <= lat <= bounds['max_lat'] and
                     bounds['min_lon'] <= lon <= bounds['max_lon']):
                     candidates.append(file_entry)
                     if is_auckland and hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
-                        logger.info(f"✅ Found NZ file for Auckland (dict): {file_entry.get('path', '').split('/')[-1]}")
+                        file_path = file_entry.get('file', file_entry.get('path', ''))
+                        file_name = file_path.split('/')[-1] if file_path else 'unknown'
+                        logger.info(f"✅ Found NZ file for Auckland (dict): {file_name}")
         
         if len(candidates) == 0 and len(collection.files) > 0:
             # Debug logging if no files found but collection has files
