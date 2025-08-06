@@ -44,11 +44,25 @@ class BaseCollectionHandler(ABC):
         
         for file_entry in collection.files:
             bounds = file_entry.bounds
-            # Only do WGS84 bounds checking if WGS84 bounds are available
+            # Check both dict access and attribute access for compatibility
             if hasattr(bounds, 'min_lat') and hasattr(bounds, 'min_lon'):
+                # Pydantic model with attributes
                 if (bounds.min_lat <= lat <= bounds.max_lat and
                     bounds.min_lon <= lon <= bounds.max_lon):
                     candidates.append(file_entry)
+            elif isinstance(bounds, dict) and 'min_lat' in bounds and 'min_lon' in bounds:
+                # Plain dict (for backwards compatibility)
+                if (bounds['min_lat'] <= lat <= bounds['max_lat'] and
+                    bounds['min_lon'] <= lon <= bounds['max_lon']):
+                    candidates.append(file_entry)
+        
+        if len(candidates) == 0 and len(collection.files) > 0:
+            # Debug logging if no files found but collection has files
+            first_file = collection.files[0]
+            logger.debug(f"No files found in collection {collection.id} for ({lat}, {lon}). "
+                       f"First file bounds type: {type(first_file.bounds)}, "
+                       f"hasattr min_lat: {hasattr(first_file.bounds, 'min_lat')}, "
+                       f"isinstance dict: {isinstance(first_file.bounds, dict)}")
         
         logger.debug(f"Found {len(candidates)} file candidates in collection {collection.id}")
         return candidates
