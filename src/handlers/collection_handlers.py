@@ -339,23 +339,44 @@ class CollectionHandlerRegistry:
     
     def get_handler_for_collection(self, collection: DataCollection) -> Optional[CollectionHandler]:
         """Get the appropriate handler for a collection"""
+        
+        # Debug for Auckland NZ
+        is_auckland_nz = (hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ' and
+                         hasattr(collection, 'id') and collection.id == '35bb9ab2-3767-45ec-b1a6-8674dd5caf2a')
+        
+        if is_auckland_nz:
+            logger.info(f"🔍 Finding handler for top NZ collection {collection.id}")
+            logger.info(f"  Available handlers: {[h.__class__.__name__ for h in self.handlers]}")
+        
         for handler in self.handlers:
-            if handler.can_handle(collection):
+            can_handle = handler.can_handle(collection)
+            if is_auckland_nz:
+                logger.info(f"  {handler.__class__.__name__}.can_handle() = {can_handle}")
+            if can_handle:
+                if is_auckland_nz:
+                    logger.info(f"  ✅ Selected: {handler.__class__.__name__}")
                 return handler
         
-        logger.warning(f"No handler found for collection type: {collection.collection_type}")
+        logger.warning(f"No handler found for collection {collection.id} (type: {getattr(collection, 'collection_type', 'unknown')}, country: {getattr(collection, 'country', 'unknown')})")
         return None
     
     def find_files_for_coordinate(self, collection: DataCollection, lat: float, lon: float) -> List[FileEntry]:
         """Find files using the appropriate handler"""
+        
+        # ALWAYS log for Auckland NZ to debug
+        is_auckland = abs(lat - (-36.8485)) < 0.001 and abs(lon - 174.7633) < 0.001
+        is_nz = hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ'
+        
+        if is_auckland and is_nz:
+            logger.info(f"🔍🔍 Processing NZ collection {collection.id} for Auckland")
+            logger.info(f"  Collection country: {getattr(collection, 'country', 'MISSING')}")
+            logger.info(f"  Collection type: {getattr(collection, 'collection_type', 'MISSING')}")
+        
         handler = self.get_handler_for_collection(collection)
         
-        # Debug logging for Auckland NZ collections
-        if (hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ' and
-            abs(lat - (-36.8485)) < 0.001 and abs(lon - 174.7633) < 0.001):
-            logger.info(f"🔍 NZ collection {collection.id}: handler={handler.__class__.__name__ if handler else 'NONE'}")
+        if is_auckland and is_nz:
+            logger.info(f"  Selected handler: {handler.__class__.__name__ if handler else 'NONE'}")
             if handler:
-                logger.info(f"  Collection type: {getattr(collection, 'collection_type', 'unknown')}")
                 logger.info(f"  Files in collection: {len(getattr(collection, 'files', []))}")
         
         if not handler:
