@@ -50,7 +50,8 @@ class BaseCollectionHandler(ABC):
             
             # Debug first file for Auckland in NZ collections
             if is_auckland and i == 0 and hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
-                logger.debug(f"NZ file bounds check for {collection.name}:")
+                collection_name = getattr(collection, 'survey_name', getattr(collection, 'name', collection.id[:8]))
+                logger.debug(f"NZ file bounds check for {collection_name}:")
                 logger.debug(f"  File: {file_entry.path.split('/')[-1] if hasattr(file_entry, 'path') else 'unknown'}")
                 logger.debug(f"  Bounds type: {type(bounds)}")
                 logger.debug(f"  Has min_lat attr: {hasattr(bounds, 'min_lat')}")
