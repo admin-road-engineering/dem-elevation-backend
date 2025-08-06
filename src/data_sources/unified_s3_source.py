@@ -134,6 +134,8 @@ class UnifiedS3Source(BaseDataSource):
             # Find best collections for coordinate
             logger.info(f"🔍🔍🔍 UNIFIED S3: Getting elevation for ({lat}, {lon})")
             logger.info(f"  Collections in index: {len(self.unified_index.data_collections)}")
+            logger.info(f"  Handler registry type: {type(self.handler_registry).__name__}")
+            logger.info(f"  Handler registry module: {type(self.handler_registry).__module__}")
             
             best_collections = self.handler_registry.find_best_collections(
                 self.unified_index.data_collections, lat, lon, max_collections=3
@@ -157,9 +159,15 @@ class UnifiedS3Source(BaseDataSource):
                 
                 try:
                     # Find files within collection
+                    logger.info(f"  🔍 Calling find_files_for_coordinate for collection {collection.id}")
+                    logger.info(f"    Collection type: {type(collection).__name__}")
+                    logger.info(f"    Collection country: {getattr(collection, 'country', 'MISSING')}")
+                    
                     candidate_files = self.handler_registry.find_files_for_coordinate(
                         collection, lat, lon
                     )
+                    
+                    logger.info(f"    Files found: {len(candidate_files)}")
                     
                     if not candidate_files:
                         continue
