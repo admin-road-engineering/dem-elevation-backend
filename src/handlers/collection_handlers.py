@@ -409,6 +409,15 @@ class CollectionHandlerRegistry:
     def get_collection_priority(self, collection: DataCollection, lat: float, lon: float) -> float:
         """Get collection priority using the appropriate handler"""
         
+        # DEBUG: Check what attributes NZ collections actually have
+        if (abs(lat - (-36.8485)) < 0.001 and abs(lon - 174.7633) < 0.001 and 
+            hasattr(collection, 'id') and collection.id in ['c5955c04-7a6b-494f-a2f6-e8681199f89a', '35bb9ab2-3767-45ec-b1a6-8674dd5caf2a']):
+            logger.info(f"🔍 PRIORITY DEBUG for {collection.id[:8]}...")
+            logger.info(f"  Type: {type(collection).__name__}")
+            logger.info(f"  hasattr country: {hasattr(collection, 'country')}")
+            logger.info(f"  getattr country: {getattr(collection, 'country', 'MISSING')}")
+            logger.info(f"  Dir contains: {[attr for attr in dir(collection) if not attr.startswith('_')]}")
+        
         # CRITICAL FIX FIRST: Check country attribute directly
         # This handles misclassified NZ collections (typed as AustralianUTMCollection but country=NZ)
         if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
