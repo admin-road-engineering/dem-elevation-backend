@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple, Protocol
 import logging
 
 from ..models.unified_spatial_models import (
-    DataCollection, AustralianUTMCollection, NewZealandCampaignCollection,
+    DataCollection, AustralianUTMCollection,
     FileEntry, CoverageBounds
 )
 from ..models.coordinates import QueryPoint, PointWGS84
@@ -278,9 +278,19 @@ class NewZealandCampaignHandler(BaseCollectionHandler):
     """Handler for New Zealand campaign collections"""
     
     def can_handle(self, collection: DataCollection) -> bool:
-        return isinstance(collection, NewZealandCampaignCollection)
+        # Check for NZ collections by country attribute
+        # This works for both unified v2.0 format and any other NZ collection types
+        if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+            return True
+            
+        # Also check for specific type if available
+        try:
+            from src.models.unified_wgs84_models import NewZealandUnifiedCollection
+            return isinstance(collection, NewZealandUnifiedCollection)
+        except (ImportError, TypeError):
+            return False
     
-    def get_collection_priority(self, collection: NewZealandCampaignCollection, lat: float, lon: float) -> float:
+    def get_collection_priority(self, collection: DataCollection, lat: float, lon: float) -> float:
         """NZ collections get priority based on data type and survey year"""
         base_priority = super().get_collection_priority(collection, lat, lon)
         
