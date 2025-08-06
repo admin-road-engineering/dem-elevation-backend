@@ -42,19 +42,38 @@ class BaseCollectionHandler(ABC):
         """Default implementation using bounds checking"""
         candidates = []
         
-        for file_entry in collection.files:
+        # Special debug for Auckland
+        is_auckland = abs(lat - (-36.8485)) < 0.001 and abs(lon - 174.7633) < 0.001
+        
+        for i, file_entry in enumerate(collection.files):
             bounds = file_entry.bounds
+            
+            # Debug first file for Auckland in NZ collections
+            if is_auckland and i == 0 and hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+                logger.debug(f"NZ file bounds check for {collection.name}:")
+                logger.debug(f"  File: {file_entry.path.split('/')[-1] if hasattr(file_entry, 'path') else 'unknown'}")
+                logger.debug(f"  Bounds type: {type(bounds)}")
+                logger.debug(f"  Has min_lat attr: {hasattr(bounds, 'min_lat')}")
+                logger.debug(f"  Is dict: {isinstance(bounds, dict)}")
+                if hasattr(bounds, 'min_lat'):
+                    logger.debug(f"  Bounds: lat [{bounds.min_lat:.4f}, {bounds.max_lat:.4f}], lon [{bounds.min_lon:.4f}, {bounds.max_lon:.4f}]")
+                    logger.debug(f"  Auckland ({lat:.4f}, {lon:.4f}) in bounds: {bounds.min_lat <= lat <= bounds.max_lat and bounds.min_lon <= lon <= bounds.max_lon}")
+            
             # Check both dict access and attribute access for compatibility
             if hasattr(bounds, 'min_lat') and hasattr(bounds, 'min_lon'):
                 # Pydantic model with attributes
                 if (bounds.min_lat <= lat <= bounds.max_lat and
                     bounds.min_lon <= lon <= bounds.max_lon):
                     candidates.append(file_entry)
+                    if is_auckland and hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+                        logger.info(f"✅ Found NZ file for Auckland: {file_entry.path.split('/')[-1]}")
             elif isinstance(bounds, dict) and 'min_lat' in bounds and 'min_lon' in bounds:
                 # Plain dict (for backwards compatibility)
                 if (bounds['min_lat'] <= lat <= bounds['max_lat'] and
                     bounds['min_lon'] <= lon <= bounds['max_lon']):
                     candidates.append(file_entry)
+                    if is_auckland and hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+                        logger.info(f"✅ Found NZ file for Auckland (dict): {file_entry.get('path', '').split('/')[-1]}")
         
         if len(candidates) == 0 and len(collection.files) > 0:
             # Debug logging if no files found but collection has files

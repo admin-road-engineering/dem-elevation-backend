@@ -186,19 +186,24 @@ Found 1 files in collection for coordinate (-27.4698, 153.0251)
 #### ⚠️ Phase 6.1: Over-Engineering Crisis & Recovery (LEARNING PHASE)
 **Critical Lesson**: *"Exceptional architecture is resilience and working functionality, not just sophisticated patterns"*
 
-**Completed P0 Optimizations**:
-- ✅ **Enhanced Diagnostic Logging**: Full GDAL/rasterio error capture with exc_info=True
-- ✅ **Root Cause Analysis**: Railway environment requires boto3 sessions, not direct AWS env vars
-- ✅ **Singleton Session Pattern**: AWS sessions created once at startup (performance + security)
-- ✅ **Bucket-Aware Architecture**: AU private (signed) vs NZ public (unsigned) session management
+**Recovery Status**: **50% Complete - Brisbane Working, Auckland In Progress**
 
-**Crisis Status**: **Both Coordinates Broken Due to Over-Engineering**
-- **Brisbane (AU)**: ❌ Previously worked (10.872m) → Now broken after complex session management changes
-- **Auckland (NZ)**: ❌ Previously worked (~25m) → Now broken after bounds/CRS logic changes  
+**Brisbane Recovery**: ✅ **COMPLETE**
+- **Fixed**: Duplicate rasterio.open statement causing syntax error
+- **Fixed**: Environment variable restoration with proper finally block
+- **Result**: Returns 10.872m elevation in <2 seconds
+- **Lesson**: Simple environment variable approach worked better than complex session management
+
+**Auckland Recovery**: 🔄 **IN PROGRESS**
+- **Discovered**: 17 files exist with Auckland in bounds (BA32_10000_0401.tiff)
+- **Verified**: Bounds are correct WGS84 (-36.8783 to -36.8126, 174.7489 to 174.8043)
+- **Confirmed**: Pydantic models parse correctly with proper attributes
+- **Issue**: Collections not being found despite correct data in index
+- **Next**: Debug logging deployed to diagnose collection discovery
 
 **Key Lesson Learned**: *"Make it work, then make it better"* - NOT the other way around
 
-**Recovery Approach**: Systematic minimal changes to restore basic functionality before ANY optimizations
+**Recovery Approach**: Test-driven minimal fixes with integration tests validating success
 
 #### 🎯 Phase 7: A+ Architectural Excellence (IN PROGRESS)
 **Gemini Roadmap**: *"Four key areas to achieve A+ (Exceptional) status"*
