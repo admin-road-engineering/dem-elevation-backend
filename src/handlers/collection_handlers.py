@@ -408,27 +408,30 @@ class CollectionHandlerRegistry:
     
     def get_collection_priority(self, collection: DataCollection, lat: float, lon: float) -> float:
         """Get collection priority using the appropriate handler"""
+        
+        # CRITICAL FIX FIRST: Check country attribute directly
+        # This handles misclassified NZ collections (typed as AustralianUTMCollection but country=NZ)
+        if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+            # Use NZ handler logic directly
+            base_priority = 1.0
+            if hasattr(collection, 'resolution_m'):
+                base_priority = 1.0 / getattr(collection, 'resolution_m', 1.0)
+            
+            # ALWAYS boost NZ collections MASSIVELY (remove coordinate restriction for debugging)
+            base_priority *= 10000.0  # HUGE boost to ensure NZ always wins
+            
+            # Prefer DEM over DSM
+            if hasattr(collection, 'data_type'):
+                data_type = getattr(collection, 'data_type', 'DEM')
+                if data_type == "DEM":
+                    base_priority *= 1.3
+            
+            logger.info(f"🔴 NZ PRIORITY BOOST: {collection.id[:8]}... → {base_priority:.0f}")
+            return base_priority
+        
+        # For non-NZ collections, use normal handler logic
         handler = self.get_handler_for_collection(collection)
         if not handler:
-            # CRITICAL FIX: NZ collections misclassified as AustralianUTMCollection
-            # Check if this is actually an NZ collection by country attribute
-            if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
-                # Use NZ handler logic directly
-                base_priority = 1.0
-                if hasattr(collection, 'resolution_m'):
-                    base_priority = 1.0 / collection.resolution_m
-                
-                # Boost NZ collections significantly for NZ coordinates
-                if (-47.5 <= lat <= -34.0) and (166.0 <= lon <= 179.0):
-                    base_priority *= 100.0  # Massive boost for NZ collections in NZ
-                
-                # Prefer DEM over DSM
-                if hasattr(collection, 'data_type'):
-                    if collection.data_type == "DEM":
-                        base_priority *= 1.3
-                
-                return base_priority
-            
             return 0.0
         
         return handler.get_collection_priority(collection, lat, lon)
