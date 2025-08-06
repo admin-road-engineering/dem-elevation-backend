@@ -382,11 +382,24 @@ class CollectionHandlerRegistry:
                 priority = self.get_collection_priority(collection, lat, lon)
                 collection_scores.append((collection, priority))
                 
+                # Debug logging for NZ collections
+                if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+                    logger.info(f"✅ NZ collection {collection.id} passed bounds check for Auckland ({lat}, {lon})")
+                
             except Exception as e:
                 logger.error(f"Failed to process collection {collection.id}: {e}")
                 continue
         
         # Sort by priority (highest first) and limit results
         collection_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        # Debug logging for Auckland coordinate
+        if abs(lat - (-36.8485)) < 0.0001 and abs(lon - 174.7633) < 0.0001:
+            nz_in_scores = [c for c, _ in collection_scores if hasattr(c, 'country') and getattr(c, 'country', None) == 'NZ']
+            logger.info(f"🔍 Auckland search: Found {len(nz_in_scores)} NZ collections out of {len(collection_scores)} total eligible")
+            if nz_in_scores:
+                first_nz = nz_in_scores[0]
+                logger.info(f"  Top NZ: {getattr(first_nz, 'survey_name', first_nz.id)}")
+        
         logger.info(f"Found {len(collection_scores)} eligible collections for ({lat}, {lon}), returning top {max_collections}")
         return collection_scores[:max_collections]
