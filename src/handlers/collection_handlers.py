@@ -348,6 +348,15 @@ class CollectionHandlerRegistry:
             logger.info(f"🔍 Finding handler for top NZ collection {collection.id}")
             logger.info(f"  Available handlers: {[h.__class__.__name__ for h in self.handlers]}")
         
+        # CRITICAL FIX: Check for NZ country first, regardless of type
+        if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+            # Return the NZ handler directly
+            for handler in self.handlers:
+                if isinstance(handler, NewZealandCampaignHandler):
+                    if is_auckland_nz:
+                        logger.info(f"  ✅ Force-selected: NewZealandCampaignHandler for NZ country")
+                    return handler
+        
         for handler in self.handlers:
             can_handle = handler.can_handle(collection)
             if is_auckland_nz:
@@ -402,6 +411,25 @@ class CollectionHandlerRegistry:
         """Get collection priority using the appropriate handler"""
         handler = self.get_handler_for_collection(collection)
         if not handler:
+            # CRITICAL FIX: NZ collections misclassified as AustralianUTMCollection
+            # Check if this is actually an NZ collection by country attribute
+            if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
+                # Use NZ handler logic directly
+                base_priority = 1.0
+                if hasattr(collection, 'resolution_m'):
+                    base_priority = 1.0 / collection.resolution_m
+                
+                # Boost NZ collections significantly for NZ coordinates
+                if (-47.5 <= lat <= -34.0) and (166.0 <= lon <= 179.0):
+                    base_priority *= 100.0  # Massive boost for NZ collections in NZ
+                
+                # Prefer DEM over DSM
+                if hasattr(collection, 'data_type'):
+                    if collection.data_type == "DEM":
+                        base_priority *= 1.3
+                
+                return base_priority
+            
             return 0.0
         
         return handler.get_collection_priority(collection, lat, lon)

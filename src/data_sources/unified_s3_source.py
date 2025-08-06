@@ -163,11 +163,20 @@ class UnifiedS3Source(BaseDataSource):
                     logger.info(f"    Collection type: {type(collection).__name__}")
                     logger.info(f"    Collection country: {getattr(collection, 'country', 'MISSING')}")
                     
+                    # CRITICAL DEBUG: Check collection files before handler
+                    logger.info(f"    📁 Files in collection: {len(getattr(collection, 'files', []))}")
+                    if len(getattr(collection, 'files', [])) > 0:
+                        first_file = collection.files[0]
+                        logger.info(f"    📁 First file example: {getattr(first_file, 'filename', 'unknown')}")
+                        logger.info(f"    📁 First file bounds type: {type(getattr(first_file, 'bounds', None))}")
+                    
                     candidate_files = self.handler_registry.find_files_for_coordinate(
                         collection, lat, lon
                     )
                     
                     logger.info(f"    Files found: {len(candidate_files)}")
+                    if len(candidate_files) == 0 and len(getattr(collection, 'files', [])) > 0:
+                        logger.warning(f"    ⚠️ No files found despite collection having {len(collection.files)} files!")
                     
                     if not candidate_files:
                         continue
