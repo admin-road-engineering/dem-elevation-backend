@@ -132,9 +132,14 @@ class UnifiedS3Source(BaseDataSource):
         
         try:
             # Find best collections for coordinate
+            logger.info(f"🔍🔍🔍 UNIFIED S3: Getting elevation for ({lat}, {lon})")
+            logger.info(f"  Collections in index: {len(self.unified_index.data_collections)}")
+            
             best_collections = self.handler_registry.find_best_collections(
                 self.unified_index.data_collections, lat, lon, max_collections=3
             )
+            
+            logger.info(f"  Best collections returned: {len(best_collections)}")
             
             if not best_collections:
                 return ElevationResult(
