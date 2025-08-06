@@ -118,7 +118,12 @@ class AustralianCampaignHandler(BaseCollectionHandler):
         self.crs_service = crs_service
         
     def can_handle(self, collection: DataCollection) -> bool:
-        # Handle Australian collections that have campaign_name (individual campaigns)
+        # IMPORTANT: Check country first to avoid handling NZ collections
+        # Only handle Australian collections (AU country)
+        if hasattr(collection, 'country'):
+            return getattr(collection, 'country', None) == 'AU'
+            
+        # Fallback: Handle Australian collections that have campaign_name (individual campaigns)
         return (isinstance(collection, AustralianUTMCollection) and 
                 hasattr(collection, 'campaign_name') and 
                 collection.campaign_name is not None)
