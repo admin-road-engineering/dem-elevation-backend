@@ -353,8 +353,7 @@ class CollectionHandlerRegistry:
             # Return the NZ handler directly
             for handler in self.handlers:
                 if isinstance(handler, NewZealandCampaignHandler):
-                    if is_auckland_nz:
-                        logger.info(f"  ✅ Force-selected: NewZealandCampaignHandler for NZ country")
+                    logger.debug(f"  ✅ Force-selected: NewZealandCampaignHandler for NZ collection {collection.id[:8]}...")
                     return handler
         
         for handler in self.handlers:
@@ -490,7 +489,7 @@ class CollectionHandlerRegistry:
                 
                 # Debug logging for NZ collections
                 if hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ':
-                    logger.info(f"✅ NZ collection {collection.id} passed bounds check for Auckland ({lat}, {lon})")
+                    logger.info(f"✅ NZ collection {collection.id[:8]}... priority={priority:.2f} for ({lat:.4f}, {lon:.4f})")
                 
             except Exception as e:
                 logger.error(f"Failed to process collection {collection.id}: {e}")

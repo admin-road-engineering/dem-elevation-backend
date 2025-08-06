@@ -142,6 +142,9 @@ class UnifiedS3Source(BaseDataSource):
             )
             
             logger.info(f"  Best collections returned: {len(best_collections)}")
+            # CRITICAL DEBUG: Show what collections were selected
+            for idx, (coll, priority) in enumerate(best_collections[:3]):
+                logger.info(f"    Top {idx+1}: {getattr(coll, 'id', 'unknown')[:8]}... country={getattr(coll, 'country', '??')} priority={priority:.2f}")
             
             if not best_collections:
                 return ElevationResult(
