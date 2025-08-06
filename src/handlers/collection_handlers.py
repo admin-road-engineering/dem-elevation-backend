@@ -344,10 +344,33 @@ class CollectionHandlerRegistry:
     def find_files_for_coordinate(self, collection: DataCollection, lat: float, lon: float) -> List[FileEntry]:
         """Find files using the appropriate handler"""
         handler = self.get_handler_for_collection(collection)
+        
+        # Debug logging for Auckland NZ collections
+        if (hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ' and
+            abs(lat - (-36.8485)) < 0.001 and abs(lon - 174.7633) < 0.001):
+            logger.info(f"🔍 NZ collection {collection.id}: handler={handler.__class__.__name__ if handler else 'NONE'}")
+            if handler:
+                logger.info(f"  Collection type: {getattr(collection, 'collection_type', 'unknown')}")
+                logger.info(f"  Files in collection: {len(getattr(collection, 'files', []))}")
+        
         if not handler:
+            logger.warning(f"No handler for collection {collection.id} (type: {getattr(collection, 'collection_type', 'unknown')})")
             return []
         
-        return handler.find_files_for_coordinate(collection, lat, lon)
+        files = handler.find_files_for_coordinate(collection, lat, lon)
+        
+        # Debug result for NZ
+        if (hasattr(collection, 'country') and getattr(collection, 'country', None) == 'NZ' and
+            abs(lat - (-36.8485)) < 0.001 and abs(lon - 174.7633) < 0.001):
+            logger.info(f"  Files found: {len(files)}")
+            if len(files) == 0 and len(getattr(collection, 'files', [])) > 0:
+                # Check first file bounds
+                first_file = collection.files[0]
+                bounds = first_file.bounds
+                logger.info(f"  First file bounds type: {type(bounds)}")
+                logger.info(f"  First file bounds: {bounds}")
+        
+        return files
     
     def get_collection_priority(self, collection: DataCollection, lat: float, lon: float) -> float:
         """Get collection priority using the appropriate handler"""
