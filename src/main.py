@@ -417,6 +417,44 @@ async def debug_settings_info():
         }
     }
 
+@app.get("/api/v1/debug/sqlite-settings")
+async def debug_sqlite_settings(request: Request):
+    """Debug endpoint to check SQLite boolean parsing issue
+    Secured with API key authentication via middleware"""
+    import os
+    
+    settings = get_settings()
+    
+    # Get raw environment values
+    env_raw = os.environ.get("USE_SQLITE_INDEX")
+    
+    return {
+        "sqlite_config": {
+            "USE_SQLITE_INDEX": {
+                "parsed_value": settings.USE_SQLITE_INDEX,
+                "parsed_type": type(settings.USE_SQLITE_INDEX).__name__,
+                "env_raw": env_raw,
+                "env_type": type(env_raw).__name__ if env_raw is not None else "None",
+                "truthy_test": env_raw.lower() in ('true', '1', 'yes', 'on') if env_raw else False
+            },
+            "SQLITE_INDEX_URL": settings.SQLITE_INDEX_URL,
+            "SQLITE_DB_HASH": settings.SQLITE_DB_HASH,
+            "SQLITE_DB_VERSION": settings.SQLITE_DB_VERSION if hasattr(settings, 'SQLITE_DB_VERSION') else None,
+            "SQLITE_DOWNLOAD_PATH": settings.SQLITE_DOWNLOAD_PATH
+        },
+        "app_environment": {
+            "APP_ENV": settings.APP_ENV,
+            "RAILWAY_ENVIRONMENT": os.environ.get("RAILWAY_ENVIRONMENT"),
+            "USE_S3_SOURCES": settings.USE_S3_SOURCES,
+            "USE_API_SOURCES": settings.USE_API_SOURCES
+        },
+        "diagnostic": {
+            "should_use_sqlite": env_raw and env_raw.lower() in ('true', '1', 'yes', 'on'),
+            "actual_using_sqlite": settings.USE_SQLITE_INDEX,
+            "mismatch": (env_raw and env_raw.lower() in ('true', '1', 'yes', 'on')) != settings.USE_SQLITE_INDEX
+        }
+    }
+
 # Add CORS middleware
 settings = get_settings()
 cors_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()] if settings.CORS_ORIGINS else ["*"]

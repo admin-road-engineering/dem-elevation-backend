@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Dict, Any, Optional, List, Literal
 import os
@@ -277,6 +277,28 @@ class Settings(BaseSettings):
         description="S3 path for unified spatial index"
     )
     
+    # Phase 2: SQLite R*Tree Spatial Index
+    USE_SQLITE_INDEX: bool = Field(
+        default=False,
+        description="Enable SQLite R*Tree spatial indexing for <10ms query performance"
+    )
+    SQLITE_INDEX_URL: str = Field(
+        default="s3://road-engineering-elevation-data/indexes/spatial_index.db.gz",
+        description="URL to compressed SQLite spatial database"
+    )
+    SQLITE_DB_HASH: Optional[str] = Field(
+        default=None,
+        description="SHA256 hash for SQLite database integrity verification"
+    )
+    SQLITE_DOWNLOAD_PATH: str = Field(
+        default="./spatial_index.db",
+        description="Local path for downloaded SQLite database"
+    )
+    SQLITE_DB_VERSION: Optional[str] = Field(
+        default=None,
+        description="SQLite database version identifier"
+    )
+    
     # Multi-source environment settings (Phase 3B.2: Enhanced with better field types)
     USE_S3_SOURCES: bool = Field(default=False, description="Enable S3-based DEM sources")
     USE_API_SOURCES: bool = Field(default=False, description="Enable external API sources")
@@ -382,6 +404,19 @@ class Settings(BaseSettings):
         env_file_encoding='utf-8', 
         extra="ignore"
     )
+    
+    @field_validator('USE_SQLITE_INDEX', 'USE_S3_SOURCES', 'USE_API_SOURCES', 
+                     'ENABLE_NZ_SOURCES', 'USE_UNIFIED_SPATIAL_INDEX', mode='before')
+    @classmethod
+    def parse_boolean(cls, v):
+        """Handle string boolean values from environment variables.
+        Railway and other platforms pass environment variables as strings.
+        This validator ensures proper boolean coercion for common representations."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() in ('true', '1', 'yes', 'on', 't', 'y')
+        return bool(v)
     
     @property
     def DEM_SOURCES(self) -> Dict[str, Dict[str, Any]]:
