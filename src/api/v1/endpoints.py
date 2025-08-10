@@ -27,6 +27,8 @@ from ...models import (
     StandardElevationResult, StandardMetadata, StandardResponse, StandardErrorResponse,
     StandardErrorDetail
 )
+# Import campaigns models
+from ...models.api_campaign_models import CampaignSummary, CampaignDetails, CampaignsResult
 
 logger = logging.getLogger(__name__)
 
@@ -934,4 +936,71 @@ async def get_elevation_points(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error in points elevation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# Campaigns endpoints for unified spatial index
+@router.get("/campaigns", response_model=CampaignsResult, summary="List available elevation data campaigns/collections")
+async def list_campaigns(
+    elevation_service: UnifiedElevationService = Depends(get_elevation_service)
+) -> CampaignsResult:
+    """
+    List all available elevation data campaigns/collections grouped by country.
+    
+    Returns campaigns from the unified spatial index including:
+    - Australian campaigns (1,394 collections)  
+    - New Zealand campaigns (188 collections)
+    - Campaign metadata, bounds, resolution, and file counts
+    """
+    try:
+        from ...unified_elevation_service import ServiceNotReadyError, NoCollectionsAvailableError
+        from fastapi import status as http_status
+        
+        return elevation_service.get_all_campaigns_summary()
+        
+    except NoCollectionsAvailableError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ServiceNotReadyError as e:
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error listing campaigns: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/campaigns/{campaign_id}", response_model=CampaignDetails, summary="Get detailed campaign information")
+async def get_campaign_details(
+    campaign_id: str,
+    file_page: int = 1,
+    file_limit: int = 10,
+    elevation_service: UnifiedElevationService = Depends(get_elevation_service)
+) -> CampaignDetails:
+    """
+    Get detailed information about a specific elevation data campaign.
+    
+    Parameters:
+    - campaign_id: Unique identifier for the campaign
+    - file_page: Page number for file listings (default: 1)
+    - file_limit: Number of files per page (default: 10, max: 100)
+    
+    Returns campaign details including:
+    - Campaign metadata and bounds
+    - Paginated list of files with bounds and metadata
+    - Total file count and pagination info
+    """
+    try:
+        from ...unified_elevation_service import ServiceNotReadyError, NoCollectionsAvailableError
+        from fastapi import status as http_status
+        
+        return elevation_service.get_campaign_details_with_files(
+            campaign_id, 
+            file_page=file_page, 
+            file_limit=file_limit
+        )
+        
+    except NoCollectionsAvailableError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ServiceNotReadyError as e:
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting campaign details for {campaign_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
