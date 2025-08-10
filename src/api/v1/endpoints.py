@@ -968,11 +968,22 @@ async def list_campaigns(
             
         elevation_source = unified_provider.elevation_source
         
-        # The elevation source has unified_index.data_collections
-        if not hasattr(elevation_source, 'unified_index') or not elevation_source.unified_index:
-            raise HTTPException(status_code=503, detail="Unified index not loaded")
+        # Handle both direct source and FallbackDataSource cases
+        unified_s3_source = None
+        if hasattr(elevation_source, 'unified_index') and elevation_source.unified_index:
+            # Direct UnifiedWGS84S3Source
+            unified_s3_source = elevation_source
+        elif hasattr(elevation_source, 'sources'):
+            # FallbackDataSource - find the UnifiedWGS84S3Source
+            for source in elevation_source.sources:
+                if hasattr(source, 'unified_index') and source.unified_index:
+                    unified_s3_source = source
+                    break
+        
+        if not unified_s3_source:
+            raise HTTPException(status_code=503, detail="Unified S3 source not found")
             
-        collections = elevation_source.unified_index.data_collections
+        collections = unified_s3_source.unified_index.data_collections
         
         # Group by country
         campaigns_by_country = {}
@@ -1068,11 +1079,22 @@ async def get_campaign_details(
             
         elevation_source = unified_provider.elevation_source
         
-        # The elevation source has unified_index.data_collections
-        if not hasattr(elevation_source, 'unified_index') or not elevation_source.unified_index:
-            raise HTTPException(status_code=503, detail="Unified index not loaded")
+        # Handle both direct source and FallbackDataSource cases
+        unified_s3_source = None
+        if hasattr(elevation_source, 'unified_index') and elevation_source.unified_index:
+            # Direct UnifiedWGS84S3Source
+            unified_s3_source = elevation_source
+        elif hasattr(elevation_source, 'sources'):
+            # FallbackDataSource - find the UnifiedWGS84S3Source
+            for source in elevation_source.sources:
+                if hasattr(source, 'unified_index') and source.unified_index:
+                    unified_s3_source = source
+                    break
+        
+        if not unified_s3_source:
+            raise HTTPException(status_code=503, detail="Unified S3 source not found")
             
-        collections = elevation_source.unified_index.data_collections
+        collections = unified_s3_source.unified_index.data_collections
         
         # Find the specific collection by ID
         collection = None
