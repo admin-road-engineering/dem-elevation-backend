@@ -1182,12 +1182,7 @@ async def get_campaign_details(
         end_idx = start_idx + file_limit
         paginated_files = files[start_idx:end_idx]
         
-        # Import FileInfo using importlib to avoid circular imports
-        import importlib
-        api_campaign_models = importlib.import_module('src.models.api_campaign_models')
-        FileInfo = api_campaign_models.FileInfo
-        
-        # Create FileInfo objects
+        # Create file info dictionaries (Pydantic will convert to FileInfo objects)
         file_info_list = []
         for file_entry in paginated_files:
             # Convert file size from MB to bytes
@@ -1201,13 +1196,14 @@ async def get_campaign_details(
                 "max_lon": file_entry.bounds.max_lon
             } if file_entry.bounds else {}
             
-            file_info = FileInfo(
-                filename=file_entry.filename,
-                file_path=file_entry.file,
-                bounds=bounds_dict,
-                size_bytes=size_bytes
-            )
-            file_info_list.append(file_info)
+            # Create dictionary that matches FileInfo structure
+            file_info_dict = {
+                "filename": file_entry.filename,
+                "file_path": file_entry.file,
+                "bounds": bounds_dict,
+                "size_bytes": size_bytes
+            }
+            file_info_list.append(file_info_dict)
         
         # Extract bounds as dictionary for API response
         bounds_dict = None
