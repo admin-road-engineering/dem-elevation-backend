@@ -27,8 +27,8 @@ from ...models import (
     StandardElevationResult, StandardMetadata, StandardResponse, StandardErrorResponse,
     StandardErrorDetail
 )
-# Import campaigns models - FileInfo fix
-from ...models.api_campaign_models import CampaignSummary, CampaignDetails, CampaignsResult, FileInfo
+# Import campaigns models - FileInfo fix  
+from ...models.api_campaign_models import CampaignSummary, CampaignDetails, CampaignsResult
 
 logger = logging.getLogger(__name__)
 
@@ -1181,6 +1181,9 @@ async def get_campaign_details(
         start_idx = (file_page - 1) * file_limit
         end_idx = start_idx + file_limit
         paginated_files = files[start_idx:end_idx]
+        
+        # Import FileInfo locally to avoid circular imports
+        from ...models.api_campaign_models import FileInfo
         
         # Create FileInfo objects
         file_info_list = []
