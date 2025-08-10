@@ -997,24 +997,31 @@ async def list_campaigns(
             
             # Extract bounds as dictionary for API response
             bounds_dict = None
-            if collection.bounds:
+            if collection.coverage_bounds_wgs84:
                 bounds_dict = {
-                    "min_lat": collection.bounds.min_lat,
-                    "max_lat": collection.bounds.max_lat,
-                    "min_lon": collection.bounds.min_lon,
-                    "max_lon": collection.bounds.max_lon
+                    "min_lat": collection.coverage_bounds_wgs84.min_lat,
+                    "max_lat": collection.coverage_bounds_wgs84.max_lat,
+                    "min_lon": collection.coverage_bounds_wgs84.min_lon,
+                    "max_lon": collection.coverage_bounds_wgs84.max_lon
                 }
             
-            # Get survey year - different field names for AU vs NZ
+            # Get survey year and name - different field names for AU vs NZ
             year = None
+            name = collection.id  # fallback to ID
             if hasattr(collection, 'survey_year') and collection.survey_year:
                 year = collection.survey_year
-            elif hasattr(collection, 'survey_years') and collection.survey_years:
+            if hasattr(collection, 'survey_years') and collection.survey_years:
                 year = max(collection.survey_years)  # Use most recent year
             
+            # Get collection name based on type
+            if hasattr(collection, 'campaign_name'):
+                name = collection.campaign_name
+            elif hasattr(collection, 'survey_name'):
+                name = collection.survey_name
+            
             campaign_summary = CampaignSummary(
-                id=collection.collection_id,
-                name=collection.name,
+                id=collection.id,
+                name=name,
                 country=country,
                 region=getattr(collection, 'region', None),
                 year=year,
@@ -1099,7 +1106,7 @@ async def get_campaign_details(
         # Find the specific collection by ID
         collection = None
         for coll in collections:
-            if coll.collection_id == campaign_id:
+            if coll.id == campaign_id:
                 collection = coll
                 break
         
@@ -1137,24 +1144,31 @@ async def get_campaign_details(
         
         # Extract bounds as dictionary for API response
         bounds_dict = None
-        if collection.bounds:
+        if collection.coverage_bounds_wgs84:
             bounds_dict = {
-                "min_lat": collection.bounds.min_lat,
-                "max_lat": collection.bounds.max_lat,
-                "min_lon": collection.bounds.min_lon,
-                "max_lon": collection.bounds.max_lon
+                "min_lat": collection.coverage_bounds_wgs84.min_lat,
+                "max_lat": collection.coverage_bounds_wgs84.max_lat,
+                "min_lon": collection.coverage_bounds_wgs84.min_lon,
+                "max_lon": collection.coverage_bounds_wgs84.max_lon
             }
         
-        # Get survey year - different field names for AU vs NZ
+        # Get survey year and name - different field names for AU vs NZ  
         year = None
+        name = collection.id  # fallback to ID
         if hasattr(collection, 'survey_year') and collection.survey_year:
             year = collection.survey_year
-        elif hasattr(collection, 'survey_years') and collection.survey_years:
+        if hasattr(collection, 'survey_years') and collection.survey_years:
             year = max(collection.survey_years)  # Use most recent year
+            
+        # Get collection name based on type
+        if hasattr(collection, 'campaign_name'):
+            name = collection.campaign_name
+        elif hasattr(collection, 'survey_name'):
+            name = collection.survey_name
         
         return CampaignDetails(
-            id=collection.collection_id,
-            name=collection.name,
+            id=collection.id,
+            name=name,
             country=collection.country,
             region=getattr(collection, 'region', None),
             year=year,
