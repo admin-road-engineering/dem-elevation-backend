@@ -960,13 +960,19 @@ async def list_campaigns(
         if not hasattr(elevation_service, 'unified_provider') or not elevation_service.unified_provider:
             raise HTTPException(status_code=503, detail="Unified provider not available")
             
-        provider = elevation_service.unified_provider
+        unified_provider = elevation_service.unified_provider
         
-        # The unified provider is actually the UnifiedWGS84S3Source which has unified_index.data_collections
-        if not hasattr(provider, 'unified_index') or not provider.unified_index:
+        # The unified provider contains the UnifiedWGS84S3Source as elevation_source
+        if not hasattr(unified_provider, 'elevation_source') or not unified_provider.elevation_source:
+            raise HTTPException(status_code=503, detail="Elevation source not available")
+            
+        elevation_source = unified_provider.elevation_source
+        
+        # The elevation source has unified_index.data_collections
+        if not hasattr(elevation_source, 'unified_index') or not elevation_source.unified_index:
             raise HTTPException(status_code=503, detail="Unified index not loaded")
             
-        collections = provider.unified_index.data_collections
+        collections = elevation_source.unified_index.data_collections
         
         # Group by country
         campaigns_by_country = {}
@@ -1054,13 +1060,19 @@ async def get_campaign_details(
         if not hasattr(elevation_service, 'unified_provider') or not elevation_service.unified_provider:
             raise HTTPException(status_code=503, detail="Unified provider not available")
             
-        provider = elevation_service.unified_provider
+        unified_provider = elevation_service.unified_provider
         
-        # The unified provider is actually the UnifiedWGS84S3Source which has unified_index.data_collections
-        if not hasattr(provider, 'unified_index') or not provider.unified_index:
+        # The unified provider contains the UnifiedWGS84S3Source as elevation_source
+        if not hasattr(unified_provider, 'elevation_source') or not unified_provider.elevation_source:
+            raise HTTPException(status_code=503, detail="Elevation source not available")
+            
+        elevation_source = unified_provider.elevation_source
+        
+        # The elevation source has unified_index.data_collections
+        if not hasattr(elevation_source, 'unified_index') or not elevation_source.unified_index:
             raise HTTPException(status_code=503, detail="Unified index not loaded")
             
-        collections = provider.unified_index.data_collections
+        collections = elevation_source.unified_index.data_collections
         
         # Find the specific collection by ID
         collection = None
