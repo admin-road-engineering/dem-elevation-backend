@@ -957,36 +957,55 @@ async def list_campaigns(
         from fastapi import status as http_status
         
         # Get collections from the unified provider
-        if not hasattr(elevation_service, '_unified_provider') or not elevation_service._unified_provider:
+        if not hasattr(elevation_service, 'unified_provider') or not elevation_service.unified_provider:
             raise HTTPException(status_code=503, detail="Unified provider not available")
             
-        provider = elevation_service._unified_provider
-        if not hasattr(provider, '_collections_by_id') or not provider._collections_by_id:
-            raise HTTPException(status_code=503, detail="Collections not loaded")
+        provider = elevation_service.unified_provider
+        
+        # The unified provider is actually the UnifiedWGS84S3Source which has unified_index.data_collections
+        if not hasattr(provider, 'unified_index') or not provider.unified_index:
+            raise HTTPException(status_code=503, detail="Unified index not loaded")
             
-        collections = provider._collections_by_id
+        collections = provider.unified_index.data_collections
         
         # Group by country
         campaigns_by_country = {}
         country_counts = {}
         
-        for collection_id, collection in collections.items():
-            country = collection.get('country', 'Unknown')
+        for collection in collections:
+            country = collection.country
             if country not in campaigns_by_country:
                 campaigns_by_country[country] = []
                 country_counts[country] = 0
             
+            # Extract bounds as dictionary for API response
+            bounds_dict = None
+            if collection.bounds:
+                bounds_dict = {
+                    "min_lat": collection.bounds.min_lat,
+                    "max_lat": collection.bounds.max_lat,
+                    "min_lon": collection.bounds.min_lon,
+                    "max_lon": collection.bounds.max_lon
+                }
+            
+            # Get survey year - different field names for AU vs NZ
+            year = None
+            if hasattr(collection, 'survey_year') and collection.survey_year:
+                year = collection.survey_year
+            elif hasattr(collection, 'survey_years') and collection.survey_years:
+                year = max(collection.survey_years)  # Use most recent year
+            
             campaign_summary = CampaignSummary(
-                id=collection_id,
-                name=collection.get('name', collection_id),
+                id=collection.collection_id,
+                name=collection.name,
                 country=country,
-                region=collection.get('region'),
-                year=collection.get('year'),
-                file_count=len(collection.get('files', [])),
-                data_type=collection.get('data_type', 'DEM'),
-                resolution_m=collection.get('resolution_m', 1.0),
-                bounds=collection.get('bounds'),
-                crs=collection.get('crs', 'EPSG:4326')
+                region=getattr(collection, 'region', None),
+                year=year,
+                file_count=collection.file_count,
+                data_type=collection.data_type,
+                resolution_m=collection.resolution_m,
+                bounds=bounds_dict,
+                crs=collection.native_crs
             )
             campaigns_by_country[country].append(campaign_summary)
             country_counts[country] += 1
@@ -1032,20 +1051,28 @@ async def get_campaign_details(
         from fastapi import status as http_status
         
         # Get specific collection from the unified provider
-        if not hasattr(elevation_service, '_unified_provider') or not elevation_service._unified_provider:
+        if not hasattr(elevation_service, 'unified_provider') or not elevation_service.unified_provider:
             raise HTTPException(status_code=503, detail="Unified provider not available")
             
-        provider = elevation_service._unified_provider
-        if not hasattr(provider, '_collections_by_id') or not provider._collections_by_id:
-            raise HTTPException(status_code=503, detail="Collections not loaded")
-            
-        collections = provider._collections_by_id
+        provider = elevation_service.unified_provider
         
-        if campaign_id not in collections:
+        # The unified provider is actually the UnifiedWGS84S3Source which has unified_index.data_collections
+        if not hasattr(provider, 'unified_index') or not provider.unified_index:
+            raise HTTPException(status_code=503, detail="Unified index not loaded")
+            
+        collections = provider.unified_index.data_collections
+        
+        # Find the specific collection by ID
+        collection = None
+        for coll in collections:
+            if coll.collection_id == campaign_id:
+                collection = coll
+                break
+        
+        if not collection:
             raise HTTPException(status_code=404, detail=f"Campaign {campaign_id} not found")
         
-        collection = collections[campaign_id]
-        files = collection.get('files', [])
+        files = collection.files
         
         # Paginate files
         start_idx = (file_page - 1) * file_limit
@@ -1054,27 +1081,54 @@ async def get_campaign_details(
         
         # Create FileInfo objects
         file_info_list = []
-        for file_data in paginated_files:
-            if isinstance(file_data, dict):
-                file_info = FileInfo(
-                    filename=file_data.get('file', 'unknown'),
-                    file_path=file_data.get('s3_path', ''),
-                    bounds=file_data.get('bounds', {}),
-                    size_bytes=file_data.get('size_bytes', 0)
-                )
-                file_info_list.append(file_info)
+        for file_entry in paginated_files:
+            # Convert file size from MB to bytes
+            size_bytes = int(file_entry.size_mb * 1024 * 1024) if file_entry.size_mb else 0
+            
+            # Extract bounds as dictionary for API response
+            bounds_dict = {
+                "min_lat": file_entry.bounds.min_lat,
+                "max_lat": file_entry.bounds.max_lat,
+                "min_lon": file_entry.bounds.min_lon,
+                "max_lon": file_entry.bounds.max_lon
+            } if file_entry.bounds else {}
+            
+            file_info = FileInfo(
+                filename=file_entry.filename,
+                file_path=file_entry.file,
+                bounds=bounds_dict,
+                size_bytes=size_bytes
+            )
+            file_info_list.append(file_info)
+        
+        # Extract bounds as dictionary for API response
+        bounds_dict = None
+        if collection.bounds:
+            bounds_dict = {
+                "min_lat": collection.bounds.min_lat,
+                "max_lat": collection.bounds.max_lat,
+                "min_lon": collection.bounds.min_lon,
+                "max_lon": collection.bounds.max_lon
+            }
+        
+        # Get survey year - different field names for AU vs NZ
+        year = None
+        if hasattr(collection, 'survey_year') and collection.survey_year:
+            year = collection.survey_year
+        elif hasattr(collection, 'survey_years') and collection.survey_years:
+            year = max(collection.survey_years)  # Use most recent year
         
         return CampaignDetails(
-            id=campaign_id,
-            name=collection.get('name', campaign_id),
-            country=collection.get('country', 'Unknown'),
-            region=collection.get('region'),
-            year=collection.get('year'),
-            file_count=len(files),
-            data_type=collection.get('data_type', 'DEM'),
-            resolution_m=collection.get('resolution_m', 1.0),
-            bounds=collection.get('bounds'),
-            crs=collection.get('crs', 'EPSG:4326'),
+            id=collection.collection_id,
+            name=collection.name,
+            country=collection.country,
+            region=getattr(collection, 'region', None),
+            year=year,
+            file_count=collection.file_count,
+            data_type=collection.data_type,
+            resolution_m=collection.resolution_m,
+            bounds=bounds_dict,
+            crs=collection.native_crs,
             files=file_info_list,
             files_truncated=len(files) > end_idx,
             total_files=len(files)
