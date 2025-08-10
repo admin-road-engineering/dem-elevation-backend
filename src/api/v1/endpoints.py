@@ -956,7 +956,47 @@ async def list_campaigns(
         from ...dem_exceptions import DEMServiceError, DEMSourceError
         from fastapi import status as http_status
         
-        return elevation_service.get_all_campaigns_summary()
+        # Get collections from the unified provider
+        if not hasattr(elevation_service, '_unified_provider') or not elevation_service._unified_provider:
+            raise HTTPException(status_code=503, detail="Unified provider not available")
+            
+        provider = elevation_service._unified_provider
+        if not hasattr(provider, '_collections_by_id') or not provider._collections_by_id:
+            raise HTTPException(status_code=503, detail="Collections not loaded")
+            
+        collections = provider._collections_by_id
+        
+        # Group by country
+        campaigns_by_country = {}
+        country_counts = {}
+        
+        for collection_id, collection in collections.items():
+            country = collection.get('country', 'Unknown')
+            if country not in campaigns_by_country:
+                campaigns_by_country[country] = []
+                country_counts[country] = 0
+            
+            campaign_summary = CampaignSummary(
+                id=collection_id,
+                name=collection.get('name', collection_id),
+                country=country,
+                region=collection.get('region'),
+                year=collection.get('year'),
+                file_count=len(collection.get('files', [])),
+                data_type=collection.get('data_type', 'DEM'),
+                resolution_m=collection.get('resolution_m', 1.0),
+                bounds=collection.get('bounds'),
+                crs=collection.get('crs', 'EPSG:4326')
+            )
+            campaigns_by_country[country].append(campaign_summary)
+            country_counts[country] += 1
+        
+        return CampaignsResult(
+            total_campaigns=len(collections),
+            campaigns_by_country=campaigns_by_country,
+            country_summary=country_counts,
+            status="success"
+        )
         
     except DEMSourceError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -991,10 +1031,53 @@ async def get_campaign_details(
         from ...dem_exceptions import DEMServiceError, DEMSourceError
         from fastapi import status as http_status
         
-        return elevation_service.get_campaign_details_with_files(
-            campaign_id, 
-            file_page=file_page, 
-            file_limit=file_limit
+        # Get specific collection from the unified provider
+        if not hasattr(elevation_service, '_unified_provider') or not elevation_service._unified_provider:
+            raise HTTPException(status_code=503, detail="Unified provider not available")
+            
+        provider = elevation_service._unified_provider
+        if not hasattr(provider, '_collections_by_id') or not provider._collections_by_id:
+            raise HTTPException(status_code=503, detail="Collections not loaded")
+            
+        collections = provider._collections_by_id
+        
+        if campaign_id not in collections:
+            raise HTTPException(status_code=404, detail=f"Campaign {campaign_id} not found")
+        
+        collection = collections[campaign_id]
+        files = collection.get('files', [])
+        
+        # Paginate files
+        start_idx = (file_page - 1) * file_limit
+        end_idx = start_idx + file_limit
+        paginated_files = files[start_idx:end_idx]
+        
+        # Create FileInfo objects
+        file_info_list = []
+        for file_data in paginated_files:
+            if isinstance(file_data, dict):
+                file_info = FileInfo(
+                    filename=file_data.get('file', 'unknown'),
+                    file_path=file_data.get('s3_path', ''),
+                    bounds=file_data.get('bounds', {}),
+                    size_bytes=file_data.get('size_bytes', 0)
+                )
+                file_info_list.append(file_info)
+        
+        return CampaignDetails(
+            id=campaign_id,
+            name=collection.get('name', campaign_id),
+            country=collection.get('country', 'Unknown'),
+            region=collection.get('region'),
+            year=collection.get('year'),
+            file_count=len(files),
+            data_type=collection.get('data_type', 'DEM'),
+            resolution_m=collection.get('resolution_m', 1.0),
+            bounds=collection.get('bounds'),
+            crs=collection.get('crs', 'EPSG:4326'),
+            files=file_info_list,
+            files_truncated=len(files) > end_idx,
+            total_files=len(files)
         )
         
     except DEMSourceError as e:
