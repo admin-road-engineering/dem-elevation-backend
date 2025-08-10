@@ -940,6 +940,55 @@ async def get_elevation_points(
 
 
 # Campaigns endpoints for unified spatial index
+@router.get("/campaigns/test", summary="Test campaigns data access")
+async def test_campaigns_access(
+    elevation_service: UnifiedElevationService = Depends(get_elevation_service)
+):
+    """Simple test to verify campaigns data access without complex processing"""
+    try:
+        # Get collections from the unified provider
+        if not hasattr(elevation_service, 'unified_provider') or not elevation_service.unified_provider:
+            return {"error": "Unified provider not available"}
+            
+        unified_provider = elevation_service.unified_provider
+        
+        # The unified provider contains the UnifiedWGS84S3Source as elevation_source
+        if not hasattr(unified_provider, 'elevation_source') or not unified_provider.elevation_source:
+            return {"error": "Elevation source not available"}
+            
+        elevation_source = unified_provider.elevation_source
+        
+        # Handle both direct source and FallbackDataSource cases
+        unified_s3_source = None
+        if hasattr(elevation_source, 'unified_index') and elevation_source.unified_index:
+            # Direct UnifiedWGS84S3Source
+            unified_s3_source = elevation_source
+        elif hasattr(elevation_source, 'sources'):
+            # FallbackDataSource - find the UnifiedWGS84S3Source
+            for source in elevation_source.sources:
+                if hasattr(source, 'unified_index') and source.unified_index:
+                    unified_s3_source = source
+                    break
+        
+        if not unified_s3_source:
+            return {"error": "Unified S3 source not found"}
+            
+        collections = unified_s3_source.unified_index.data_collections
+        
+        return {
+            "status": "success",
+            "total_collections": len(collections),
+            "first_collection_id": collections[0].id if collections else None,
+            "first_collection_type": type(collections[0]).__name__ if collections else None
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
 @router.get("/campaigns", response_model=CampaignsResult, summary="List available elevation data campaigns/collections")
 async def list_campaigns(
     elevation_service: UnifiedElevationService = Depends(get_elevation_service)
