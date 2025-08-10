@@ -1046,8 +1046,11 @@ async def list_campaigns(
     except DEMServiceError as e:
         raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         logger.error(f"Error listing campaigns: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Traceback: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.get("/campaigns/{campaign_id}", response_model=CampaignDetails, summary="Get detailed campaign information")
@@ -1187,5 +1190,8 @@ async def get_campaign_details(
     except DEMServiceError as e:
         raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         logger.error(f"Error getting campaign details for {campaign_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Traceback: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
