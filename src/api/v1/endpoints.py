@@ -989,10 +989,10 @@ async def test_campaigns_access(
             "traceback": traceback.format_exc()
         }
 
-@router.get("/campaigns", response_model=CampaignsResult, summary="List available elevation data campaigns/collections")
+@router.get("/campaigns", summary="List available elevation data campaigns/collections")
 async def list_campaigns(
     elevation_service: UnifiedElevationService = Depends(get_elevation_service)
-) -> CampaignsResult:
+):
     """
     List all available elevation data campaigns/collections grouped by country.
     
