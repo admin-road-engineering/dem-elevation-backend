@@ -1182,7 +1182,7 @@ async def get_campaign_details(
         end_idx = start_idx + file_limit
         paginated_files = files[start_idx:end_idx]
         
-        # Import FileInfo locally to avoid circular imports
+        # Import FileInfo locally to avoid circular imports - fix v2
         from ...models.api_campaign_models import FileInfo
         
         # Create FileInfo objects
