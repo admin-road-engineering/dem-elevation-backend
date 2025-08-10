@@ -49,9 +49,15 @@ class UnifiedCollectionHandler:
         
         This is the key architectural improvement: no country-specific logic needed
         """
-        bounds = collection.coverage_bounds_wgs84
-        return (bounds.min_lat <= lat <= bounds.max_lat and
-                bounds.min_lon <= lon <= bounds.max_lon)
+        bounds = collection.coverage_bounds
+        # Handle both WGS84Bounds (lat/lon) and UTMBounds (x/y) formats
+        if hasattr(bounds, 'min_lat'):
+            return (bounds.min_lat <= lat <= bounds.max_lat and
+                    bounds.min_lon <= lon <= bounds.max_lon)
+        else:
+            # UTM bounds - this would need coordinate transformation
+            # For now, return False to skip UTM collections in bounds checking
+            return False
     
     def find_files_for_coordinate(self, collection: UnifiedDataCollection, lat: float, lon: float) -> List[dict]:
         """
