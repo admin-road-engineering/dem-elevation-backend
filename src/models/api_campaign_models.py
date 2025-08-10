@@ -28,7 +28,7 @@ class CampaignSummary(BaseModel):
 
 class CampaignDetails(CampaignSummary):
     """Detailed campaign information with file listings"""
-    files: Optional[List[FileInfo]] = Field(None, description="List of files (paginated)")
+    files: Optional[List['FileInfo']] = Field(None, description="List of files (paginated)")
     files_truncated: Optional[bool] = Field(None, description="Whether file list is truncated")
     total_files: Optional[int] = Field(None, description="Total number of files")
 
