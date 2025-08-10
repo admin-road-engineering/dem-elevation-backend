@@ -1182,8 +1182,10 @@ async def get_campaign_details(
         end_idx = start_idx + file_limit
         paginated_files = files[start_idx:end_idx]
         
-        # Import FileInfo locally to avoid circular imports - fix v2
-        from ...models.api_campaign_models import FileInfo
+        # Import FileInfo using importlib to avoid circular imports
+        import importlib
+        api_campaign_models = importlib.import_module('src.models.api_campaign_models')
+        FileInfo = api_campaign_models.FileInfo
         
         # Create FileInfo objects
         file_info_list = []
