@@ -27,7 +27,7 @@ from ...models import (
     StandardElevationResult, StandardMetadata, StandardResponse, StandardErrorResponse,
     StandardErrorDetail
 )
-# Import campaigns models
+# Import campaigns models - FileInfo fix
 from ...models.api_campaign_models import CampaignSummary, CampaignDetails, CampaignsResult, FileInfo
 
 logger = logging.getLogger(__name__)
