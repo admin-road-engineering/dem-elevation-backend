@@ -940,7 +940,7 @@ async def get_elevation_points(
 
 
 # Campaigns endpoints for unified spatial index
-@router.get("/campaigns/test", summary="Test campaigns data access")
+@router.get("/test-campaigns", summary="Test campaigns data access")
 async def test_campaigns_access(
     elevation_service: UnifiedElevationService = Depends(get_elevation_service)
 ):
