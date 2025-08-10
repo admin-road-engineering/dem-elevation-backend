@@ -28,7 +28,7 @@ from ...models import (
     StandardErrorDetail
 )
 # Import campaigns models
-from ...models.api_campaign_models import CampaignSummary, CampaignDetails, CampaignsResult
+from ...models.api_campaign_models import CampaignSummary, CampaignDetails, CampaignsResult, FileInfo
 
 logger = logging.getLogger(__name__)
 
