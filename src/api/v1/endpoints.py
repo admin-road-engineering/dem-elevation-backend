@@ -1046,13 +1046,23 @@ async def list_campaigns(
             
             # Extract bounds as dictionary for API response
             bounds_dict = None
-            if collection.coverage_bounds_wgs84:
-                bounds_dict = {
-                    "min_lat": collection.coverage_bounds_wgs84.min_lat,
-                    "max_lat": collection.coverage_bounds_wgs84.max_lat,
-                    "min_lon": collection.coverage_bounds_wgs84.min_lon,
-                    "max_lon": collection.coverage_bounds_wgs84.max_lon
-                }
+            if hasattr(collection, 'coverage_bounds') and collection.coverage_bounds:
+                bounds = collection.coverage_bounds
+                # Handle both WGS84Bounds (lat/lon) and UTMBounds (x/y) formats
+                if hasattr(bounds, 'min_lat'):
+                    bounds_dict = {
+                        "min_lat": bounds.min_lat,
+                        "max_lat": bounds.max_lat,
+                        "min_lon": bounds.min_lon,
+                        "max_lon": bounds.max_lon
+                    }
+                elif hasattr(bounds, 'min_x'):
+                    bounds_dict = {
+                        "min_x": bounds.min_x,
+                        "max_x": bounds.max_x,
+                        "min_y": bounds.min_y,
+                        "max_y": bounds.max_y
+                    }
             
             # Get survey year and name - different field names for AU vs NZ
             year = None
@@ -1078,7 +1088,7 @@ async def list_campaigns(
                 data_type=collection.data_type,
                 resolution_m=collection.resolution_m,
                 bounds=bounds_dict,
-                crs=collection.native_crs
+                crs=getattr(collection, 'epsg', 'EPSG:4326')  # Use epsg attribute for AU collections
             )
             campaigns_by_country[country].append(campaign_summary)
             country_counts[country] += 1
@@ -1196,13 +1206,23 @@ async def get_campaign_details(
         
         # Extract bounds as dictionary for API response
         bounds_dict = None
-        if collection.coverage_bounds_wgs84:
-            bounds_dict = {
-                "min_lat": collection.coverage_bounds_wgs84.min_lat,
-                "max_lat": collection.coverage_bounds_wgs84.max_lat,
-                "min_lon": collection.coverage_bounds_wgs84.min_lon,
-                "max_lon": collection.coverage_bounds_wgs84.max_lon
-            }
+        if hasattr(collection, 'coverage_bounds') and collection.coverage_bounds:
+            bounds = collection.coverage_bounds
+            # Handle both WGS84Bounds (lat/lon) and UTMBounds (x/y) formats
+            if hasattr(bounds, 'min_lat'):
+                bounds_dict = {
+                    "min_lat": bounds.min_lat,
+                    "max_lat": bounds.max_lat,
+                    "min_lon": bounds.min_lon,
+                    "max_lon": bounds.max_lon
+                }
+            elif hasattr(bounds, 'min_x'):
+                bounds_dict = {
+                    "min_x": bounds.min_x,
+                    "max_x": bounds.max_x,
+                    "min_y": bounds.min_y,
+                    "max_y": bounds.max_y
+                }
         
         # Get survey year and name - different field names for AU vs NZ  
         year = None
@@ -1228,7 +1248,7 @@ async def get_campaign_details(
             data_type=collection.data_type,
             resolution_m=collection.resolution_m,
             bounds=bounds_dict,
-            crs=collection.native_crs,
+            crs=getattr(collection, 'epsg', 'EPSG:4326'),  # Use epsg attribute for AU collections
             files=file_info_list,
             files_truncated=len(files) > end_idx,
             total_files=len(files)
