@@ -953,14 +953,14 @@ async def list_campaigns(
     - Campaign metadata, bounds, resolution, and file counts
     """
     try:
-        from ...unified_elevation_service import ServiceNotReadyError, NoCollectionsAvailableError
+        from ...dem_exceptions import DEMServiceError, DEMSourceError
         from fastapi import status as http_status
         
         return elevation_service.get_all_campaigns_summary()
         
-    except NoCollectionsAvailableError as e:
+    except DEMSourceError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except ServiceNotReadyError as e:
+    except DEMServiceError as e:
         raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
         logger.error(f"Error listing campaigns: {e}")
@@ -988,7 +988,7 @@ async def get_campaign_details(
     - Total file count and pagination info
     """
     try:
-        from ...unified_elevation_service import ServiceNotReadyError, NoCollectionsAvailableError
+        from ...dem_exceptions import DEMServiceError, DEMSourceError
         from fastapi import status as http_status
         
         return elevation_service.get_campaign_details_with_files(
@@ -997,9 +997,9 @@ async def get_campaign_details(
             file_limit=file_limit
         )
         
-    except NoCollectionsAvailableError as e:
+    except DEMSourceError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except ServiceNotReadyError as e:
+    except DEMServiceError as e:
         raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
     except Exception as e:
         logger.error(f"Error getting campaign details for {campaign_id}: {e}")
