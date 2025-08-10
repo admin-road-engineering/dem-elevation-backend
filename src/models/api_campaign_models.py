@@ -2,6 +2,7 @@
 API Campaign Models for Campaigns Endpoints
 Pydantic models for type-safe campaigns API responses
 """
+from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
@@ -28,7 +29,7 @@ class CampaignSummary(BaseModel):
 
 class CampaignDetails(CampaignSummary):
     """Detailed campaign information with file listings"""
-    files: Optional[List['FileInfo']] = Field(None, description="List of files (paginated)")
+    files: Optional[List[FileInfo]] = Field(None, description="List of files (paginated)")
     files_truncated: Optional[bool] = Field(None, description="Whether file list is truncated")
     total_files: Optional[int] = Field(None, description="Total number of files")
 
