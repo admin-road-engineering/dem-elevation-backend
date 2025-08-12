@@ -13,6 +13,7 @@ from ...dataset_manager import DatasetManager
 from ...contour_service import ContourService
 from ...unified_elevation_service import UnifiedElevationService
 from ...auth import get_current_user
+# Import models from both the package and main models.py file
 from ...models import (
     PointRequest, LineRequest, PathRequest, ContourDataRequest,
     PointResponse, LineResponse, PathResponse, ContourDataResponse,
@@ -22,11 +23,17 @@ from ...models import (
     EnhancedPointResponse, EnhancedLineResponse, EnhancedPathResponse,
     # Frontend-specific models
     FrontendContourDataRequest, FrontendContourDataResponse,
-    # New standardized models
+    # New standardized models (from models package)
     StandardCoordinate, PointsRequest, LineRequest_Standard, PathRequest_Standard,
-    StandardElevationResult, StandardMetadata, StandardResponse, StandardErrorResponse,
-    StandardErrorDetail
 )
+
+# Import the fixed models from main models.py file
+from ... import models as main_models
+StandardElevationResult = main_models.StandardElevationResult
+StandardMetadata = main_models.StandardMetadata
+StandardResponse = main_models.StandardResponse
+StandardErrorResponse = main_models.StandardErrorResponse
+StandardErrorDetail = main_models.StandardErrorDetail
 # Import campaigns models - FileInfo fix  
 from ...models.api_campaign_models import CampaignSummary, CampaignDetails, CampaignsResult
 
