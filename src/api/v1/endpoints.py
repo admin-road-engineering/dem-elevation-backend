@@ -27,8 +27,18 @@ from ...models import (
     StandardCoordinate, PointsRequest, LineRequest_Standard, PathRequest_Standard,
 )
 
-# Import the fixed models from main models.py file
-from ... import models as main_models
+# Import the fixed models directly from main models.py file (not models package)
+import sys
+import os
+import importlib.util
+
+# Load the main models.py file directly to avoid conflicts with models/__init__.py
+models_path = os.path.join(os.path.dirname(__file__), '..', '..', 'models.py')
+spec = importlib.util.spec_from_file_location("main_models", models_path)
+main_models = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(main_models)
+
+# Get the correct models
 StandardElevationResult = main_models.StandardElevationResult
 StandardMetadata = main_models.StandardMetadata
 StandardResponse = main_models.StandardResponse
