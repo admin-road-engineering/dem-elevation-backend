@@ -884,13 +884,13 @@ async def debug_source_selection(
 # NEW STANDARDIZED API ENDPOINTS
 # =============================================================================
 
-@router.post("/points", response_model=StandardResponse, summary="Get elevations for multiple discrete coordinates")
+@router.post("/points", response_model=main_models.StandardResponse, summary="Get elevations for multiple discrete coordinates")
 @limiter.limit("10/minute")  # Most restrictive for bulk operations
 async def get_elevation_points(
     request: Request,
     points_request: PointsRequest,
     service: DEMService = Depends(get_dem_service)
-) -> StandardResponse:
+) -> main_models.StandardResponse:
     """Get elevations for multiple discrete coordinates (batch endpoint)."""
     try:
         if not points_request.points:
@@ -924,7 +924,7 @@ async def get_elevation_points(
             if elevation_value is not None:
                 successful_points += 1
             
-            results.append(StandardElevationResult(
+            results.append(main_models.StandardElevationResult(
                 lat=elev["input_latitude"],
                 lon=elev["input_longitude"],
                 elevation=elevation_value,
@@ -932,12 +932,12 @@ async def get_elevation_points(
                 resolution=1.0  # TODO: Get actual resolution from source
             ))
         
-        metadata = StandardMetadata(
+        metadata = main_models.StandardMetadata(
             total_points=len(results),
             successful_points=successful_points
         )
         
-        return StandardResponse(
+        return main_models.StandardResponse(
             results=results,
             metadata=metadata
         )
