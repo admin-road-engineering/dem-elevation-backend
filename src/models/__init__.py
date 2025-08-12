@@ -122,9 +122,8 @@ class SourceSelectionResponse(BaseModel):
 class PointsRequest(BaseModel):
     points: List[Dict[str, float]]
 
-class StandardResponse(BaseModel):
-    results: List[DEMPoint]
-    metadata: Dict[str, Any]
+# StandardResponse moved to src/models.py to avoid conflicts
+# Use the updated model with List[StandardElevationResult] and StandardMetadata
 
 class ElevationRequest(BaseModel):
     latitude: float

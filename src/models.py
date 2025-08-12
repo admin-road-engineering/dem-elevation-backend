@@ -190,6 +190,9 @@ class StandardResponse(BaseModel):
     status: str = "OK"
     results: List[StandardElevationResult]
     metadata: StandardMetadata
+    
+    class Config:
+        arbitrary_types_allowed = True
 
 class StandardErrorDetail(BaseModel):
     """Standardized error detail structure."""
