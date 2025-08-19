@@ -113,7 +113,8 @@ class UnifiedWGS84S3Source(BaseDataSource):
                 )
             
             # Step 1: Find best collections using universal WGS84 bounds checking
-            logger.debug(f"Searching {len(self.unified_index.data_collections)} collections for ({lat}, {lon})")
+            collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
+            logger.debug(f"Searching {collections_count} collections for ({lat}, {lon})")
             
             best_collections = self.unified_handler.find_best_collections(
                 self.unified_index, lat, lon, max_collections=5
@@ -125,7 +126,7 @@ class UnifiedWGS84S3Source(BaseDataSource):
                     elevation_m=None,
                     source_info={
                         "message": "No collections found for coordinate",
-                        "collections_searched": len(self.unified_index.data_collections),
+                        "collections_searched": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
                         "coordinates": {"lat": lat, "lon": lon}
                     },
                     processing_time_ms=processing_time
@@ -335,7 +336,9 @@ class UnifiedWGS84S3Source(BaseDataSource):
                 # Parse with WGS84 Pydantic models
                 self.unified_index = UnifiedWGS84SpatialIndex(**index_data)
                 
-                logger.info(f"✅ Loaded WGS84 unified index from S3: {len(self.unified_index.data_collections)} collections")
+                # Safe collection count (data_collections might be None before conversion)
+                collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
+                logger.info(f"✅ Loaded WGS84 unified index from S3: {collections_count} collections")
                 return True
             
         except Exception as e:
@@ -356,7 +359,8 @@ class UnifiedWGS84S3Source(BaseDataSource):
             
             self.unified_index = UnifiedWGS84SpatialIndex(**index_data)
             
-            logger.info(f"✅ Loaded WGS84 unified index from filesystem: {len(self.unified_index.data_collections)} collections")
+            collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
+            logger.info(f"✅ Loaded WGS84 unified index from filesystem: {collections_count} collections")
             return True
             
         except Exception as e:
@@ -376,7 +380,7 @@ class UnifiedWGS84S3Source(BaseDataSource):
         
         if self.unified_index:
             health.update({
-                "collection_count": len(self.unified_index.data_collections),
+                "collection_count": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
                 "total_files": self.unified_index.schema_metadata.total_files,
                 "countries": self.unified_index.schema_metadata.countries,
                 "collection_types": self.unified_index.schema_metadata.collection_types
@@ -394,7 +398,7 @@ class UnifiedWGS84S3Source(BaseDataSource):
             "schema_version": self.unified_index.schema_metadata.schema_version,
             "bounds_format": self.unified_index.schema_metadata.bounds_format,
             "generated_at": self.unified_index.schema_metadata.generated_at,
-            "total_collections": len(self.unified_index.data_collections),
+            "total_collections": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
             "total_files": self.unified_index.schema_metadata.total_files,
             "countries": {}
         }
