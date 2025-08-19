@@ -123,9 +123,13 @@ class SchemaMetadata(BaseModel):
 
 class UnifiedSpatialIndex(BaseModel):
     """Top-level unified spatial index with discriminated unions"""
-    version: Literal["2.0"] = "2.0"
-    schema_metadata: SchemaMetadata = Field(..., description="Index metadata")
-    data_collections: List[DataCollection] = Field(..., min_items=1, description="List of all data collections")
+    version: Optional[Literal["2.0"]] = "2.0"
+    # Support both new and legacy schema formats
+    schema_metadata: Optional[SchemaMetadata] = Field(None, description="Index metadata (new format)")
+    data_collections: Optional[List[DataCollection]] = Field(None, description="List of all data collections (new format)")
+    # Legacy format support (from coordinate correction deployment)
+    schema_version: Optional[str] = Field(None, description="Schema version (legacy format)")
+    campaigns: Optional[Dict[str, Any]] = Field(None, description="Campaign data (legacy format)")
     transformation_metadata: Optional[Dict[str, Any]] = Field(None, description="Bounds transformation metadata")
     
     class Config:
@@ -133,15 +137,18 @@ class UnifiedSpatialIndex(BaseModel):
         
     def get_collections_by_country(self, country: str) -> List[DataCollection]:
         """Get all collections for a specific country"""
-        return [c for c in self.data_collections if c.country == country]
+        collections = self.data_collections or []
+        return [c for c in collections if c.country == country]
     
     def get_collections_by_type(self, collection_type: str) -> List[DataCollection]:
         """Get all collections of a specific type"""
-        return [c for c in self.data_collections if c.collection_type == collection_type]
+        collections = self.data_collections or []
+        return [c for c in collections if c.collection_type == collection_type]
     
     def get_collection_by_id(self, collection_id: str) -> Optional[DataCollection]:
         """Get a specific collection by ID"""
-        for collection in self.data_collections:
+        collections = self.data_collections or []
+        for collection in collections:
             if collection.id == collection_id:
                 return collection
         return None
