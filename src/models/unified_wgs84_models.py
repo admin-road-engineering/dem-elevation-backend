@@ -194,27 +194,51 @@ class UnifiedWGS84SpatialIndex(BaseModel):
                             # Skip collection if bounds calculation fails
                             continue
                         
-                        collection = UnifiedDataCollection(
-                            id=campaign_id,
-                            collection_type="legacy_campaign",
-                            country="AU" if "AU" in campaign_id.upper() else "NZ",
-                            name=campaign_id.replace('_', ' ').title(),
-                            bounds=WGS84Bounds(
-                                min_lat=min_lat,
-                                max_lat=max_lat,
-                                min_lon=min_lon,
-                                max_lon=max_lon
-                            ),
-                            file_count=len(converted_files),
-                            total_size_mb=sum(f.size_mb for f in converted_files),
-                            files=converted_files,
-                            metadata=CollectionMetadata(
-                                source_bucket="road-engineering-elevation-data",
-                                native_crs="WGS84",
+                        # Determine country from campaign ID
+                        country = "AU" if "AU" in campaign_id.upper() else "NZ"
+                        
+                        # Create appropriate collection type based on country
+                        if country == "AU":
+                            collection = AustralianUnifiedCollection(
+                                id=campaign_id,
+                                files=converted_files,
+                                coverage_bounds_wgs84=WGS84Bounds(
+                                    min_lat=min_lat,
+                                    max_lat=max_lat,
+                                    min_lon=min_lon,
+                                    max_lon=max_lon
+                                ),
+                                native_crs="EPSG:28356",  # Default Australian UTM
+                                file_count=len(converted_files),
+                                utm_zone=56,  # Default to Zone 56 for legacy
+                                state="NSW",  # Default state
+                                campaign_name=campaign_id.replace('_', ' ').title(),
                                 survey_year=None,
-                                data_type="DEM"
+                                metadata=CollectionMetadata(
+                                    source_bucket="road-engineering-elevation-data",
+                                    coordinate_system="EPSG:28356"
+                                )
                             )
-                        )
+                        else:
+                            collection = NewZealandUnifiedCollection(
+                                id=campaign_id,
+                                files=converted_files,
+                                coverage_bounds_wgs84=WGS84Bounds(
+                                    min_lat=min_lat,
+                                    max_lat=max_lat,
+                                    min_lon=min_lon,
+                                    max_lon=max_lon
+                                ),
+                                native_crs="EPSG:2193",  # NZGD2000 
+                                file_count=len(converted_files),
+                                region="Unknown",
+                                survey_name=campaign_id.replace('_', ' ').title(),
+                                survey_years=[2020],  # Default year
+                                metadata=CollectionMetadata(
+                                    source_bucket="nz-elevation",
+                                    coordinate_system="EPSG:2193"
+                                )
+                            )
                         converted_collections.append(collection)
                         
                 except Exception as e:
