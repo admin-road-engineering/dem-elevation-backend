@@ -148,6 +148,20 @@ class UnifiedWGS84SpatialIndex(BaseModel):
             # Log first few campaign keys for debugging
             campaign_keys = list(self.campaigns.keys())[:5]
             logger.info(f"Sample campaign keys: {campaign_keys}")
+            
+            # DEBUG: Log sample campaign structure to understand why conversion fails
+            for key in campaign_keys[:2]:
+                campaign_data = self.campaigns[key]
+                logger.info(f"DEBUG: Campaign {key} structure: {type(campaign_data)}")
+                if isinstance(campaign_data, dict):
+                    logger.info(f"DEBUG: Campaign {key} keys: {list(campaign_data.keys())}")
+                    if 'files' in campaign_data:
+                        files = campaign_data['files']
+                        logger.info(f"DEBUG: Campaign {key} has {len(files) if files else 0} files")
+                        if files and len(files) > 0:
+                            logger.info(f"DEBUG: First file structure: {type(files[0])}")
+                            if isinstance(files[0], dict):
+                                logger.info(f"DEBUG: First file keys: {list(files[0].keys())}")
         
         if self.data_collections is None and self.campaigns is not None and isinstance(self.campaigns, dict):
             # Convert legacy campaigns to data_collections
