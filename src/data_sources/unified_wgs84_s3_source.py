@@ -381,9 +381,9 @@ class UnifiedWGS84S3Source(BaseDataSource):
         if self.unified_index:
             health.update({
                 "collection_count": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
-                "total_files": self.unified_index.schema_metadata.total_files,
-                "countries": self.unified_index.schema_metadata.countries,
-                "collection_types": self.unified_index.schema_metadata.collection_types
+                "total_files": self.unified_index.schema_metadata.total_files if self.unified_index.schema_metadata else 0,
+                "countries": self.unified_index.schema_metadata.countries if self.unified_index.schema_metadata else [],
+                "collection_types": self.unified_index.schema_metadata.collection_types if self.unified_index.schema_metadata else []
             })
         
         return health
@@ -395,21 +395,22 @@ class UnifiedWGS84S3Source(BaseDataSource):
         
         coverage = {
             "version": self.unified_index.version,
-            "schema_version": self.unified_index.schema_metadata.schema_version,
-            "bounds_format": self.unified_index.schema_metadata.bounds_format,
-            "generated_at": self.unified_index.schema_metadata.generated_at,
+            "schema_version": self.unified_index.schema_metadata.schema_version if self.unified_index.schema_metadata else "unknown",
+            "bounds_format": self.unified_index.schema_metadata.bounds_format if self.unified_index.schema_metadata else "unknown",
+            "generated_at": self.unified_index.schema_metadata.generated_at if self.unified_index.schema_metadata else "unknown",
             "total_collections": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
-            "total_files": self.unified_index.schema_metadata.total_files,
+            "total_files": self.unified_index.schema_metadata.total_files if self.unified_index.schema_metadata else 0,
             "countries": {}
         }
         
         # Group by country
-        for country in self.unified_index.schema_metadata.countries:
-            country_collections = self.unified_index.get_collections_by_country(country)
-            coverage["countries"][country] = {
-                "collection_count": len(country_collections),
-                "file_count": sum(c.file_count for c in country_collections),
-                "collection_types": list(set(c.collection_type for c in country_collections))
-            }
+        if self.unified_index.schema_metadata:
+            for country in self.unified_index.schema_metadata.countries:
+                country_collections = self.unified_index.get_collections_by_country(country)
+                coverage["countries"][country] = {
+                    "collection_count": len(country_collections),
+                    "file_count": sum(c.file_count for c in country_collections),
+                    "collection_types": list(set(c.collection_type for c in country_collections))
+                }
         
         return coverage
