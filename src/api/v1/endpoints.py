@@ -366,20 +366,20 @@ async def get_elevation_line(
             request.dem_source_id
         )
         
-        # Convert to response model
+        # Convert to response model - match EnhancedLineResponse structure
         line_points = []
         for point in points:
-            line_points.append({
-                "latitude": point["latitude"],
-                "longitude": point["longitude"],
-                "elevation_m": point["elevation_m"],
-                "sequence": point["sequence"],
-                "message": point["message"]
-            })
+            line_points.append(EnhancedPointResponse(
+                elevation=point["elevation_m"],
+                latitude=point["latitude"],
+                longitude=point["longitude"],
+                dem_source_used=dem_source_used,
+                message=point["message"]
+            ))
         
-        return LineResponse(
+        return EnhancedLineResponse(
             points=line_points,
-            dem_source_used=dem_source_used,
+            total_points=len(line_points),
             message=message
         )
         
@@ -427,21 +427,20 @@ async def get_elevation_path(
             path_request.dem_source_id
         )
         
-        # Convert to response model
-        path_elevations = []
+        # Convert to response model - match PathResponse structure
+        points = []
         for elev in elevations:
-            path_elevations.append({
-                "input_latitude": elev["input_latitude"],
-                "input_longitude": elev["input_longitude"],
-                "input_id": elev["input_id"],
-                "elevation_m": elev["elevation_m"],
-                "sequence": elev["sequence"],
-                "message": elev["message"]
-            })
+            points.append(PointResponse(
+                elevation=elev["elevation_m"],
+                latitude=elev["input_latitude"],
+                longitude=elev["input_longitude"],
+                dem_source_used=dem_source_used,
+                message=elev["message"]
+            ))
         
         return PathResponse(
-            path_elevations=path_elevations,
-            dem_source_used=dem_source_used,
+            points=points,
+            total_points=len(points),
             message=message
         )
         
