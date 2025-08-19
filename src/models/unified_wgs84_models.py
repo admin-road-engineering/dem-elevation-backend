@@ -143,6 +143,11 @@ class UnifiedWGS84SpatialIndex(BaseModel):
         logger = logging.getLogger(__name__)
         
         logger.info(f"Legacy conversion starting: data_collections={self.data_collections is not None}, campaigns={self.campaigns is not None}")
+        if self.campaigns:
+            logger.info(f"Found {len(self.campaigns)} campaigns in legacy format")
+            # Log first few campaign keys for debugging
+            campaign_keys = list(self.campaigns.keys())[:5]
+            logger.info(f"Sample campaign keys: {campaign_keys}")
         
         if self.data_collections is None and self.campaigns is not None and isinstance(self.campaigns, dict):
             # Convert legacy campaigns to data_collections
