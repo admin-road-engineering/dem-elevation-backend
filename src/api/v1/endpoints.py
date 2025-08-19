@@ -897,7 +897,7 @@ async def get_elevation_points(
             points_request.source
         )
         
-        # Convert to standardized response format
+        # Convert to StandardResponse format - match DEMPoint model
         results = []
         successful_points = 0
         
@@ -906,18 +906,19 @@ async def get_elevation_points(
             if elevation_value is not None:
                 successful_points += 1
             
-            results.append(StandardElevationResult(
+            results.append(DEMPoint(
                 lat=elev["input_latitude"],
                 lon=elev["input_longitude"],
                 elevation=elevation_value,
-                data_source=dem_source_used,
-                resolution=1.0  # TODO: Get actual resolution from source
+                data_source=dem_source_used
             ))
         
-        metadata = StandardMetadata(
-            total_points=len(results),
-            successful_points=successful_points
-        )
+        metadata = {
+            "total_points": len(results),
+            "successful_points": successful_points,
+            "crs": "EPSG:4326",
+            "units": "meters"
+        }
         
         return StandardResponse(
             results=results,
