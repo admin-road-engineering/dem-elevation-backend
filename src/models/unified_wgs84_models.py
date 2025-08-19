@@ -139,6 +139,11 @@ class UnifiedWGS84SpatialIndex(BaseModel):
     
     def _convert_legacy_format(self):
         """Convert legacy campaigns format to data_collections format"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Legacy conversion starting: data_collections={self.data_collections is not None}, campaigns={self.campaigns is not None}")
+        
         if self.data_collections is None and self.campaigns is not None and isinstance(self.campaigns, dict):
             # Convert legacy campaigns to data_collections
             converted_collections = []
@@ -243,10 +248,12 @@ class UnifiedWGS84SpatialIndex(BaseModel):
                         
                 except Exception as e:
                     # Skip problematic collections but continue processing
+                    logger.warning(f"Failed to convert campaign {campaign_id}: {e}")
                     continue
             
             # Only set converted collections if we actually converted some
             if converted_collections:
+                logger.info(f"Legacy conversion successful: {len(converted_collections)} collections converted")
                 self.data_collections = converted_collections
                 
                 # Create schema metadata from legacy data
@@ -258,6 +265,9 @@ class UnifiedWGS84SpatialIndex(BaseModel):
                         countries=list(set(c.country for c in converted_collections if c.country)),
                         collection_types=list(set(c.collection_type for c in converted_collections if c.collection_type))
                     )
+                    logger.info(f"Schema metadata created: {self.schema_metadata.total_collections} collections, {self.schema_metadata.total_files} files")
+            else:
+                logger.warning("Legacy conversion produced no collections")
         
     def get_collections_by_country(self, country: str) -> List[UnifiedDataCollection]:
         """Get all collections for a specific country"""
