@@ -129,7 +129,13 @@ class UnifiedWGS84SpatialIndex(BaseModel):
     
     def model_post_init(self, __context):
         """Convert legacy format to new format if needed"""
-        self._convert_legacy_format()
+        try:
+            self._convert_legacy_format()
+        except Exception as e:
+            # Log error but don't crash the service
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Legacy conversion failed: {e}", exc_info=True)
     
     def _convert_legacy_format(self):
         """Convert legacy campaigns format to data_collections format"""
@@ -178,11 +184,15 @@ class UnifiedWGS84SpatialIndex(BaseModel):
                         converted_files.append(converted_file)
                     
                     if converted_files:  # Only create collection if it has files
-                        # Create collection bounds from file bounds
-                        min_lat = min(f.bounds.min_lat for f in converted_files)
-                        max_lat = max(f.bounds.max_lat for f in converted_files)
-                        min_lon = min(f.bounds.min_lon for f in converted_files)
-                        max_lon = max(f.bounds.max_lon for f in converted_files)
+                        # Create collection bounds from file bounds with safe handling
+                        try:
+                            min_lat = min(f.bounds.min_lat for f in converted_files if f.bounds)
+                            max_lat = max(f.bounds.max_lat for f in converted_files if f.bounds)
+                            min_lon = min(f.bounds.min_lon for f in converted_files if f.bounds)
+                            max_lon = max(f.bounds.max_lon for f in converted_files if f.bounds)
+                        except (ValueError, AttributeError):
+                            # Skip collection if bounds calculation fails
+                            continue
                         
                         collection = UnifiedDataCollection(
                             id=campaign_id,

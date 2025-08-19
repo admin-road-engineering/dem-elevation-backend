@@ -133,7 +133,8 @@ class UnifiedS3Source(BaseDataSource):
         try:
             # Find best collections for coordinate
             logger.info(f"🔍🔍🔍 UNIFIED S3: Getting elevation for ({lat}, {lon})")
-            logger.info(f"  Collections in index: {len(self.unified_index.data_collections)}")
+            collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
+            logger.info(f"  Collections in index: {collections_count}")
             logger.info(f"  Handler registry type: {type(self.handler_registry).__name__}")
             logger.info(f"  Handler registry module: {type(self.handler_registry).__module__}")
             
@@ -267,7 +268,7 @@ class UnifiedS3Source(BaseDataSource):
         
         if self.unified_index:
             health.update({
-                "collection_count": len(self.unified_index.data_collections),
+                "collection_count": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
                 "total_files": self.unified_index.schema_metadata.total_files,
                 "countries": self.unified_index.schema_metadata.countries,
                 "collection_types": self.unified_index.schema_metadata.collection_types
@@ -283,7 +284,7 @@ class UnifiedS3Source(BaseDataSource):
         coverage = {
             "version": self.unified_index.version,
             "generated_at": self.unified_index.schema_metadata.generated_at.isoformat(),
-            "total_collections": len(self.unified_index.data_collections),
+            "total_collections": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
             "total_files": self.unified_index.schema_metadata.total_files,
             "countries": {}
         }
@@ -321,7 +322,8 @@ class UnifiedS3Source(BaseDataSource):
                 # Parse with Pydantic
                 self.unified_index = UnifiedSpatialIndex(**index_data)
                 
-                logger.info(f"✅ Loaded unified index from S3: {len(self.unified_index.data_collections)} collections")
+                collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
+                logger.info(f"✅ Loaded unified index from S3: {collections_count} collections")
                 return True
             
         except Exception as e:
@@ -342,7 +344,8 @@ class UnifiedS3Source(BaseDataSource):
             
             self.unified_index = UnifiedSpatialIndex(**index_data)
             
-            logger.info(f"✅ Loaded unified index from filesystem: {len(self.unified_index.data_collections)} collections")
+            collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
+            logger.info(f"✅ Loaded unified index from filesystem: {collections_count} collections")
             return True
             
         except Exception as e:
@@ -608,7 +611,7 @@ class UnifiedS3Source(BaseDataSource):
         
         return {
             "source_type": "unified_s3",
-            "collections": len(self.unified_index.data_collections),
+            "collections": len(self.unified_index.data_collections) if self.unified_index.data_collections else 0,
             "total_files": self.unified_index.schema_metadata.total_files,
             "countries": self.unified_index.schema_metadata.countries,
             "collection_types": self.unified_index.schema_metadata.collection_types
