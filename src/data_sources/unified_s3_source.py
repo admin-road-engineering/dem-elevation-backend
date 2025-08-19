@@ -106,7 +106,7 @@ class UnifiedS3Source(BaseDataSource):
                 success = False  # Force fallback to legacy system
             
             if success:
-                count = len(self.unified_index.data_collections) if self.unified_index else 0
+                count = len(self.unified_index.data_collections) if self.unified_index and self.unified_index.data_collections else 0
                 logger.info(f"✅ Unified index loaded: {count} collections")
             else:
                 logger.warning("❌ Failed to load unified index")
