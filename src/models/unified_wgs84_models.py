@@ -133,31 +133,46 @@ class UnifiedWGS84SpatialIndex(BaseModel):
     
     def _convert_legacy_format(self):
         """Convert legacy campaigns format to data_collections format"""
-        if self.data_collections is None and self.campaigns is not None:
+        if self.data_collections is None and self.campaigns is not None and isinstance(self.campaigns, dict):
             # Convert legacy campaigns to data_collections
             converted_collections = []
             
             for campaign_id, campaign_data in self.campaigns.items():
                 try:
+                    # Skip if campaign_data is None or not a dict
+                    if not isinstance(campaign_data, dict):
+                        continue
+                        
                     # Extract files from legacy format
                     files = campaign_data.get('files', [])
+                    if not isinstance(files, list):
+                        continue
+                        
                     converted_files = []
                     
                     for file_data in files:
-                        # Convert file format
+                        if not isinstance(file_data, dict):
+                            continue
+                            
+                        # Safely extract bounds
+                        bounds_data = file_data.get('bounds', {})
+                        if not isinstance(bounds_data, dict):
+                            continue
+                            
+                        # Convert file format with safe defaults
                         converted_file = FileEntry(
-                            file=file_data.get('file', ''),
-                            filename=file_data.get('filename', ''),
+                            file=str(file_data.get('file', '')),
+                            filename=str(file_data.get('filename', '')),
                             bounds=WGS84Bounds(
-                                min_lat=file_data.get('bounds', {}).get('min_lat', 0),
-                                max_lat=file_data.get('bounds', {}).get('max_lat', 0),
-                                min_lon=file_data.get('bounds', {}).get('min_lon', 0),
-                                max_lon=file_data.get('bounds', {}).get('max_lon', 0)
+                                min_lat=float(bounds_data.get('min_lat', 0)),
+                                max_lat=float(bounds_data.get('max_lat', 0)),
+                                min_lon=float(bounds_data.get('min_lon', 0)),
+                                max_lon=float(bounds_data.get('max_lon', 0))
                             ),
-                            size_mb=file_data.get('size_mb', 0.0),
-                            last_modified=file_data.get('last_modified', ''),
-                            resolution=file_data.get('resolution', '1m'),
-                            coordinate_system=file_data.get('utm_zone', 'WGS84'),
+                            size_mb=float(file_data.get('size_mb', 0.0)),
+                            last_modified=str(file_data.get('last_modified', '')),
+                            resolution=str(file_data.get('resolution', '1m')),
+                            coordinate_system=str(file_data.get('utm_zone', 'WGS84')),
                             method='legacy_conversion'
                         )
                         converted_files.append(converted_file)
@@ -196,18 +211,19 @@ class UnifiedWGS84SpatialIndex(BaseModel):
                     # Skip problematic collections but continue processing
                     continue
             
-            # Set converted collections
-            self.data_collections = converted_collections
-            
-            # Create schema metadata from legacy data
-            if self.schema_metadata is None:
-                self.schema_metadata = UnifiedSchemaMetadata(
-                    generated_at=self.generated_at or datetime.now().isoformat(),
-                    total_collections=len(converted_collections),
-                    total_files=sum(c.file_count for c in converted_collections),
-                    countries=list(set(c.country for c in converted_collections)),
-                    collection_types=list(set(c.collection_type for c in converted_collections))
-                )
+            # Only set converted collections if we actually converted some
+            if converted_collections:
+                self.data_collections = converted_collections
+                
+                # Create schema metadata from legacy data
+                if self.schema_metadata is None:
+                    self.schema_metadata = UnifiedSchemaMetadata(
+                        generated_at=self.generated_at or datetime.now().isoformat(),
+                        total_collections=len(converted_collections),
+                        total_files=sum(c.file_count for c in converted_collections if c.file_count),
+                        countries=list(set(c.country for c in converted_collections if c.country)),
+                        collection_types=list(set(c.collection_type for c in converted_collections if c.collection_type))
+                    )
         
     def get_collections_by_country(self, country: str) -> List[UnifiedDataCollection]:
         """Get all collections for a specific country"""
