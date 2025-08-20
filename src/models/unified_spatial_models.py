@@ -95,7 +95,7 @@ class AustralianUTMCollection(BaseCollection):
     campaign_year: Optional[int] = Field(None, description="Survey campaign year (legacy)")
     data_type: Literal["DEM", "DSM"] = Field(default="DEM", description="Digital Elevation Model type")
     resolution_m: float = Field(default=1.0, gt=0, description="Resolution in meters")
-    epsg: str = Field(..., description="EPSG code for CRS-aware spatial queries")
+    epsg: Optional[str] = Field(None, description="EPSG code for CRS-aware spatial queries")
     bounds_transformation: Optional[Dict[str, Any]] = Field(None, description="Bounds transformation metadata")
 
 class NewZealandCampaignCollection(BaseCollection):
