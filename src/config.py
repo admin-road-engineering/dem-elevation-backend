@@ -1,10 +1,13 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Dict, Any, Optional, List, Literal
 import os
 import json
 from pathlib import Path
 from dotenv import load_dotenv
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Explicitly load .env file to ensure environment variables are available
 load_dotenv()
@@ -276,6 +279,15 @@ class Settings(BaseSettings):
         default="indexes/unified_spatial_index_v2.json",
         description="S3 path for unified spatial index"
     )
+    
+    @validator('UNIFIED_INDEX_PATH')
+    def fix_incomplete_index_path(cls, v):
+        """Fix incomplete index path from environment variable"""
+        if v == "indexes/" or v == "indexes":
+            correct_path = "indexes/unified_spatial_index_v2.json"
+            logger.warning(f"⚠️ Fixing incomplete UNIFIED_INDEX_PATH: '{v}' → '{correct_path}'")
+            return correct_path
+        return v
     
     # Phase 2: SQLite R*Tree Spatial Index
     USE_SQLITE_INDEX: bool = Field(
