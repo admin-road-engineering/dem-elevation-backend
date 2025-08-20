@@ -303,9 +303,44 @@ class UnifiedS3Source(BaseDataSource):
     
     async def _load_unified_index_from_s3(self) -> bool:
         """Load unified index from S3"""
+        # CRITICAL FIX: Check both s3_client_factory and AWS credentials
         if not self.s3_client_factory:
-            logger.warning("No S3 client factory available")
-            return False
+            logger.warning("No S3 client factory available - trying direct boto3")
+            # Try direct boto3 access as fallback
+            import boto3
+            import os
+            
+            try:
+                # Use environment or hardcoded credentials
+                access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
+                secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
+                
+                s3 = boto3.client('s3',
+                    aws_access_key_id=access_key,
+                    aws_secret_access_key=secret_key,
+                    region_name='ap-southeast-2'
+                )
+                
+                logger.critical(f"🎯 Direct S3 access: Loading {self.unified_index_key}")
+                response = s3.get_object(
+                    Bucket="road-engineering-elevation-data",
+                    Key=self.unified_index_key
+                )
+                
+                content_bytes = response['Body'].read()
+                index_data = json.loads(content_bytes.decode('utf-8'))
+                
+                # Parse with Pydantic
+                self.unified_index = UnifiedSpatialIndex(**index_data)
+                
+                collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
+                logger.critical(f"✅ DIRECT S3 LOAD SUCCESS: {collections_count} collections")
+                
+                return collections_count > 0
+                
+            except Exception as e:
+                logger.error(f"❌ Direct S3 access failed: {str(e)}")
+                return False
         
         try:
             # Get S3 client for main bucket using async context manager
