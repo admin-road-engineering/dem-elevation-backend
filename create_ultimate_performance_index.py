@@ -216,7 +216,24 @@ def create_ultimate_performance_index():
     with open(input_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
-    files = data.get('utm_zones', {}).get('geographic', {}).get('files', [])
+    # Handle different index formats
+    files = []
+    if 'data_collections' in data:
+        # New unified format - extract all files from collections
+        logger.info("Processing unified index format...")
+        for collection in data.get('data_collections', []):
+            for file_entry in collection.get('files', []):
+                # Adapt file structure
+                files.append({
+                    'key': file_entry.get('file', ''),
+                    'filename': file_entry.get('filename', ''),
+                    'bounds': file_entry.get('bounds', {}),
+                    'campaign_name': collection.get('campaign_name', 'unknown')
+                })
+    else:
+        # Old format
+        files = data.get('utm_zones', {}).get('geographic', {}).get('files', [])
+    
     logger.info(f"Total files to process: {len(files):,}")
     
     # Initialize components
@@ -276,8 +293,10 @@ def create_ultimate_performance_index():
             stats['invalid_files'] += 1
             continue
         
-        # Extract campaign name
-        campaign_name = extractor.extract_campaign(s3_key)
+        # Extract campaign name - use provided or extract from path
+        campaign_name = file_info.get('campaign_name', None)
+        if not campaign_name or campaign_name == 'unknown':
+            campaign_name = extractor.extract_campaign(s3_key)
         
         # Process based on coordinate system
         wgs84_bounds = None
