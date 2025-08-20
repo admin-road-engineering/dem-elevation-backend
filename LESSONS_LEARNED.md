@@ -2,6 +2,49 @@
 
 This document captures critical lessons learned from resolving the major service stability crisis in the DEM Backend. These patterns and solutions should prevent similar issues in the future.
 
+## 🚨 **RAILWAY DEPLOYMENT HEALTH CHECK FAILURE INCIDENT** (August 20, 2025)
+
+### **Incident Summary**
+Production service was stuck on a 4+ hour old deployment with 0 collections available, causing all elevation endpoints to return null values. New deployments were being rolled back by Railway due to health check failures.
+
+### **Root Cause - The Health Check Paradox**
+Railway was successfully deploying new code, but the deployments were **failing health checks** and being automatically rolled back to the last "healthy" deployment (which ironically had 0 collections but reported as healthy).
+
+### **The Catch-22 Situation**
+1. **Old deployment**: Had 0 collections but returned `status: "healthy"` (false positive)
+2. **New deployments**: Had fail-fast logic (`raise SystemExit(1)`) when unified provider failed
+3. **Railway behavior**: Interpreted SystemExit as unhealthy and rolled back
+4. **Result**: Stuck on broken "healthy" deployment indefinitely
+
+### **Resolution Steps**
+1. **Disabled fail-fast temporarily** to allow deployment to succeed
+2. **Added enhanced logging** to understand initialization failures  
+3. **Implemented smarter fail-fast** - only fail if NO elevation sources available
+4. **Added restart loop prevention** to avoid rapid restart cycles
+5. **Hardcoded correct index path** as temporary fix for environment variable issue
+
+### **Key Learnings**
+1. **Health checks must be accurate** - A service with 0 collections should NOT report healthy
+2. **Fail-fast must be intelligent** - Don't fail if fallback sources are available
+3. **Graceful degradation works** - Service operated via GPXZ API and NZ S3 sources
+4. **Railway rollback behavior** - Automatically reverts to last "healthy" deployment
+5. **Evidence preservation critical** - Save logs BEFORE attempting fixes
+
+### **Prevention Measures Implemented**
+```python
+# Smart fail-fast that checks for fallback sources
+if not unified_success and settings.APP_ENV == "production":
+    has_fallback = settings.USE_API_SOURCES or hasattr(app.state, 'source_provider')
+    
+    if not has_fallback:
+        # Only fail if we have NO elevation sources
+        raise SystemExit(1)
+    else:
+        logger.warning("Operating in degraded mode with fallback sources")
+```
+
+---
+
 ## 🚨 **CRITICAL PATTERNS TO AVOID**
 
 ### 1. **Pydantic Schema Validation Failures**

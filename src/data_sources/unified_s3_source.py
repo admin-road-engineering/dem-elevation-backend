@@ -328,10 +328,20 @@ class UnifiedS3Source(BaseDataSource):
                 
                 collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
                 logger.info(f"✅ Loaded unified index from S3: {collections_count} collections")
+                
+                # Log more details about what was loaded
+                if self.unified_index and self.unified_index.data_collections:
+                    logger.info(f"📊 Index contains {collections_count} collections from {len(set(c.country for c in self.unified_index.data_collections))} countries")
+                else:
+                    logger.warning(f"⚠️ Index loaded but has no data_collections")
+                    
                 return True
             
         except Exception as e:
-            logger.warning(f"Failed to load unified index from S3: {e}")
+            logger.error(f"❌ Failed to load unified index from S3: {str(e)}")
+            logger.error(f"❌ Index key attempted: {self.unified_index_key}")
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return False
     
     def _load_unified_index_from_filesystem(self) -> bool:

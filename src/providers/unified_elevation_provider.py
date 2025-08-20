@@ -78,7 +78,7 @@ class UnifiedElevationProvider:
             # Create unified S3 source with CRS service injection
             # HOTFIX: Override environment variable issue with correct index path
             correct_index_path = "indexes/unified_spatial_index_v2.json"
-            logger.info(f"Using corrected index path: {correct_index_path} (env was: {self.settings.UNIFIED_INDEX_PATH})")
+            logger.critical(f"🎯 FORCING index path: {correct_index_path} (env was: {self.settings.UNIFIED_INDEX_PATH})")
             
             unified_s3_source = UnifiedS3Source(
                 use_unified_index=True,
@@ -86,6 +86,9 @@ class UnifiedElevationProvider:
                 s3_client_factory=self.s3_client_factory,
                 crs_service=self.crs_service
             )
+            
+            # Log initialization attempt
+            logger.info("📦 UnifiedS3Source created, attempting initialization...")
             
             # Initialize API sources for fallback (if enabled)
             # TODO: Temporarily disabled until API sources are adapted to BaseDataSource interface

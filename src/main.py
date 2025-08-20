@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -179,9 +180,56 @@ async def lifespan(app: FastAPI):
             
             if not unified_success and settings.APP_ENV == "production":
                 logger.critical("Production service cannot start without unified system")
-                # TEMPORARY: Disable fail-fast to allow deployment - will fix index after deploy
-                logger.critical("ALLOWING DEGRADED START - MUST FIX INDEX PATH IMMEDIATELY")
-                # raise SystemExit(1)  # DISABLED TEMPORARILY FOR DEPLOYMENT FIX
+                # Re-enabled with smarter logic - only fail if we have NO elevation sources
+                logger.warning("Unified system failed - checking for fallback sources...")
+                
+                # Check if we have ANY working elevation sources
+                has_fallback = False
+                if settings.USE_API_SOURCES or hasattr(app.state, 'source_provider'):
+                    has_fallback = True
+                    logger.info("✅ Fallback sources available - service can operate")
+                
+                if not has_fallback:
+                    logger.critical("❌ NO ELEVATION SOURCES AVAILABLE - Cannot start")
+                    
+                    # Restart loop prevention
+                    restart_file = Path("/tmp/dem_restart_count.txt")
+                    max_restarts = 3
+                    restart_window = 300  # 5 minutes
+                    
+                    current_time = time.time()
+                    restart_count = 1
+                    
+                    if restart_file.exists():
+                        try:
+                            with open(restart_file, 'r') as f:
+                                lines = f.read().strip().split('\n')
+                                if lines:
+                                    parts = lines[-1].split(',')
+                                    if len(parts) == 2:
+                                        last_time = float(parts[0])
+                                        last_count = int(parts[1])
+                                        
+                                        if current_time - last_time < restart_window:
+                                            restart_count = last_count + 1
+                        except Exception as e:
+                            logger.warning(f"Error reading restart file: {e}")
+                    
+                    # Write current restart
+                    with open(restart_file, 'a') as f:
+                        f.write(f"{current_time},{restart_count}\n")
+                    
+                    if restart_count > max_restarts:
+                        logger.critical(f"🛑 RESTART LIMIT EXCEEDED: {restart_count} restarts in {restart_window}s")
+                        logger.critical("Service halted - manual intervention required")
+                        # Keep container alive for debugging
+                        while True:
+                            await asyncio.sleep(3600)
+                    else:
+                        logger.warning(f"Restart attempt {restart_count}/{max_restarts}")
+                        raise SystemExit(1)
+                else:
+                    logger.warning("⚠️ Operating in degraded mode with fallback sources")
             elif not unified_success:
                 logger.warning("Development service: unified system failed, falling back to legacy")
                 # Fall through to legacy initialization below
