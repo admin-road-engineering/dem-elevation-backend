@@ -1,0 +1,10 @@
+=== Railway Deployment Outage Evidence ===
+Timestamp: Wed, Aug 20, 2025 10:58:56 AM
+
+--- Railway Status ---
+Project: road-engineering-DEM-Backend
+Environment: production
+Service: dem-elevation-backend
+
+--- Current Health Check ---
+{"status":"healthy","service":"DEM Backend API","version":"v1.0.0","uptime_seconds":15411,"last_check":"2025-08-20T01:00:22Z","provider_type":"unified","unified_mode":true,"provider_health":{"status":"healthy","provider":"unified","initialized":true,"unified_mode":true,"unified_index_path":"indexes/unified_spatial_index_v2_ideal.json","source_health":{"status":"healthy","unified_index_loaded":true,"use_unified_index":true,"collection_count":0,"total_files":0,"countries":[],"collection_types":[]}},"collections_available":0}

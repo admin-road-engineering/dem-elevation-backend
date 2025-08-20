@@ -310,6 +310,9 @@ class UnifiedS3Source(BaseDataSource):
         try:
             # Get S3 client for main bucket using async context manager
             async with self.s3_client_factory.get_client("private", "ap-southeast-2") as s3_client:
+                # Log what we're trying to load for debugging
+                logger.info(f"🔍 Attempting to load index from S3: {self.unified_index_key}")
+                
                 # Download unified index
                 response = await s3_client.get_object(
                     Bucket="road-engineering-elevation-data",
