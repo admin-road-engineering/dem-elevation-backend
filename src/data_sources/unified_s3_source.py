@@ -69,20 +69,29 @@ class UnifiedS3Source(BaseDataSource):
         
         try:
             # AU Private Bucket Session (signed)
-            access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
-            secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
+            access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+            secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+            
+            if not access_key or not secret_key:
+                raise EnvironmentError(
+                    "AWS credentials are required but not set. "
+                    "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+                )
             
             au_boto_session = boto3.Session(
                 aws_access_key_id=access_key,
                 aws_secret_access_key=secret_key,
                 region_name='ap-southeast-2'
             )
-            sessions['au_private'] = AWSSession(au_boto_session)
+            sessions['au_private'] = AWSSession(session=au_boto_session)
             
-            # NZ Public Bucket Session (unsigned) 
+            # NZ Public Bucket Session (unsigned)
+            # For unsigned requests, we need to configure the session without credentials
+            nz_config = Config(signature_version=UNSIGNED)
             nz_boto_session = boto3.Session(region_name='ap-southeast-2')
-            nz_s3_client = nz_boto_session.client('s3', config=Config(signature_version=UNSIGNED))
-            sessions['nz_public'] = AWSSession(session=nz_boto_session, client=nz_s3_client)
+            # Set the unsigned config as environment variable for GDAL
+            os.environ['AWS_NO_SIGN_REQUEST'] = 'YES'
+            sessions['nz_public'] = AWSSession(session=nz_boto_session)
             
             logger.info("✅ Created singleton AWS sessions for AU private and NZ public buckets")
             
@@ -303,32 +312,50 @@ class UnifiedS3Source(BaseDataSource):
     
     async def _load_unified_index_from_s3(self) -> bool:
         """Load unified index from S3"""
-        # CRITICAL FIX: Check both s3_client_factory and AWS credentials
+        # Performance Fix Phase 1.3: Use async S3 operations to prevent blocking
         if not self.s3_client_factory:
-            logger.warning("No S3 client factory available - trying direct boto3")
-            # Try direct boto3 access as fallback
-            import boto3
-            import os
+            logger.warning("No S3 client factory available - using async boto3 fallback")
+            # Performance Fix Phase 1.3: Use async execution to prevent event loop blocking
+            import asyncio
+            
+            def _sync_s3_load():
+                """Synchronous S3 loading function for thread pool execution"""
+                import boto3
+                import os
+                
+                try:
+                    # Use environment credentials (fail-fast if missing)
+                    access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+                    secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+                    
+                    if not access_key or not secret_key:
+                        raise EnvironmentError(
+                            "AWS credentials are required but not set. "
+                            "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+                        )
+                    
+                    s3 = boto3.client('s3',
+                        aws_access_key_id=access_key,
+                        aws_secret_access_key=secret_key,
+                        region_name='ap-southeast-2'
+                    )
+                    
+                    logger.info(f"🎯 Async S3 access: Loading {self.unified_index_key}")
+                    response = s3.get_object(
+                        Bucket="road-engineering-elevation-data",
+                        Key=self.unified_index_key
+                    )
+                    
+                    content_bytes = response['Body'].read()
+                    return json.loads(content_bytes.decode('utf-8'))
+                except Exception as e:
+                    logger.error(f"Thread pool S3 loading failed: {e}")
+                    raise
             
             try:
-                # Use environment or hardcoded credentials
-                access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
-                secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
-                
-                s3 = boto3.client('s3',
-                    aws_access_key_id=access_key,
-                    aws_secret_access_key=secret_key,
-                    region_name='ap-southeast-2'
-                )
-                
-                logger.critical(f"🎯 Direct S3 access: Loading {self.unified_index_key}")
-                response = s3.get_object(
-                    Bucket="road-engineering-elevation-data",
-                    Key=self.unified_index_key
-                )
-                
-                content_bytes = response['Body'].read()
-                index_data = json.loads(content_bytes.decode('utf-8'))
+                # Run synchronous S3 operations in thread pool to avoid blocking event loop
+                loop = asyncio.get_event_loop()
+                index_data = await loop.run_in_executor(None, _sync_s3_load)
                 
                 # Parse with Pydantic
                 self.unified_index = UnifiedSpatialIndex(**index_data)
@@ -450,9 +477,15 @@ class UnifiedS3Source(BaseDataSource):
             else:
                 # Private bucket - use signed requests
                 gdal.SetConfigOption('AWS_NO_SIGN_REQUEST', 'NO')
-                # Use fallback credentials if env vars not set
-                access_key = os.environ.get('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
-                secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY', '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')
+                # Use environment credentials (fail-fast if missing)
+                access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+                secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+                
+                if not access_key or not secret_key:
+                    raise EnvironmentError(
+                        "AWS credentials are required but not set. "
+                        "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+                    )
                 if access_key:
                     gdal.SetConfigOption('AWS_ACCESS_KEY_ID', access_key)
                 if secret_key:
@@ -603,10 +636,12 @@ class UnifiedS3Source(BaseDataSource):
                 else:
                     # AU private bucket  
                     os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
-                    if not os.environ.get('AWS_ACCESS_KEY_ID'):
-                        os.environ['AWS_ACCESS_KEY_ID'] = 'AKIA5SIDYET7N3U4JQ5H'
-                    if not os.environ.get('AWS_SECRET_ACCESS_KEY'):
-                        os.environ['AWS_SECRET_ACCESS_KEY'] = '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'
+                    # Validate required AWS credentials
+                    if not os.environ.get('AWS_ACCESS_KEY_ID') or not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+                        raise EnvironmentError(
+                            "AWS credentials are required but not set. "
+                            "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+                        )
                     # Remove unsigned flag
                     if 'AWS_NO_SIGN_REQUEST' in os.environ:
                         del os.environ['AWS_NO_SIGN_REQUEST']
