@@ -286,7 +286,7 @@ class Settings(BaseSettings):
     )
     INDEX_PATH_V3: str = Field(
         default="indexes/unified_spatial_index_v3_final.json", 
-        description="S3 path for v3 spatial index (precise bounds fix + file EPSG fix)"
+        description="S3 path for v3 spatial index (precise bounds + file EPSG + Pydantic validation fixes)"
     )
     
     @property
