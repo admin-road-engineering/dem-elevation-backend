@@ -275,9 +275,34 @@ class Settings(BaseSettings):
         default=False,
         description="Enable unified v2.0 spatial index (AU+NZ combined with discriminated unions)"
     )
+    # Feature flag for index version selection (SAFE DEPLOYMENT)
+    ACTIVE_INDEX_VERSION: Literal["v2", "v3"] = Field(
+        default="v2",
+        description="Active spatial index version - v2 (legacy) or v3 (precise bounds)"
+    )
+    INDEX_PATH_V2: str = Field(
+        default="indexes/unified_spatial_index_v2_proper.json",
+        description="S3 path for v2 spatial index (legacy with campaign bounds bug)"
+    )
+    INDEX_PATH_V3: str = Field(
+        default="indexes/unified_spatial_index_v3_final.json", 
+        description="S3 path for v3 spatial index (precise bounds fix + file EPSG fix)"
+    )
+    
+    @property
+    def unified_index_path(self) -> str:
+        """Returns active index path based on feature flag"""
+        if self.ACTIVE_INDEX_VERSION == "v3":
+            logger.info("🚀 Using v3 precise bounds index")
+            return self.INDEX_PATH_V3
+        else:
+            logger.info("📋 Using v2 legacy index")
+            return self.INDEX_PATH_V2
+    
+    # Legacy field for backward compatibility
     UNIFIED_INDEX_PATH: str = Field(
         default="indexes/unified_spatial_index_v2.json",
-        description="S3 path for unified spatial index"
+        description="DEPRECATED: Use ACTIVE_INDEX_VERSION instead"
     )
     
     @validator('UNIFIED_INDEX_PATH')
@@ -287,6 +312,24 @@ class Settings(BaseSettings):
             correct_path = "indexes/unified_spatial_index_v2.json"
             logger.warning(f"⚠️ Fixing incomplete UNIFIED_INDEX_PATH: '{v}' → '{correct_path}'")
             return correct_path
+        return v
+    
+    @validator('REDIS_FALLBACK_MODE')
+    def validate_redis_mode_for_production(cls, v, values):
+        """Ensure strict mode in production for security"""
+        app_env = values.get('APP_ENV', 'production')
+        
+        # Default to strict in production if not explicitly set
+        if app_env == 'production':
+            if v != 'strict':
+                logger.warning("⚠️ SECURITY: Non-strict Redis mode in production is a security risk!")
+                logger.warning(f"⚠️ Setting REDIS_FALLBACK_MODE=strict for production (was: {v})")
+                return 'strict'
+        elif app_env == 'development':
+            # Allow degraded or local mode in development
+            if v == 'strict':
+                logger.info("ℹ️ Using strict Redis mode in development environment")
+        
         return v
     
     # Phase 2: SQLite R*Tree Spatial Index
@@ -357,6 +400,31 @@ class Settings(BaseSettings):
     # New S3 bucket for high-resolution data
     AWS_S3_BUCKET_NAME_HIGH_RES: Optional[str] = None
     
+    # ========================================
+    # REDIS CONFIGURATION (Phase B.2)
+    # ========================================
+    # Redis configuration for production state management and rate limiting
+    REDIS_URL: Optional[str] = Field(
+        default=None,
+        description="Redis connection URL for production state management"
+    )
+    
+    # CRITICAL: Default to strict in production to prevent security bypass
+    REDIS_FALLBACK_MODE: Literal["strict", "degraded", "local"] = Field(
+        default="strict",  # Will be set by validator based on APP_ENV
+        description="Redis fallback: strict (fail closed), degraded (log+allow), local (memory)"
+    )
+    
+    REDIS_RATE_LIMIT_WINDOW: int = Field(
+        default=60,
+        description="Rate limiting window in seconds"
+    )
+    
+    REDIS_RATE_LIMIT_MAX_REQUESTS: int = Field(
+        default=10,
+        description="Max requests per window for non-AU coordinates"
+    )
+    
     # GPXZ.io API Configuration
     GPXZ_API_KEY: Optional[str] = None
     GPXZ_DAILY_LIMIT: int = Field(default=100, description="Daily request limit for GPXZ API")
@@ -393,11 +461,34 @@ class Settings(BaseSettings):
     S3_SOURCES_CONFIG: str = Field(default="", description="JSON configuration for advanced multi-bucket setup")
     
     # Server settings (Phase 3B.3.2: Enhanced with Railway PORT support)
-    HOST: str = Field(default="0.0.0.0", description="Server host")
+    # Security Fix B104: Use 127.0.0.1 by default, allow 0.0.0.0 only in production with explicit override
+    HOST: str = Field(
+        default="127.0.0.1", 
+        description="Server host - use 127.0.0.1 for development, 0.0.0.0 for production containers"
+    )
     PORT: int = Field(
         default=8001, 
         description="Port for the Uvicorn server. Injected by Railway's $PORT in production."
     )
+    
+    @field_validator('HOST')
+    @classmethod
+    def validate_host_binding(cls, v, info):
+        """Security validation for host binding - prevent accidental exposure"""
+        # Get APP_ENV from the values being validated
+        app_env = info.data.get('APP_ENV', 'production') if info.data else 'production'
+        
+        if v == "0.0.0.0":  # nosec B104 - This is validation code, not binding to all interfaces
+            if app_env == "production":
+                # Allow 0.0.0.0 in production (containers/Railway need this)
+                logger.info("🔒 Production environment: Allowing 0.0.0.0 binding for container networking")
+                return v
+            else:
+                # Warn about security risk in development
+                logger.warning("⚠️ SECURITY: Binding to 0.0.0.0 in development exposes service to network")
+                logger.warning("   Consider using 127.0.0.1 for local development")
+                
+        return v
     
     # Authentication settings
     SUPABASE_JWT_SECRET: Optional[str] = None
