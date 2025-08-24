@@ -193,3 +193,9 @@ config/unified_spatial_index_v2.json
 
 # Large spatial index files (stored in S3)
 config/unified_spatial_index_v2*.json
+config/unified_spatial_index_v3*.json
+config/ultimate_performance_index.json
+
+# Large backup and archive directories
+backups/
+archive/deprecated_indexes/
