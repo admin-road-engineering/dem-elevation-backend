@@ -5,7 +5,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from typing import Dict, Any, List, Optional
 
-from ...middleware.rate_limiter import get_rate_limiter
+from ...middleware.simple_rate_limiter import get_rate_limiter
 
 from ...config import Settings
 from ...dem_service import DEMService

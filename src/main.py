@@ -172,7 +172,7 @@ async def lifespan(app: FastAPI):
             logger.info("✅ Redis strict mode enforced in production environment")
         
         # Initialize Redis rate limiter for multi-worker security
-        from .middleware.rate_limiter import initialize_rate_limiter
+        from .middleware.simple_rate_limiter import initialize_rate_limiter
         redis_url = getattr(settings, 'REDIS_URL', 'redis://localhost:6379')
         rate_limiter = initialize_rate_limiter(redis_url)
         logger.info(f"Redis rate limiter initialized with URL: {redis_url}")
@@ -431,7 +431,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down DEM Elevation Service...", extra={"event": "shutdown_begin"})
     try:
         # Shutdown Redis rate limiter
-        from .middleware.rate_limiter import shutdown_rate_limiter
+        from .middleware.simple_rate_limiter import shutdown_rate_limiter
         await shutdown_rate_limiter()
         
         # Clean up service container
