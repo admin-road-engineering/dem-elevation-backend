@@ -638,7 +638,8 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "3.0"
+        "version": "3.1",
+        "deployment_fixed": "2025-08-24T14:35:00Z"
     }
 
 # Set start time for uptime calculation
