@@ -34,13 +34,14 @@ def upload_ideal_index():
     if total_collections != 1582:
         print(f"WARNING: Expected 1582 collections, found {total_collections}")
     
-    # AWS credentials from .env file or environment
-    aws_access_key = os.getenv('AWS_ACCESS_KEY_ID', 'AKIA5SIDYET7N3U4JQ5H')
-    aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY', '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')
+    # AWS credentials from environment variables only
+    aws_access_key = os.getenv('AWS_ACCESS_KEY_ID')
+    aws_secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
     aws_region = os.getenv('AWS_DEFAULT_REGION', 'ap-southeast-2')
     
     if not aws_access_key or not aws_secret_key:
-        print("ERROR: AWS credentials not found")
+        print("ERROR: AWS credentials not found in environment variables")
+        print("Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables")
         return False
     
     print(f"Using AWS region: {aws_region}")

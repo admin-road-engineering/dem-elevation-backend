@@ -10,6 +10,7 @@ import boto3
 import logging
 from pathlib import Path
 import json
+import os
 from datetime import datetime
 
 # Setup logging
@@ -29,13 +30,15 @@ def upload_utm_bounds_index():
         return False
     
     try:
-        # Create S3 client with correct credentials from .env
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id='AKIA5SIDYET7N3U4JQ5H',
-            aws_secret_access_key='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',
-            region_name='ap-southeast-2'
-        )
+        # Create S3 client using environment variables
+        if not os.environ.get('AWS_ACCESS_KEY_ID'):
+            logger.error("AWS_ACCESS_KEY_ID not set in environment")
+            return False
+        if not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+            logger.error("AWS_SECRET_ACCESS_KEY not set in environment")
+            return False
+            
+        s3_client = boto3.client('s3', region_name='ap-southeast-2')
         
         # Get file size for progress tracking
         file_size = source_file.stat().st_size

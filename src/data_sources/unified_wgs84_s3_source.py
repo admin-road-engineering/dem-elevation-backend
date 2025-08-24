@@ -267,12 +267,15 @@ class UnifiedWGS84S3Source(BaseDataSource):
                 original_env[key] = os.environ.get(key)
             
             try:
-                # Set environment variables directly (more reliable than Env context manager)
+                # Set environment variables and validate credentials
                 os.environ['AWS_REGION'] = 'ap-southeast-2'
-                if 'AWS_ACCESS_KEY_ID' not in os.environ:
-                    os.environ['AWS_ACCESS_KEY_ID'] = 'AKIA5SIDYET7N3U4JQ5H'
-                if 'AWS_SECRET_ACCESS_KEY' not in os.environ:
-                    os.environ['AWS_SECRET_ACCESS_KEY'] = '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'
+                
+                # Validate required AWS credentials
+                if not os.environ.get('AWS_ACCESS_KEY_ID') or not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+                    raise EnvironmentError(
+                        "AWS credentials are required but not set. "
+                        "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables."
+                    )
                 
                 # Open rasterio dataset with S3 credentials
                 with rasterio.open(file_path) as dataset:

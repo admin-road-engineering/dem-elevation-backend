@@ -3,10 +3,14 @@
 import rasterio
 import os
 
-# Set up environment for S3 access
-os.environ['AWS_ACCESS_KEY_ID'] = 'AKIA5SIDYET7N3U4JQ5H'
-os.environ['AWS_SECRET_ACCESS_KEY'] = '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'
-os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+# Set up environment for S3 access using environment variables
+if not os.environ.get('AWS_ACCESS_KEY_ID'):
+    print("⚠️ ERROR: AWS_ACCESS_KEY_ID not set in environment")
+    exit(1)
+if not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+    print("⚠️ ERROR: AWS_SECRET_ACCESS_KEY not set in environment")
+    exit(1)
+os.environ.setdefault('AWS_DEFAULT_REGION', 'ap-southeast-2')
 
 # Open a Sydney file to check its actual bounds
 sydney_file = 's3://road-engineering-elevation-data/nsw-elvis/elevation/1m-dem/z56/Sydney201105/Sydney201105-LID1-AHD_3146266_56_0002_0002_1m.tif'

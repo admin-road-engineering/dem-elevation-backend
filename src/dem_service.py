@@ -217,26 +217,37 @@ class DEMService:
             Tuple of (elevation_list, dem_source_used, error_message)
         """
         try:
-            result_elevations = []
-            primary_source = None
+            # Performance Enhancement Phase 2.3: Parallel batch processing
+            import asyncio
             
-            for i, point in enumerate(points):
+            async def process_single_point(i: int, point: Dict[str, Any]) -> Dict[str, Any]:
+                """Process a single point asynchronously"""
                 lat = point["latitude"]
                 lon = point["longitude"]
                 point_id = point.get("id", i)
                 
                 elevation, dem_used, message = await self.get_elevation_unified(lat, lon, dem_source_id)
-                if primary_source is None:
-                    primary_source = dem_used
                 
-                result_elevations.append({
+                return {
                     "input_latitude": lat,
                     "input_longitude": lon,
                     "input_id": point_id,
                     "elevation_m": elevation,
                     "sequence": i,
-                    "message": message
-                })
+                    "message": message,
+                    "dem_source": dem_used
+                }
+            
+            # Process all points concurrently for maximum performance
+            logger.info(f"Processing {len(points)} points concurrently (Performance Phase 2.3)")
+            tasks = [process_single_point(i, point) for i, point in enumerate(points)]
+            result_elevations = await asyncio.gather(*tasks, return_exceptions=False)
+            
+            # Extract primary source from first successful result
+            primary_source = next(
+                (result["dem_source"] for result in result_elevations if result.get("elevation_m") is not None), 
+                "unknown"
+            )
             
             return result_elevations, primary_source or "unknown", None
             

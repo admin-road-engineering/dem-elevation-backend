@@ -2,7 +2,10 @@
 Unified Elevation Service - Consolidates all source selection logic
 This addresses the code review feedback about scattered source selection logic
 """
+import asyncio
 import logging
+import hashlib
+import time
 from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass
 
@@ -17,6 +20,7 @@ from .dem_exceptions import (
 )
 from .gpxz_client import GPXZConfig
 from .redis_state_manager import RedisStateManager
+from .performance_monitor import get_performance_monitor, track_elevation_performance
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,7 @@ class UnifiedElevationService:
     2. Providing a single, clean interface for elevation queries
     3. Hiding complexity from the DEMService class
     4. Supporting both legacy and enhanced source selectors
+    5. Built-in caching for performance optimization
     """
     
     def __init__(self, settings: Settings, redis_manager: Optional[RedisStateManager] = None, 
@@ -65,6 +70,14 @@ class UnifiedElevationService:
             self.source_provider = source_provider
             self.pre_initialized_enhanced_selector = enhanced_selector
             self.unified_provider = unified_provider
+            
+            # Initialize performance cache system with efficient LRU eviction
+            from collections import OrderedDict
+            self._cache = OrderedDict()  # OrderedDict for O(1) LRU operations
+            self._cache_hits = 0
+            self._cache_misses = 0
+            self._cache_max_size = getattr(settings, 'ELEVATION_CACHE_SIZE', 10000)
+            logger.info(f"Elevation cache initialized with OrderedDict LRU (max_size={self._cache_max_size})")
             
             # Phase 3B.5: Feature flag controlled architecture selection
             if unified_provider and settings.USE_UNIFIED_SPATIAL_INDEX:
@@ -133,6 +146,69 @@ class UnifiedElevationService:
             logger.error(f"Unexpected error initializing elevation service: {e}")
             raise DEMServiceError(f"Failed to initialize elevation service: {e}") from e
     
+    def _get_cache_key(self, lat: float, lon: float, source_id: Optional[str] = None) -> str:
+        """Generate cache key with 4 decimal precision for lat/lon (approx 11m resolution)"""
+        # Round to 4 decimal places for geographic coordinates
+        rounded_lat = round(lat, 4)
+        rounded_lon = round(lon, 4)
+        
+        # Include source_id in cache key if specified
+        key_parts = [f"{rounded_lat:.4f}", f"{rounded_lon:.4f}"]
+        if source_id:
+            key_parts.append(source_id)
+        
+        return "|".join(key_parts)
+    
+    def _cache_get(self, cache_key: str) -> Optional[ElevationResult]:
+        """Get result from cache if available with LRU access pattern"""
+        if cache_key in self._cache:
+            cached_result, timestamp = self._cache[cache_key]
+            
+            # Optional: Add cache expiration (e.g., 1 hour)
+            cache_max_age = getattr(self.settings, 'ELEVATION_CACHE_MAX_AGE_SECONDS', 3600)
+            if time.time() - timestamp > cache_max_age:
+                del self._cache[cache_key]
+                self._cache_misses += 1
+                return None
+            
+            # Move to end (most recently accessed) - LRU pattern
+            self._cache.move_to_end(cache_key)
+            self._cache_hits += 1
+            logger.debug(f"Cache hit for {cache_key}")
+            return cached_result
+        
+        self._cache_misses += 1
+        return None
+    
+    def _cache_put(self, cache_key: str, result: ElevationResult):
+        """Store result in cache with efficient O(1) LRU eviction"""
+        # Check if key exists - move to end (most recent)
+        if cache_key in self._cache:
+            del self._cache[cache_key]
+        
+        # Remove oldest item if at capacity (O(1) operation)
+        while len(self._cache) >= self._cache_max_size:
+            oldest_key, _ = self._cache.popitem(last=False)  # Remove oldest (FIFO)
+            logger.debug(f"Cache evicted oldest entry: {oldest_key}")
+        
+        # Add new item at end (most recent)
+        self._cache[cache_key] = (result, time.time())
+        logger.debug(f"Cache stored {cache_key}")
+    
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache performance statistics"""
+        total_requests = self._cache_hits + self._cache_misses
+        hit_rate = self._cache_hits / total_requests if total_requests > 0 else 0
+        
+        return {
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "total_requests": total_requests,
+            "hit_rate": f"{hit_rate:.2%}",
+            "cache_size": len(self._cache),
+            "cache_max_size": self._cache_max_size
+        }
+    
     def _is_new_zealand_coordinate(self, lat: float, lon: float) -> bool:
         """Check if coordinates are within New Zealand geographic bounds"""
         # New Zealand bounds: approximately -47.3 to -34.4 latitude, 166.4 to 178.6 longitude
@@ -169,9 +245,10 @@ class UnifiedElevationService:
     async def get_elevation(self, latitude: float, longitude: float, 
                           dem_source_id: Optional[str] = None) -> ElevationResult:
         """
-        Get elevation at a single point with unified source selection.
+        Get elevation at a single point with unified source selection and caching.
         
         This is the single entry point for all elevation queries, handling:
+        - In-memory caching for performance (sub-millisecond repeated queries)
         - Automatic source selection
         - Fallback chain execution (S3 → GPXZ → Google → Local)
         - Error handling and recovery
@@ -191,16 +268,35 @@ class UnifiedElevationService:
         if not (-180 <= longitude <= 180):
             raise DEMCoordinateError(f"Invalid longitude: {longitude}. Must be between -180 and 180.")
         
+        # Check cache first for performance optimization
+        cache_key = self._get_cache_key(latitude, longitude, dem_source_id)
+        cached_result = self._cache_get(cache_key)
+        if cached_result:
+            return cached_result
+        
+        # Determine endpoint name for performance tracking
+        if hasattr(self, 'using_unified_provider') and self.using_unified_provider:
+            endpoint = "unified_elevation"
+        elif hasattr(self, 'using_index_driven_selector') and self.using_index_driven_selector:
+            endpoint = "index_driven_elevation"
+        elif self.using_enhanced_selector:
+            endpoint = "enhanced_elevation"
+        else:
+            endpoint = "legacy_elevation"
+        
+        # Execute with performance monitoring
         try:
-            # Phase 3B.5: Check for unified provider first (highest priority)
-            if hasattr(self, 'using_unified_provider') and self.using_unified_provider:
-                return await self._get_elevation_unified(latitude, longitude, dem_source_id)
-            elif hasattr(self, 'using_index_driven_selector') and self.using_index_driven_selector:
-                return await self._get_elevation_index_driven(latitude, longitude, dem_source_id)
-            elif self.using_enhanced_selector:
-                return await self._get_elevation_enhanced(latitude, longitude, dem_source_id)
-            else:
-                return await self._get_elevation_legacy(latitude, longitude, dem_source_id)
+            result = await track_elevation_performance(
+                endpoint,
+                self._get_elevation_internal,
+                latitude, longitude, dem_source_id
+            )
+            
+            # Cache successful results for performance optimization
+            if result and result.elevation_m is not None:
+                self._cache_put(cache_key, result)
+            
+            return result
                 
         except DEMCoordinateError:
             # Re-raise coordinate errors as-is
@@ -226,6 +322,19 @@ class UnifiedElevationService:
                 dem_source_used="unknown_error",
                 message=f"Unexpected error: {str(e)}"
             )
+    
+    async def _get_elevation_internal(self, latitude: float, longitude: float, 
+                                    dem_source_id: Optional[str] = None) -> ElevationResult:
+        """Internal elevation method without caching/monitoring (for performance tracking)"""
+        # Phase 3B.5: Check for unified provider first (highest priority)
+        if hasattr(self, 'using_unified_provider') and self.using_unified_provider:
+            return await self._get_elevation_unified(latitude, longitude, dem_source_id)
+        elif hasattr(self, 'using_index_driven_selector') and self.using_index_driven_selector:
+            return await self._get_elevation_index_driven(latitude, longitude, dem_source_id)
+        elif self.using_enhanced_selector:
+            return await self._get_elevation_enhanced(latitude, longitude, dem_source_id)
+        else:
+            return await self._get_elevation_legacy(latitude, longitude, dem_source_id)
     
     async def _get_elevation_enhanced(self, lat: float, lon: float, 
                                     source_id: Optional[str]) -> ElevationResult:
@@ -511,21 +620,46 @@ class UnifiedElevationService:
     async def get_elevations_batch(self, points: List[Tuple[float, float]], 
                                  dem_source_id: Optional[str] = None) -> List[ElevationResult]:
         """
-        Get elevations for multiple points efficiently.
+        Get elevations for multiple points efficiently using parallel processing.
         
-        This consolidates the batch processing logic and can optimize for:
-        - Same source usage across multiple points
-        - Bulk API calls where supported
-        - Connection pooling and rate limiting
+        **PERFORMANCE FIX**: Uses asyncio.gather() for concurrent processing instead of
+        sequential for-loop. This addresses the 3-7s performance crisis by processing
+        multiple elevation requests simultaneously.
+        
+        Features:
+        - Parallel processing with asyncio.gather()
+        - Proper exception handling with return_exceptions=True
+        - Connection pooling and rate limiting preserved
+        - Order of results maintained
         """
-        results = []
+        if not points:
+            return []
         
-        # For now, process sequentially - could be optimized for batch operations
-        for lat, lon in points:
-            result = await self.get_elevation(lat, lon, dem_source_id)
-            results.append(result)
+        # Create tasks for parallel execution
+        tasks = [
+            self.get_elevation(lat, lon, dem_source_id) 
+            for lat, lon in points
+        ]
         
-        return results
+        # Execute all tasks concurrently with proper exception handling
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Process results and handle any exceptions
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                lat, lon = points[i]
+                logger.error(f"Batch processing error for point ({lat}, {lon}): {result}")
+                # Create error result instead of failing entire batch
+                processed_results.append(ElevationResult(
+                    elevation_m=None,
+                    dem_source_used="batch_error",
+                    message=f"Batch processing failed: {str(result)}"
+                ))
+            else:
+                processed_results.append(result)
+        
+        return processed_results
     
     def get_available_sources(self) -> List[Dict[str, Any]]:
         """Get list of available DEM sources"""
@@ -556,14 +690,25 @@ class UnifiedElevationService:
             return 0
     
     def get_coverage_summary(self) -> Dict[str, Any]:
-        """Get coverage summary for all sources""" 
+        """Get coverage summary for all sources with cache statistics""" 
+        summary = {}
+        
         if hasattr(self.source_selector, 'get_coverage_summary'):
-            return self.source_selector.get_coverage_summary()
+            summary = self.source_selector.get_coverage_summary()
         else:
-            return {
+            summary = {
                 "message": "Coverage summary not available for this source selector",
                 "source_count": len(self.get_available_sources())
             }
+        
+        # Add cache and performance statistics
+        summary["cache_stats"] = self.get_cache_stats()
+        
+        # Add performance monitoring statistics
+        performance_monitor = get_performance_monitor()
+        summary["performance_stats"] = performance_monitor.get_performance_summary()
+        
+        return summary
     
     async def close(self):
         """Clean up resources"""

@@ -19,6 +19,9 @@ from .redis_state_manager import RedisStateManager
 from .unified_index_loader import UnifiedIndexLoader
 from .source_provider import SourceProvider
 from .services.crs_service import CRSTransformationService
+from .services.thread_pool_service import ThreadPoolService
+from .services.spatial_index_service import SpatialIndexService
+from .campaign_dataset_selector import CampaignDatasetSelector
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,15 @@ class ServiceContainer:
         
         # Initialize CRS transformation service for CRS-aware spatial queries (Phase 5)
         self._crs_service: Optional[CRSTransformationService] = None
+        
+        # Initialize CampaignDatasetSelector for campaign-based queries (Performance Fix Phase 1.1)
+        self._campaign_selector: Optional[CampaignDatasetSelector] = None
+        
+        # Initialize ThreadPoolService for CPU-intensive operations (Performance Fix Phase 2.1)
+        self._thread_pool_service: Optional[ThreadPoolService] = None
+        
+        # Initialize SpatialIndexService for O(log N) spatial queries (Performance Fix Phase 3)
+        self._spatial_index_service: Optional[SpatialIndexService] = None
         
         logger.info(f"ServiceContainer initialized with Redis state management, SourceProvider: {source_provider is not None}, UnifiedProvider: {unified_provider is not None}")
     
@@ -139,6 +151,33 @@ class ServiceContainer:
             logger.info("CRSTransformationService created for data-driven coordinate transformations")
         return self._crs_service
     
+    @property
+    def campaign_selector(self) -> CampaignDatasetSelector:
+        """Get CampaignDatasetSelector singleton (Performance Fix Phase 1.1)"""
+        if self._campaign_selector is None:
+            # Use same config_dir logic as dataset_endpoints.py
+            from pathlib import Path
+            config_dir = Path(__file__).parent / "config"
+            self._campaign_selector = CampaignDatasetSelector(config_dir)
+            logger.info("CampaignDatasetSelector created as singleton to prevent re-initialization")
+        return self._campaign_selector
+    
+    @property
+    def thread_pool_service(self) -> ThreadPoolService:
+        """Get ThreadPoolService singleton for CPU-intensive operations (Performance Fix Phase 2.1)"""
+        if self._thread_pool_service is None:
+            self._thread_pool_service = ThreadPoolService()
+            logger.info("ThreadPoolService created for optimized CPU/I-O task execution")
+        return self._thread_pool_service
+    
+    @property
+    def spatial_index_service(self) -> SpatialIndexService:
+        """Get SpatialIndexService singleton for O(log N) spatial queries (Performance Fix Phase 3)"""
+        if self._spatial_index_service is None:
+            self._spatial_index_service = SpatialIndexService()
+            logger.info("SpatialIndexService created for high-performance spatial queries")
+        return self._spatial_index_service
+    
     async def close(self):
         """Close all managed services and clean up resources."""
         services_to_close = [
@@ -147,6 +186,9 @@ class ServiceContainer:
             ("dataset_manager", self._dataset_manager),
             ("redis_manager", self._redis_manager),
             ("crs_service", self._crs_service),
+            ("campaign_selector", self._campaign_selector),
+            ("thread_pool_service", self._thread_pool_service),
+            ("spatial_index_service", self._spatial_index_service),
         ]
         
         for service_name, service in services_to_close:
@@ -246,3 +288,18 @@ def get_enhanced_selector_from_app_state(request: Request):
 def get_crs_service() -> CRSTransformationService:
     """FastAPI dependency to get CRSTransformationService instance."""
     return get_service_container().crs_service
+
+
+def get_campaign_selector() -> CampaignDatasetSelector:
+    """FastAPI dependency to get CampaignDatasetSelector singleton."""
+    return get_service_container().campaign_selector
+
+
+def get_thread_pool_service() -> ThreadPoolService:
+    """FastAPI dependency to get ThreadPoolService singleton."""
+    return get_service_container().thread_pool_service
+
+
+def get_spatial_index_service() -> SpatialIndexService:
+    """FastAPI dependency to get SpatialIndexService singleton."""
+    return get_service_container().spatial_index_service

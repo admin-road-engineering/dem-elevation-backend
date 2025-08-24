@@ -3,12 +3,17 @@
 
 import json
 import boto3
+import os
 
-s3 = boto3.client('s3',
-    aws_access_key_id='AKIA5SIDYET7N3U4JQ5H',
-    aws_secret_access_key='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',
-    region_name='ap-southeast-2'
-)
+# Use environment variables for AWS credentials
+if not os.environ.get('AWS_ACCESS_KEY_ID'):
+    print("⚠️ ERROR: AWS_ACCESS_KEY_ID not set in environment")
+    exit(1)
+if not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+    print("⚠️ ERROR: AWS_SECRET_ACCESS_KEY not set in environment")
+    exit(1)
+
+s3 = boto3.client('s3', region_name='ap-southeast-2')
 
 # Check the IDEAL index that Railway is using
 response = s3.get_object(Bucket='road-engineering-elevation-data', Key='indexes/unified_spatial_index_v2_ideal.json')

@@ -6,10 +6,14 @@ import os
 import boto3
 from pathlib import Path
 
-# Set AWS credentials
-os.environ['AWS_ACCESS_KEY_ID'] = 'AKIA5SIDYET7N3U4JQ5H'
-os.environ['AWS_SECRET_ACCESS_KEY'] = '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'
-os.environ['AWS_DEFAULT_REGION'] = 'ap-southeast-2'
+# Use AWS credentials from environment
+if not os.environ.get('AWS_ACCESS_KEY_ID'):
+    print("⚠️ ERROR: AWS_ACCESS_KEY_ID not set in environment")
+    exit(1)
+if not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+    print("⚠️ ERROR: AWS_SECRET_ACCESS_KEY not set in environment")
+    exit(1)
+os.environ.setdefault('AWS_DEFAULT_REGION', 'ap-southeast-2')
 
 def fix_bounds_format(bounds):
     """Convert bounds to canonical WGS84 format"""

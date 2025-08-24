@@ -6,6 +6,9 @@ Uses shared fixtures for consistent testing.
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
+from datetime import datetime, timedelta
+import jwt
 
 from src.auth import verify_token, get_current_user, require_auth, AuthConfig
 from tests.conftest import assert_http_exception
@@ -192,18 +195,20 @@ class TestJWTVerification:
     
     @patch('src.auth.get_settings')
     @pytest.mark.asyncio
-    async def test_verify_token_no_secret_configured(self, mock_get_settings):
-        """Test JWT verification when no secret is configured."""
-        # Mock settings without JWT secret
+    async def test_verify_token_auth_required_no_secret(self, mock_get_settings):
+        """Test JWT verification fails closed when secret missing but auth required."""
+        # Mock settings without JWT secret but auth required
         mock_settings = MagicMock()
         mock_settings.SUPABASE_JWT_SECRET = None
         mock_settings.REQUIRE_AUTH = True
         mock_get_settings.return_value = mock_settings
         
-        # No credentials provided
-        result = await verify_token(None)
+        # Should raise HTTPException 500 when auth required but not configured
+        with pytest.raises(HTTPException) as exc_info:
+            await verify_token(None)
         
-        assert result is None
+        assert exc_info.value.status_code == 500
+        assert "not properly set up" in exc_info.value.detail
     
     @patch('src.auth.get_settings')
     @pytest.mark.asyncio

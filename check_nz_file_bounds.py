@@ -8,9 +8,14 @@ import os
 # Auckland coordinate
 lat, lon = -36.8485, 174.7633
 
-# Load the NZ index from S3 with credentials
-os.environ['AWS_ACCESS_KEY_ID'] = 'AKIA5SIDYET7N3U4JQ5H'
-os.environ['AWS_SECRET_ACCESS_KEY'] = '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'
+# Load the NZ index from S3 with credentials from environment
+# Use environment variables for AWS credentials
+if not os.environ.get('AWS_ACCESS_KEY_ID'):
+    print("⚠️ ERROR: AWS_ACCESS_KEY_ID not set in environment")
+    exit(1)
+if not os.environ.get('AWS_SECRET_ACCESS_KEY'):
+    print("⚠️ ERROR: AWS_SECRET_ACCESS_KEY not set in environment")
+    exit(1)
 s3 = boto3.client('s3', region_name='ap-southeast-2')
 
 response = s3.get_object(

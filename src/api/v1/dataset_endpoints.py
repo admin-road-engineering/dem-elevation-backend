@@ -2,9 +2,10 @@
 Dataset Management Endpoints - Phase 2 Enhancement
 Provides transparency into the grouped dataset architecture
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, List, Any
 from ...campaign_dataset_selector import CampaignDatasetSelector
+from ...dependencies import get_campaign_selector
 from pathlib import Path
 import logging
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/campaigns", summary="List all available campaigns (Phase 3)")
-async def get_datasets() -> Dict[str, Any]:
+async def get_datasets(smart_selector: CampaignDatasetSelector = Depends(get_campaign_selector)) -> Dict[str, Any]:
     """
     Get comprehensive information about all available datasets in the grouped spatial index.
     
@@ -23,9 +24,6 @@ async def get_datasets() -> Dict[str, Any]:
         Dict containing dataset catalog with metadata, file counts, and performance metrics
     """
     try:
-        config_dir = Path(__file__).parent.parent.parent / "config"
-        smart_selector = CampaignDatasetSelector(config_dir)
-        
         # Get performance statistics
         perf_stats = smart_selector.get_performance_stats()
         
@@ -85,7 +83,7 @@ async def get_datasets() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve dataset information: {str(e)}")
 
 @router.get("/datasets/{dataset_id}", summary="Get detailed information about a specific dataset")
-async def get_dataset_details(dataset_id: str) -> Dict[str, Any]:
+async def get_dataset_details(dataset_id: str, smart_selector: CampaignDatasetSelector = Depends(get_campaign_selector)) -> Dict[str, Any]:
     """
     Get detailed information about a specific dataset.
     
@@ -96,8 +94,6 @@ async def get_dataset_details(dataset_id: str) -> Dict[str, Any]:
         Detailed dataset information including sample files
     """
     try:
-        config_dir = Path(__file__).parent.parent.parent / "config"
-        smart_selector = CampaignDatasetSelector(config_dir)
         
         if not smart_selector.grouped_index or "datasets" not in smart_selector.grouped_index:
             raise HTTPException(status_code=404, detail="No dataset index available")
@@ -245,7 +241,7 @@ async def get_performance_outlier_analysis() -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve outlier analysis: {str(e)}")
 
 @router.post("/datasets/query/preview", summary="Preview which datasets would be selected for a coordinate")
-async def preview_dataset_selection(latitude: float, longitude: float) -> Dict[str, Any]:
+async def preview_dataset_selection(latitude: float, longitude: float, smart_selector: CampaignDatasetSelector = Depends(get_campaign_selector)) -> Dict[str, Any]:
     """
     Preview which datasets would be selected for a given coordinate without executing the search.
     
@@ -259,8 +255,6 @@ async def preview_dataset_selection(latitude: float, longitude: float) -> Dict[s
         Dataset selection preview with confidence scores and reasoning
     """
     try:
-        config_dir = Path(__file__).parent.parent.parent / "config"
-        smart_selector = CampaignDatasetSelector(config_dir)
         
         # Get dataset matches with confidence scores
         dataset_matches = smart_selector.select_datasets_for_coordinate(latitude, longitude)

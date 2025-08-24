@@ -84,14 +84,18 @@ class S3EnvironmentContext:
         if self.aws_access_key:
             os.environ['AWS_ACCESS_KEY_ID'] = self.aws_access_key
         elif 'AWS_ACCESS_KEY_ID' not in os.environ:
-            # Fallback to known working credentials for Railway environment
-            os.environ['AWS_ACCESS_KEY_ID'] = 'AKIA5SIDYET7N3U4JQ5H'
+            raise EnvironmentError(
+                "AWS_ACCESS_KEY_ID is required but not set. "
+                "Please configure AWS credentials properly."
+            )
             
         if self.aws_secret_key:
             os.environ['AWS_SECRET_ACCESS_KEY'] = self.aws_secret_key
         elif 'AWS_SECRET_ACCESS_KEY' not in os.environ:
-            # Fallback to known working credentials for Railway environment
-            os.environ['AWS_SECRET_ACCESS_KEY'] = '2EWShSmRqi9Y/CV1nYsk7mSvTU9DsGfqz5RZqqNZ'
+            raise EnvironmentError(
+                "AWS_SECRET_ACCESS_KEY is required but not set. "
+                "Please configure AWS credentials properly."
+            )
         
         # Remove unsigned request flag if present
         if 'AWS_NO_SIGN_REQUEST' in os.environ:

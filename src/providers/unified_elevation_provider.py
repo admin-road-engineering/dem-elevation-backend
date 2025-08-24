@@ -76,13 +76,13 @@ class UnifiedElevationProvider:
         
         try:
             # Create unified S3 source with CRS service injection
-            # HOTFIX: Override environment variable issue with correct index path
-            correct_index_path = "indexes/unified_spatial_index_v2.json"
-            logger.critical(f"🎯 FORCING index path: {correct_index_path} (env was: {self.settings.UNIFIED_INDEX_PATH})")
+            # Use feature flag to select correct index version
+            active_index_path = self.settings.unified_index_path
+            logger.info(f"🎯 Selected index path: {active_index_path} (version: {self.settings.ACTIVE_INDEX_VERSION})")
             
             unified_s3_source = UnifiedS3Source(
                 use_unified_index=True,
-                unified_index_key=correct_index_path,  
+                unified_index_key=active_index_path,  
                 s3_client_factory=self.s3_client_factory,
                 crs_service=self.crs_service
             )
@@ -258,7 +258,9 @@ class UnifiedElevationProvider:
         stats = {
             "provider_type": "unified",
             "unified_mode": self.settings.USE_UNIFIED_SPATIAL_INDEX,
-            "initialized": self.initialized
+            "initialized": self.initialized,
+            "active_index_version": self.settings.ACTIVE_INDEX_VERSION,
+            "active_index_path": self.settings.unified_index_path
         }
         
         if self.elevation_source:

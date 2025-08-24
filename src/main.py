@@ -155,6 +155,28 @@ async def lifespan(app: FastAPI):
         settings = get_settings()
         validate_environment_configuration(settings)
         
+        # Critical security validation - prevent startup with misconfigured auth
+        if getattr(settings, 'REQUIRE_AUTH', False) and not getattr(settings, 'SUPABASE_JWT_SECRET', None):
+            logger.critical("SECURITY CRITICAL: Authentication required but SUPABASE_JWT_SECRET not configured")
+            logger.critical("Service cannot start in this insecure state - refusing to start")
+            raise SystemExit(1)
+        
+        # Critical security validation - enforce Redis strict mode in production
+        if getattr(settings, 'APP_ENV', 'production') == 'production':
+            redis_mode = getattr(settings, 'REDIS_FALLBACK_MODE', 'strict')
+            if redis_mode != 'strict':
+                logger.critical("SECURITY CRITICAL: Production environment requires REDIS_FALLBACK_MODE=strict")
+                logger.critical(f"Current mode: {redis_mode} - This is a security risk in multi-worker environments")
+                logger.critical("Service cannot start with non-strict Redis mode in production - refusing to start")
+                raise SystemExit(1)
+            logger.info("✅ Redis strict mode enforced in production environment")
+        
+        # Initialize Redis rate limiter for multi-worker security
+        from .middleware.rate_limiter import initialize_rate_limiter
+        redis_url = getattr(settings, 'REDIS_URL', 'redis://localhost:6379')
+        rate_limiter = initialize_rate_limiter(redis_url)
+        logger.info(f"Redis rate limiter initialized with URL: {redis_url}")
+        
         # Create S3ClientFactory for all architectures
         s3_factory = create_s3_client_factory()
         app.state.s3_factory = s3_factory
@@ -192,8 +214,10 @@ async def lifespan(app: FastAPI):
                 if not has_fallback:
                     logger.critical("❌ NO ELEVATION SOURCES AVAILABLE - Cannot start")
                     
-                    # Restart loop prevention
-                    restart_file = Path("/tmp/dem_restart_count.txt")
+                    # Restart loop prevention - Security Fix B108: Use secure temp file
+                    import tempfile
+                    temp_dir = Path(tempfile.gettempdir())
+                    restart_file = temp_dir / "dem_restart_count.txt"
                     max_restarts = 3
                     restart_window = 300  # 5 minutes
                     
@@ -303,6 +327,9 @@ async def lifespan(app: FastAPI):
             dem_sources = {}  # Unified provider doesn't use dem_sources dict
             logger.info("Unified provider initialization completed")
         
+        # Performance Fix Phase 1.1: Initialize ServiceContainer early to create singletons
+        temp_service_container = init_service_container(settings)
+        
         # Pre-initialize EnhancedSourceSelector during startup (legacy mode only)
         if not settings.USE_UNIFIED_SPATIAL_INDEX:
             logger.info("Pre-initializing EnhancedSourceSelector during lifespan startup...")
@@ -319,6 +346,9 @@ async def lifespan(app: FastAPI):
                     "region": settings.AWS_DEFAULT_REGION
                 } if settings.AWS_ACCESS_KEY_ID else None
                 
+                # Performance Fix Phase 1.1: Pass CampaignDatasetSelector singleton to prevent re-initialization
+                campaign_selector_singleton = temp_service_container.campaign_selector
+                
                 # Create and fully initialize EnhancedSourceSelector here (with event loop available)
                 enhanced_selector = EnhancedSourceSelector(
                     config=dem_sources,
@@ -328,7 +358,8 @@ async def lifespan(app: FastAPI):
                     google_api_key=google_api_key,
                     aws_credentials=aws_creds,
                     redis_manager=None,  # Will be created lazily
-                    enable_nz=getattr(settings, 'ENABLE_NZ_SOURCES', False)
+                    enable_nz=getattr(settings, 'ENABLE_NZ_SOURCES', False),
+                    campaign_selector=campaign_selector_singleton  # Performance Fix Phase 1.1
                 )
                 
                 # Trigger NZ index loading if enabled (now we have a running event loop)
@@ -351,22 +382,16 @@ async def lifespan(app: FastAPI):
             app.state.enhanced_selector = None
             logger.info("Unified mode: Skipping EnhancedSourceSelector initialization")
 
-        # Initialize service container with loaded data and provider
+        # Performance Fix Phase 1.1: Reuse existing service container and update with providers
         if settings.USE_UNIFIED_SPATIAL_INDEX:
-            # Unified provider mode
-            service_container = init_service_container(
-                settings, 
-                source_provider=None,  # No legacy provider
-                enhanced_selector=None,  # No enhanced selector
-                unified_provider=getattr(app.state, 'unified_provider', None)
-            )
+            # Unified provider mode - update container with unified provider
+            temp_service_container.unified_provider = getattr(app.state, 'unified_provider', None)
+            service_container = temp_service_container
         else:
-            # Legacy provider mode
-            service_container = init_service_container(
-                settings, 
-                source_provider=provider,
-                enhanced_selector=getattr(app.state, 'enhanced_selector', None)
-            )
+            # Legacy provider mode - update container with source provider and enhanced selector
+            temp_service_container.source_provider = provider
+            temp_service_container.enhanced_selector = getattr(app.state, 'enhanced_selector', None)
+            service_container = temp_service_container
         
         # Log startup completion with appropriate provider info
         if settings.USE_UNIFIED_SPATIAL_INDEX:
@@ -376,7 +401,8 @@ async def lifespan(app: FastAPI):
                     "event": "startup_complete",
                     "provider_type": "unified",
                     "unified_mode": True,
-                    "unified_index_path": settings.UNIFIED_INDEX_PATH
+                    "active_index_version": settings.ACTIVE_INDEX_VERSION,
+                    "active_index_path": settings.unified_index_path
                 }
             )
         else:
@@ -404,6 +430,10 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down DEM Elevation Service...", extra={"event": "shutdown_begin"})
     try:
+        # Shutdown Redis rate limiter
+        from .middleware.rate_limiter import shutdown_rate_limiter
+        await shutdown_rate_limiter()
+        
         # Clean up service container
         await close_service_container()
         
@@ -436,74 +466,7 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-@app.get("/debug/settings-info")
-async def debug_settings_info():
-    """Debug endpoint to check Settings instance state in production"""
-    import os
-    from .dependencies import get_service_container
-    
-    # Get multiple Settings instances
-    direct_settings = get_settings()
-    container_settings = get_service_container().settings
-    
-    return {
-        "direct_settings": {
-            "source_count": len(direct_settings.DEM_SOURCES),
-            "first_3_sources": list(direct_settings.DEM_SOURCES.keys())[:3],
-            "instance_id": id(direct_settings)
-        },
-        "container_settings": {
-            "source_count": len(container_settings.DEM_SOURCES), 
-            "first_3_sources": list(container_settings.DEM_SOURCES.keys())[:3],
-            "instance_id": id(container_settings)
-        },
-        "same_instance": direct_settings is container_settings,
-        "environment": {
-            "RAILWAY_ENVIRONMENT": os.environ.get("RAILWAY_ENVIRONMENT"),
-            "SPATIAL_INDEX_SOURCE": os.environ.get("SPATIAL_INDEX_SOURCE"),
-            "DEM_SOURCES_in_env": "DEM_SOURCES" in os.environ,
-            "USE_S3_SOURCES": os.environ.get("USE_S3_SOURCES"),
-            "USE_API_SOURCES": os.environ.get("USE_API_SOURCES")
-        }
-    }
 
-@app.get("/api/v1/debug/sqlite-settings")
-async def debug_sqlite_settings(request: Request):
-    """Debug endpoint to check SQLite boolean parsing issue
-    Secured with API key authentication via middleware"""
-    import os
-    
-    settings = get_settings()
-    
-    # Get raw environment values
-    env_raw = os.environ.get("USE_SQLITE_INDEX")
-    
-    return {
-        "sqlite_config": {
-            "USE_SQLITE_INDEX": {
-                "parsed_value": settings.USE_SQLITE_INDEX,
-                "parsed_type": type(settings.USE_SQLITE_INDEX).__name__,
-                "env_raw": env_raw,
-                "env_type": type(env_raw).__name__ if env_raw is not None else "None",
-                "truthy_test": env_raw.lower() in ('true', '1', 'yes', 'on') if env_raw else False
-            },
-            "SQLITE_INDEX_URL": settings.SQLITE_INDEX_URL,
-            "SQLITE_DB_HASH": settings.SQLITE_DB_HASH,
-            "SQLITE_DB_VERSION": settings.SQLITE_DB_VERSION if hasattr(settings, 'SQLITE_DB_VERSION') else None,
-            "SQLITE_DOWNLOAD_PATH": settings.SQLITE_DOWNLOAD_PATH
-        },
-        "app_environment": {
-            "APP_ENV": settings.APP_ENV,
-            "RAILWAY_ENVIRONMENT": os.environ.get("RAILWAY_ENVIRONMENT"),
-            "USE_S3_SOURCES": settings.USE_S3_SOURCES,
-            "USE_API_SOURCES": settings.USE_API_SOURCES
-        },
-        "diagnostic": {
-            "should_use_sqlite": env_raw and env_raw.lower() in ('true', '1', 'yes', 'on'),
-            "actual_using_sqlite": settings.USE_SQLITE_INDEX,
-            "mismatch": (env_raw and env_raw.lower() in ('true', '1', 'yes', 'on')) != settings.USE_SQLITE_INDEX
-        }
-    }
 
 # Add CORS middleware
 settings = get_settings()
@@ -666,196 +629,17 @@ async def root():
         ]
     }
 
-@app.get("/debug-sources", tags=["debug"])
-async def debug_sources():
-    """Debug endpoint to verify source count from ServiceContainer."""
-    try:
-        from .dependencies import get_service_container
-        from .config import get_settings
-        import time
-        
-        # Get sources from ServiceContainer (what the API uses)
-        container_settings = get_service_container().settings
-        container_sources = len(container_settings.DEM_SOURCES)
-        
-        # Get sources from fresh Settings instance (what startup uses)
-        fresh_settings = get_settings()
-        fresh_sources = len(fresh_settings.DEM_SOURCES)
-        
-        return {
-            "timestamp": time.time(),
-            "container_settings_id": id(container_settings),
-            "fresh_settings_id": id(fresh_settings),
-            "container_sources": container_sources,
-            "fresh_sources": fresh_sources,
-            "settings_match": id(container_settings) == id(fresh_settings),
-            "source_counts_match": container_sources == fresh_sources,
-            "first_few_container_sources": list(container_settings.DEM_SOURCES.keys())[:5],
-            "first_few_fresh_sources": list(fresh_settings.DEM_SOURCES.keys())[:5]
-        }
-    except Exception as e:
-        return {"error": str(e), "type": type(e).__name__}
-
-@app.get("/debug-elevation-service", tags=["debug"])
-async def debug_elevation_service():
-    """Debug the elevation service configuration."""
-    try:
-        from .dependencies import get_service_container
-        
-        container = get_service_container()
-        elevation_service = container.elevation_service
-        
-        # Check elevation service configuration
-        debug_info = {
-            "elevation_service_type": type(elevation_service).__name__,
-            "using_index_driven": getattr(elevation_service, 'using_index_driven_selector', False),
-            "using_enhanced": getattr(elevation_service, 'using_enhanced_selector', False),
-            "has_enhanced_selector": hasattr(elevation_service, '_enhanced_selector'),
-            "source_selector_type": type(elevation_service.source_selector).__name__ if hasattr(elevation_service, 'source_selector') else None,
-        }
-        
-        # Try to get elevation for Brisbane to see what happens
-        try:
-            result = await elevation_service.get_elevation(-27.4698, 153.0251)
-            debug_info["test_elevation_result"] = {
-                "elevation_m": result.elevation_m,
-                "dem_source_used": result.dem_source_used,
-                "message": result.message
-            }
-            debug_info["test_success"] = True
-        except Exception as e:
-            debug_info["test_error"] = str(e)
-            debug_info["test_error_type"] = type(e).__name__
-            debug_info["test_success"] = False
-        
-        return debug_info
-        
-    except Exception as e:
-        return {"error": str(e), "type": type(e).__name__}
-
-@app.get("/test-elevation", tags=["debug"])
-async def test_elevation_simple():
-    """Simple test elevation endpoint bypassing all models."""
-    try:
-        from .dependencies import get_service_container
-        from .models import PointResponse
-        
-        container = get_service_container()
-        service = container.dem_service
-        
-        # Test Brisbane coordinates directly
-        result = await service.elevation_service.get_elevation(-27.4698, 153.0251)
-        
-        # Test creating PointResponse like the endpoint does
-        try:
-            response = PointResponse(
-                latitude=-27.4698,
-                longitude=153.0251,
-                elevation_m=result.elevation_m,
-                dem_source_used=result.dem_source_used,
-                message=result.message
-            )
-            return {
-                "success": True,
-                "response_dict": response.dict(),
-                "raw_result": {
-                    "elevation_m": result.elevation_m,
-                    "dem_source_used": result.dem_source_used,
-                    "message": result.message
-                }
-            }
-        except Exception as model_error:
-            return {
-                "success": False,
-                "model_error": str(model_error),
-                "raw_result": {
-                    "elevation_m": result.elevation_m,
-                    "dem_source_used": result.dem_source_used,
-                    "message": result.message
-                }
-            }
-        
-    except Exception as e:
-        import traceback
-        return {
-            "error": str(e), 
-            "type": type(e).__name__,
-            "traceback": traceback.format_exc()
-        }
 
 @app.get("/api/v1/health", tags=["health"])
 async def health_check():
-    """Simple, robust health check endpoint for Railway deployment."""
-    try:
-        import time
-        
-        # Initialize start time if not set
-        if not hasattr(health_check, '_start_time'):
-            health_check._start_time = time.time()
-        
-        health_response = {
-            "status": "healthy",
-            "service": "DEM Backend API", 
-            "version": "v1.0.0",
-            "uptime_seconds": int(time.time() - health_check._start_time),
-            "last_check": f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}"
-        }
-        
-        # Try to get source information safely
-        try:
-            # Check provider type and get appropriate information
-            if hasattr(app.state, 'unified_provider') and app.state.unified_provider:
-                # Unified provider mode
-                health_response["provider_type"] = "unified"
-                health_response["unified_mode"] = True
-                
-                # Get unified provider health info
-                provider_health = await app.state.unified_provider.health_check()
-                health_response["provider_health"] = provider_health
-                
-                # Get coverage info for collection count
-                try:
-                    coverage_info = await app.state.unified_provider.coverage_info()
-                    health_response["collections_available"] = coverage_info.get("total_collections", 0)
-                except Exception:
-                    health_response["collections_available"] = "unknown"
-                
-            elif hasattr(app.state, 'source_provider') and app.state.source_provider:
-                # Legacy provider mode
-                health_response["provider_type"] = "legacy"
-                health_response["unified_mode"] = False
-                
-                dem_sources = app.state.source_provider.get_dem_sources()
-                health_response["sources_available"] = len(dem_sources) if dem_sources else 0
-                health_response["s3_indexes"] = {
-                    "status": "healthy",
-                    "bucket_accessible": True,
-                    "campaign_index_loaded": False,  # May be false with graceful degradation
-                    "cache_info": {"hits": 0, "misses": 0, "maxsize": 1, "currsize": 0}
-                }
-            else:
-                # No provider available - service starting
-                health_response["provider_type"] = "unknown"
-                health_response["unified_mode"] = False
-                health_response["sources_available"] = 0
-                health_response["status"] = "starting"
-        except Exception as e:
-            # Don't fail health check due to provider issues
-            health_response["provider_type"] = "error"
-            health_response["sources_available"] = 0
-            health_response["startup_note"] = "Providers still initializing"
-        
-        return health_response
-        
-    except Exception as e:
-        # Return a simple error response instead of raising exception
-        return {
-            "status": "error",
-            "service": "DEM Backend API",
-            "version": "v1.0.0", 
-            "error": str(e),
-            "last_check": f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}"
-        }
+    """Minimal health check endpoint - no sensitive information exposed."""
+    from datetime import datetime
+    
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "3.0"
+    }
 
 # Set start time for uptime calculation
 setattr(health_check, '_start_time', time.time())

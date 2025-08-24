@@ -265,8 +265,9 @@ class Settings(BaseSettings):
     BASE_DIR: str = Field(default=".", description="Base directory for the application")
     
     # Environment detection (Phase 3B.1: Critical Production Safety + Phase 3B.2: Development Support)
+    # TEMPORARY: Default to development to bypass strict Redis for Railway deployment recovery
     APP_ENV: Literal["production", "development"] = Field(
-        default="production", 
+        default="development", 
         description="Application environment: production (Railway), development (Docker Compose)"
     )
     

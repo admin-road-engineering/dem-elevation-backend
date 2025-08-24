@@ -222,7 +222,7 @@ logger = logging.getLogger(__name__)
 class EnhancedSourceSelector:
     """Enhanced source selector with S3 → GPXZ → Google fallback chain"""
     
-    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None, redis_manager: Optional[RedisStateManager] = None, enable_nz: bool = False):
+    def __init__(self, config: Dict, use_s3: bool = False, use_apis: bool = False, gpxz_config: Optional[GPXZConfig] = None, google_api_key: Optional[str] = None, aws_credentials: Optional[Dict] = None, redis_manager: Optional[RedisStateManager] = None, enable_nz: bool = False, campaign_selector: Optional['CampaignDatasetSelector'] = None):
         logger.info("=== EnhancedSourceSelector Initialization ===")
         logger.info(f"Parameters:")
         logger.info(f"  use_s3: {use_s3}")
@@ -263,8 +263,12 @@ class EnhancedSourceSelector:
         else:
             logger.info("NZ spatial index loading skipped (NZ sources disabled)")
         
-        # Phase 3 Selector with S3 index support
-        if use_s3:
+        # Phase 3 Selector with S3 index support (Performance Fix Phase 1.1: Use injected singleton)
+        if campaign_selector is not None:
+            # Use pre-initialized singleton from ServiceContainer
+            self.campaign_selector = campaign_selector
+            logger.info("Using injected CampaignDatasetSelector singleton (Performance Fix Phase 1.1)")
+        elif use_s3:
             import os
             use_s3_indexes = os.getenv("SPATIAL_INDEX_SOURCE", "local").lower() == "s3"
             logger.info(f"Initializing CampaignDatasetSelector with S3 indexes: {use_s3_indexes}")

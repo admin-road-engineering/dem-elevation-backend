@@ -5,9 +5,10 @@ Integrates with Supabase JWT from the main Road Engineering platform.
 import logging
 from typing import Optional, Dict, Any
 import jwt
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .config import get_settings
+from .security_logger import security_logger
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,22 @@ async def verify_token(
         logger.debug("Authentication disabled, allowing request")
         return None
     
-    # If no JWT secret is configured, log warning and allow request
-    if not auth_config.supabase_jwt_secret:
-        logger.warning("SUPABASE_JWT_SECRET not configured, authentication disabled")
+    # If authentication is required but JWT secret is missing, fail closed
+    if auth_config.require_auth and not auth_config.supabase_jwt_secret:
+        logger.critical("CRITICAL: Authentication required but SUPABASE_JWT_SECRET not configured")
+        security_logger.log_security_violation(
+            "auth_misconfiguration",
+            {"details": "Authentication required but JWT secret not configured"},
+            severity="critical"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Service misconfigured - authentication not properly set up"
+        )
+    
+    # If authentication is disabled and no JWT secret, allow request
+    if not auth_config.require_auth and not auth_config.supabase_jwt_secret:
+        logger.debug("Authentication disabled, no JWT secret required")
         return None
     
     # If no credentials provided
@@ -69,12 +83,20 @@ async def verify_token(
         
         user_id = payload.get("sub")
         if not user_id:
+            security_logger.log_auth_attempt(
+                success=False,
+                reason="Invalid token: missing user ID"
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token: missing user ID"
             )
         
         logger.debug(f"Successfully authenticated user: {user_id}")
+        security_logger.log_auth_attempt(
+            success=True,
+            user_id=user_id
+        )
         
         return {
             "user_id": user_id,
@@ -86,6 +108,10 @@ async def verify_token(
         }
         
     except jwt.ExpiredSignatureError:
+        security_logger.log_auth_attempt(
+            success=False,
+            reason="Token has expired"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
@@ -93,6 +119,10 @@ async def verify_token(
         )
     except jwt.InvalidTokenError as e:
         logger.warning(f"Invalid JWT token: {e}")
+        security_logger.log_auth_attempt(
+            success=False,
+            reason=f"Invalid JWT token: {str(e)}"
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",

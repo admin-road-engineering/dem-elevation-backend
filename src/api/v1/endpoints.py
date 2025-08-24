@@ -5,6 +5,8 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from typing import Dict, Any, List, Optional
 
+from ...middleware.rate_limiter import get_rate_limiter
+
 from ...config import Settings
 from ...dem_service import DEMService
 from ...dem_exceptions import DEMCoordinateError, DEMServiceError
@@ -54,28 +56,21 @@ async def get_elevation_simple(
     try:
         # Check for API fallback abuse (same logic as POST endpoint)
         if is_api_fallback_coordinate(lat, lon):
-            # Apply stricter rate limiting for expensive API coordinates
-            from slowapi.errors import RateLimitExceeded
-            import time
-            current_minute = int(time.time() // 60)
-            rate_key = f"api_fallback:{get_remote_address(request)}:{current_minute}"
-            
-            # Simple in-memory rate limiting for API coordinates (10/minute)
-            if not hasattr(get_elevation_simple, '_api_rate_cache'):
-                get_elevation_simple._api_rate_cache = {}
-            
-            current_count = get_elevation_simple._api_rate_cache.get(rate_key, 0)
-            if current_count >= 10:
-                logger.warning(f"API fallback rate limit exceeded for {get_remote_address(request)}")
-                raise HTTPException(
-                    status_code=429, 
-                    detail="Rate limit exceeded for non-Australian coordinates (10/minute). These coordinates require expensive API calls."
-                )
-            get_elevation_simple._api_rate_cache[rate_key] = current_count + 1
-            
-            # Clean old cache entries
-            get_elevation_simple._api_rate_cache = {k: v for k, v in get_elevation_simple._api_rate_cache.items() 
-                                                  if k.endswith(f":{current_minute}")}
+            # Apply stricter rate limiting for expensive API coordinates using Redis
+            rate_limiter = get_rate_limiter()
+            if rate_limiter:
+                client_ip = get_remote_address(request)
+                rate_key = f"api_fallback:{client_ip}"
+                
+                # Check rate limit: 10 requests per minute using Redis
+                if not await rate_limiter.check_rate_limit(rate_key, limit=10, window=60):
+                    logger.warning(f"API fallback rate limit exceeded for {client_ip}")
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Rate limit exceeded for non-Australian coordinates (10/minute). These coordinates require expensive API calls."
+                    )
+            else:
+                logger.warning("Rate limiting disabled - Redis rate limiter not available")
         
         # Use unified elevation service
         result = await service.elevation_service.get_elevation(lat, lon, source_id)
@@ -293,28 +288,21 @@ async def get_elevation_point(
     try:
         # Check for API fallback abuse (more restrictive rate limiting)
         if is_api_fallback_coordinate(point_request.latitude, point_request.longitude):
-            # Apply stricter rate limiting for expensive API coordinates
-            from slowapi.errors import RateLimitExceeded
-            import time
-            current_minute = int(time.time() // 60)
-            rate_key = f"api_fallback:{get_remote_address(request)}:{current_minute}"
-            
-            # Simple in-memory rate limiting for API coordinates (10/minute)
-            if not hasattr(get_elevation_point, '_api_rate_cache'):
-                get_elevation_point._api_rate_cache = {}
-            
-            current_count = get_elevation_point._api_rate_cache.get(rate_key, 0)
-            if current_count >= 10:
-                logger.warning(f"API fallback rate limit exceeded for {get_remote_address(request)}")
-                raise HTTPException(
-                    status_code=429, 
-                    detail="Rate limit exceeded for non-Australian coordinates (10/minute). These coordinates require expensive API calls."
-                )
-            get_elevation_point._api_rate_cache[rate_key] = current_count + 1
-            
-            # Clean old cache entries (keep only current minute)
-            get_elevation_point._api_rate_cache = {k: v for k, v in get_elevation_point._api_rate_cache.items() 
-                                                  if k.endswith(f":{current_minute}")}
+            # Apply stricter rate limiting for expensive API coordinates using Redis
+            rate_limiter = get_rate_limiter()
+            if rate_limiter:
+                client_ip = get_remote_address(request)
+                rate_key = f"api_fallback:{client_ip}"
+                
+                # Check rate limit: 10 requests per minute using Redis
+                if not await rate_limiter.check_rate_limit(rate_key, limit=10, window=60):
+                    logger.warning(f"API fallback rate limit exceeded for {client_ip}")
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Rate limit exceeded for non-Australian coordinates (10/minute). These coordinates require expensive API calls."
+                    )
+            else:
+                logger.warning("Rate limiting disabled - Redis rate limiter not available")
         
         # Use the same approach as the working test endpoint
         result = await service.elevation_service.get_elevation(
@@ -731,136 +719,6 @@ async def get_coverage_summary(
         logger.error(f"Error getting coverage summary: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting coverage summary: {str(e)}")
 
-@router.get("/internal-debug", summary="Debug service container state and settings objects")
-async def internal_debug(service: DEMService = Depends(get_dem_service)) -> Dict[str, Any]:
-    """Debug endpoint to diagnose service container state and settings object identity."""
-    try:
-        from ...dependencies import get_service_container
-        from ...config import get_settings
-        
-        # Get global instances for comparison
-        container = get_service_container()
-        global_settings = get_settings()
-        
-        debug_info = {
-            # Service State
-            "service_settings_source_count": len(service.settings.DEM_SOURCES),
-            "service_settings_object_id": id(service.settings),
-            "elevation_service_type": type(service.elevation_service).__name__,
-            "using_index_driven": getattr(service.elevation_service, 'using_index_driven_selector', False),
-            "source_selector_type": type(service.elevation_service.source_selector).__name__ if hasattr(service.elevation_service, 'source_selector') else 'None',
-            
-            # Global State for Comparison  
-            "global_settings_source_count": len(global_settings.DEM_SOURCES),
-            "global_settings_object_id": id(global_settings),
-            
-            # Container State for Comparison
-            "container_settings_object_id": id(container.settings),
-            "container_service_object_id": id(container.dem_service),
-            
-            # Additional diagnosis
-            "service_elevation_service_id": id(service.elevation_service),
-            "container_elevation_service_id": id(container.elevation_service),
-            "settings_objects_match": id(service.settings) == id(global_settings),
-            "services_match": id(service) == id(container.dem_service),
-            
-            # S3 Source Analysis
-            "s3_sources_in_service_settings": [k for k, v in service.settings.DEM_SOURCES.items() if v.get('source_type') == 's3'],
-            "s3_sources_in_global_settings": [k for k, v in global_settings.DEM_SOURCES.items() if v.get('source_type') == 's3'],
-        }
-        
-        return debug_info
-        
-    except Exception as e:
-        logger.error(f"Error in internal debug endpoint: {e}", exc_info=True)
-        return {"error": str(e), "error_type": type(e).__name__}
-
-@router.get("/debug/source-selection", summary="Debug source selection configuration")
-async def debug_source_selection(
-    lat: float = -27.4698,
-    lon: float = 153.0251,
-    service: DEMService = Depends(get_dem_service)
-) -> Dict[str, Any]:
-    """
-    Debug endpoint to show source selection configuration and process.
-    This helps diagnose why attempted_sources might be empty.
-    """
-    try:
-        logger.info(f"=== Debug Source Selection Endpoint Called ===")
-        logger.info(f"Testing coordinates: ({lat}, {lon})")
-        
-        debug_info = {
-            "request_coordinates": {"lat": lat, "lon": lon},
-            "timestamp": datetime.utcnow().isoformat(),
-            "service_info": {},
-            "source_selection_debug": {},
-            "elevation_attempt": {}
-        }
-        
-        # Get service information
-        if hasattr(service, 'elevation_service') and service.elevation_service:
-            elevation_service = service.elevation_service
-            debug_info["service_info"]["elevation_service_type"] = type(elevation_service).__name__
-            
-            # Check if it has an enhanced source selector
-            if hasattr(elevation_service, 'source_selector'):
-                selector = elevation_service.source_selector
-                debug_info["service_info"]["source_selector_type"] = type(selector).__name__
-                
-                # Debug source selector configuration
-                if hasattr(selector, 'config'):
-                    debug_info["source_selection_debug"]["configured_sources"] = list(selector.config.keys())
-                
-                if hasattr(selector, 'use_s3'):
-                    debug_info["source_selection_debug"]["use_s3"] = selector.use_s3
-                
-                if hasattr(selector, 'use_apis'):
-                    debug_info["source_selection_debug"]["use_apis"] = selector.use_apis
-                
-                if hasattr(selector, 'campaign_selector'):
-                    debug_info["source_selection_debug"]["campaign_selector_available"] = selector.campaign_selector is not None
-                
-                if hasattr(selector, 'gpxz_client'):
-                    debug_info["source_selection_debug"]["gpxz_client_available"] = selector.gpxz_client is not None
-                
-                if hasattr(selector, 'google_client'):
-                    debug_info["source_selection_debug"]["google_client_available"] = selector.google_client is not None
-                
-                # Check circuit breakers
-                if hasattr(selector, 'circuit_breakers'):
-                    cb_status = {}
-                    for name, cb in selector.circuit_breakers.items():
-                        cb_status[name] = {
-                            "available": cb.is_available(),
-                            "failures": cb.failure_count,
-                            "threshold": cb.failure_threshold
-                        }
-                    debug_info["source_selection_debug"]["circuit_breakers"] = cb_status
-        
-        # Try to get elevation and capture the process
-        try:
-            logger.info("Attempting elevation query for debugging...")
-            elevation, dem_source_used, message = await service.get_elevation_unified(lat, lon)
-            
-            debug_info["elevation_attempt"] = {
-                "elevation_m": elevation,
-                "dem_source_used": dem_source_used,
-                "message": message,
-                "success": elevation is not None
-            }
-            
-        except Exception as e:
-            debug_info["elevation_attempt"] = {
-                "error": str(e),
-                "error_type": type(e).__name__,
-                "success": False
-            }
-        
-        return debug_info
-        
-    except Exception as e:
-        logger.error(f"Error in debug endpoint: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Debug endpoint error: {str(e)}")
 
 # =============================================================================
 # NEW STANDARDIZED API ENDPOINTS
