@@ -632,15 +632,32 @@ async def root():
 
 @app.get("/api/v1/health", tags=["health"])
 async def health_check():
-    """Minimal health check endpoint - no sensitive information exposed."""
+    """Health check endpoint with Railway deployment debugging."""
     from datetime import datetime
+    import os
     
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "3.1",
-        "deployment_fixed": "2025-08-24T14:35:00Z"
-    }
+    try:
+        # Basic health check that should always work
+        response = {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "3.1",
+            "deployment_fixed": "2025-08-24T14:37:00Z",
+            "environment": {
+                "app_env": os.getenv("APP_ENV", "development"),
+                "port": os.getenv("PORT", "8001"),
+                "python_path": os.getenv("PYTHONPATH", "not_set")
+            }
+        }
+        return response
+    except Exception as e:
+        # Fallback health check - should never fail
+        return {
+            "status": "error_in_health_check",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "3.1"
+        }
 
 # Set start time for uptime calculation
 setattr(health_check, '_start_time', time.time())
