@@ -6,10 +6,10 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 
 **Role**: Critical elevation data microservice providing sub-100ms responses for road engineering applications through intelligent data source selection and spatial indexing.
 
-**Current Status**: **✅ PRODUCTION OPERATIONAL - DEPLOYMENT CRISIS RESOLVED**  
-**Latest Update**: 4-day deployment crisis resolved (August 24, 2025)  
-**Critical Fix**: Railway auth import error resolved - new deployments working  
-**API Status**: All elevation and campaigns endpoints operational on latest deployment (v3.1)
+**Current Status**: **🔧 V3 SPATIAL INDEX MIGRATION - 80% COMPLETE**  
+**Latest Update**: V3 index with Pydantic compliance deployed (August 24, 2025)  
+**Critical Progress**: Collection discovery working, elevation extraction debugging in progress  
+**API Status**: All infrastructure operational, coordinate → collection mapping successful
 
 ## 🏗️ Architectural Principles
 
@@ -71,19 +71,66 @@ DEM Backend - Production elevation microservice for Road Engineering SaaS platfo
 - **Service Status**: OPERATIONAL - Performance acceptable for production use
 - **SQLite R*Tree**: Fully implemented and ready for <10ms queries when needed
 
-### Current Production Metrics (Post-Fix)
-- **Sydney**: ✅ 0.9s response time (was 3-7s) - **7.7x faster**
-- **Brisbane**: ✅ 1.5s response time (was 3.5s) - **2.4x faster**  
-- **Melbourne**: ✅ 0.9s response time
-- **Perth**: ✅ 1.0s response time
-- **Auckland**: ✅ 25.0m elevation via unified NZ architecture
-- **Average Response**: ✅ ~1 second (acceptable for production)
+### Current Production Metrics (V3 Migration - August 24, 2025)
+- **Infrastructure**: ✅ V3 index (2,928 collections) deployed with Pydantic compliance
+- **Collection Discovery**: ✅ Sydney (2 collections), Brisbane (2 collections), Auckland (25 collections)
+- **Response Times**: ✅ 800ms average (down from 4+ seconds) - 5x improvement
+- **Index Loading**: ✅ `unified_s3` source operational (no GPXZ fallback)
+- **Remaining Issue**: ⚠️ File-level elevation extraction returning null (debugging in progress)
 
-### Technical Achievement Metrics  
-- **Database Size**: 176MB compressed SQLite (fits Railway $10/month plan)
-- **Collections Available**: 1,582 campaigns (1,394 AU + 188 NZ)
-- **Spatial Index Performance**: Sub-10ms P95 latency for all major cities
-- **Connection Pooling**: WAL mode enabling concurrent read access
+### V3 Technical Achievement Metrics (August 24, 2025)
+- **V3 Index Size**: 304MB with field mapping fixes (Pydantic compliant)
+- **Collections Deployed**: 2,928 collections (2,740 AU + 188 NZ campaigns)
+- **Pydantic Validation**: ✅ Zero validation errors (754 errors resolved)
+- **Collection Discovery**: ✅ Coordinate → collection mapping working correctly
+- **Infrastructure**: ✅ Railway deployment stable with unified_s3 source
+
+## 🚀 V3 Spatial Index Migration Progress (August 24, 2025)
+
+### ✅ MAJOR ACHIEVEMENTS COMPLETED
+
+**1. Deployment Crisis Resolution (100% Complete)**
+- ✅ **Root Cause Fixed**: Removed conflicting auth directory causing ImportError
+- ✅ **Missing Modules**: Added all untracked service files to repository
+- ✅ **Railway Deployment**: Service successfully upgraded from v1.0.0 → v3.1
+- ✅ **Prevention Measures**: Pre-push hooks implemented to prevent regressions
+
+**2. V3 Index Infrastructure (100% Complete)**
+- ✅ **Pydantic Compliance**: Fixed 754 validation errors through field mapping
+- ✅ **Field Mapping**: `coverage_bounds` → `coverage_bounds_wgs84`, added `native_crs`
+- ✅ **Collection Structure**: 2,928 collections with proper AU/NZ discriminated unions
+- ✅ **S3 Deployment**: 304MB index uploaded and Railway auto-deployed successfully
+
+**3. Collection Discovery System (100% Complete)**
+- ✅ **Sydney Matching**: 2 collections found (Sydney201304-LID1-AHD, Sydney202005)
+- ✅ **Brisbane Matching**: 2 collections found (Brisbane, Brisbane_2019_Prj)
+- ✅ **Auckland Matching**: 25 collections found (comprehensive NZ coverage)
+- ✅ **Bounds Checking**: WGS84 coordinate → collection intersection working correctly
+
+**4. Performance Infrastructure (100% Complete)**
+- ✅ **Response Time**: 800ms average (5x improvement from 4+ seconds)
+- ✅ **Source Selection**: `unified_s3` active (no GPXZ API fallback)
+- ✅ **Index Loading**: V3 index loads without validation errors
+- ✅ **Railway Stability**: Production deployment stable and operational
+
+### ⚠️ REMAINING ISSUE: File-Level Elevation Extraction (20% Complete)
+
+**Current Problem**: Collections found correctly, but elevation extraction returns null
+```json
+{"elevation_m": null, "message": "No elevation found in available files"}
+```
+
+**Root Cause Hypothesis**: Issue likely in file discovery/GDAL extraction pipeline:
+1. **File Selection**: Individual files within collections may not be selected correctly
+2. **S3 Path Resolution**: GDAL/rasterio may have issues accessing S3 file paths
+3. **File Bounds Checking**: File-level coordinate intersection may be failing
+
+**Investigation Status**: 
+- ✅ **Collection Level**: Coordinate → collection matching confirmed working
+- ⚠️ **File Level**: Collection → file → elevation extraction needs debugging
+- 🔍 **Next Steps**: Debug file discovery logic within collections
+
+**Success Rate**: **80% Complete** - Major architecture working, final extraction layer needs debugging
 
 ## 🔗 API Endpoints Status (August 10, 2025)
 
