@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import asyncio
 from datetime import datetime
 
-from ..models.unified_spatial_models import UnifiedSpatialIndex, DataCollection, FileEntry
+from ..models.unified_wgs84_models import UnifiedWGS84SpatialIndex, UnifiedDataCollection, FileEntry
 from ..handlers import CollectionHandlerRegistry
 from ..s3_client_factory import S3ClientFactory
 from .base_source import BaseDataSource, ElevationResult
@@ -46,7 +46,7 @@ class UnifiedS3Source(BaseDataSource):
         self.s3_client_factory = s3_client_factory
         
         # Core components
-        self.unified_index: Optional[UnifiedSpatialIndex] = None
+        self.unified_index: Optional[UnifiedWGS84SpatialIndex] = None
         self.handler_registry = CollectionHandlerRegistry(crs_service)
         
         # AWS Sessions (singleton pattern per Gemini recommendation)
@@ -358,7 +358,7 @@ class UnifiedS3Source(BaseDataSource):
                 index_data = await loop.run_in_executor(None, _sync_s3_load)
                 
                 # Parse with Pydantic
-                self.unified_index = UnifiedSpatialIndex(**index_data)
+                self.unified_index = UnifiedWGS84SpatialIndex(**index_data)
                 
                 collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
                 logger.critical(f"✅ DIRECT S3 LOAD SUCCESS: {collections_count} collections")
@@ -386,7 +386,7 @@ class UnifiedS3Source(BaseDataSource):
                 index_data = json.loads(content_bytes.decode('utf-8'))
                 
                 # Parse with Pydantic
-                self.unified_index = UnifiedSpatialIndex(**index_data)
+                self.unified_index = UnifiedWGS84SpatialIndex(**index_data)
                 
                 collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
                 logger.info(f"✅ Loaded unified index from S3: {collections_count} collections")
@@ -418,7 +418,7 @@ class UnifiedS3Source(BaseDataSource):
             with open(index_file, 'r') as f:
                 index_data = json.load(f)
             
-            self.unified_index = UnifiedSpatialIndex(**index_data)
+            self.unified_index = UnifiedWGS84SpatialIndex(**index_data)
             
             collections_count = len(self.unified_index.data_collections) if self.unified_index.data_collections else 0
             logger.info(f"✅ Loaded unified index from filesystem: {collections_count} collections")
