@@ -327,8 +327,12 @@ async def lifespan(app: FastAPI):
             dem_sources = {}  # Unified provider doesn't use dem_sources dict
             logger.info("Unified provider initialization completed")
         
-        # Performance Fix Phase 1.1: Initialize ServiceContainer early to create singletons
-        temp_service_container = init_service_container(settings)
+        # Create CampaignDatasetSelector independently for later use
+        from pathlib import Path
+        from .campaign_dataset_selector import CampaignDatasetSelector
+        config_dir = Path(__file__).parent.parent / "config"
+        campaign_selector_instance = CampaignDatasetSelector(config_dir)
+        logger.info("CampaignDatasetSelector created independently")
         
         # Pre-initialize EnhancedSourceSelector during startup (legacy mode only)
         if not settings.USE_UNIFIED_SPATIAL_INDEX:
@@ -346,8 +350,8 @@ async def lifespan(app: FastAPI):
                     "region": settings.AWS_DEFAULT_REGION
                 } if settings.AWS_ACCESS_KEY_ID else None
                 
-                # Performance Fix Phase 1.1: Pass CampaignDatasetSelector singleton to prevent re-initialization
-                campaign_selector_singleton = temp_service_container.campaign_selector
+                # Performance Fix Phase 1.1: Use independently created CampaignDatasetSelector
+                campaign_selector_singleton = campaign_selector_instance
                 
                 # Create and fully initialize EnhancedSourceSelector here (with event loop available)
                 enhanced_selector = EnhancedSourceSelector(
@@ -382,16 +386,23 @@ async def lifespan(app: FastAPI):
             app.state.enhanced_selector = None
             logger.info("Unified mode: Skipping EnhancedSourceSelector initialization")
 
-        # Performance Fix Phase 1.1: Reuse existing service container and update with providers
+        # Create ServiceContainer with all dependencies ready (fix for unified provider integration)
         if settings.USE_UNIFIED_SPATIAL_INDEX:
-            # Unified provider mode - update container with unified provider
-            temp_service_container.unified_provider = getattr(app.state, 'unified_provider', None)
-            service_container = temp_service_container
+            # Unified provider mode - create container with unified provider
+            unified_provider = getattr(app.state, 'unified_provider', None)
+            service_container = init_service_container(
+                settings,
+                unified_provider=unified_provider
+            )
+            logger.info(f"✅ ServiceContainer created with UnifiedProvider: {service_container.unified_provider is not None}")
         else:
-            # Legacy provider mode - update container with source provider and enhanced selector
-            temp_service_container.source_provider = provider
-            temp_service_container.enhanced_selector = getattr(app.state, 'enhanced_selector', None)
-            service_container = temp_service_container
+            # Legacy provider mode - create container with legacy providers
+            service_container = init_service_container(
+                settings,
+                source_provider=provider,
+                enhanced_selector=getattr(app.state, 'enhanced_selector', None)
+            )
+            logger.info("ServiceContainer created with Legacy providers")
         
         # Log startup completion with appropriate provider info
         if settings.USE_UNIFIED_SPATIAL_INDEX:

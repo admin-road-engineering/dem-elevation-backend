@@ -107,6 +107,9 @@ class ServiceContainer:
         Phase 3A-Fix: Injects SourceProvider if available.
         """
         if self._elevation_service is None:
+            # Log detailed provider state for debugging integration issue
+            logger.info(f"Creating UnifiedElevationService with providers - UnifiedProvider: {self.unified_provider is not None}, SourceProvider: {self.source_provider is not None}, EnhancedSelector: {self.enhanced_selector is not None}")
+            
             self._elevation_service = UnifiedElevationService(
                 self.settings, 
                 redis_manager=self.redis_manager,
@@ -117,7 +120,7 @@ class ServiceContainer:
             # Inject dataset manager if the service supports it
             if hasattr(self._elevation_service, 'set_dataset_manager'):
                 self._elevation_service.set_dataset_manager(self.dataset_manager)
-            logger.info(f"UnifiedElevationService created with Redis, SourceProvider: {self.source_provider is not None}, UnifiedProvider: {self.unified_provider is not None}")
+            logger.info(f"✅ UnifiedElevationService created successfully with UnifiedProvider: {self.unified_provider is not None}")
         return self._elevation_service
     
     @property
