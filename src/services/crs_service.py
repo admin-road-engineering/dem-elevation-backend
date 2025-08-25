@@ -28,7 +28,7 @@ class CRSTransformationService:
         """Get cached transformer for WGS84 → target CRS
         
         Args:
-            target_epsg: Target EPSG code (e.g., "28356")
+            target_epsg: Target EPSG code (e.g., "28356" or "EPSG:28356")
             
         Returns:
             Cached Transformer instance
@@ -36,16 +36,24 @@ class CRSTransformationService:
         Raises:
             CRSError: If EPSG code is invalid
         """
-        if target_epsg not in self._transformer_cache:
+        # Normalize EPSG code - handle both "28356" and "EPSG:28356" formats
+        if target_epsg.startswith("EPSG:"):
+            normalized_epsg = target_epsg  # Already has EPSG: prefix
+            cache_key = target_epsg
+        else:
+            normalized_epsg = f"EPSG:{target_epsg}"  # Add EPSG: prefix
+            cache_key = target_epsg
+            
+        if cache_key not in self._transformer_cache:
             try:
-                self._transformer_cache[target_epsg] = Transformer.from_crs(
-                    "EPSG:4326", f"EPSG:{target_epsg}", always_xy=True
+                self._transformer_cache[cache_key] = Transformer.from_crs(
+                    "EPSG:4326", normalized_epsg, always_xy=True
                 )
-                logger.debug(f"Created transformer for EPSG:{target_epsg}")
+                logger.debug(f"Created transformer for {normalized_epsg}")
             except CRSError as e:
-                logger.error(f"Failed to create transformer for EPSG:{target_epsg}: {e}")
+                logger.error(f"Failed to create transformer for {normalized_epsg}: {e}")
                 raise
-        return self._transformer_cache[target_epsg]
+        return self._transformer_cache[cache_key]
     
     def transform_to_crs(self, lat: float, lon: float, target_epsg: str) -> tuple[float, float]:
         """Transform WGS84 coordinates to target CRS (data-driven)
